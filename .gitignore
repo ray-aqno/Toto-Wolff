@@ -1,0 +1,8 @@
+# Local gstack session state and security reports — machine-specific, never commit
+.gstack/
+
+# Local Claude Code permission overrides — machine-specific, never commit
+.claude/settings.local.json
+
+# macOS
+.DS_Store

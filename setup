@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Toto Wolff setup — creates vault dirs and wires ~/.claude/CLAUDE.md symlink.
+# Exit codes: 2=missing prereq  3=vault error  4=symlink conflict/assertion failure  5=permission denied
+set -euo pipefail
+
+# Accept env var override for multi-developer installs; default is Rayyan's machine path
+VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_CLAUDE_MD="${REPO_DIR}/CLAUDE.md"
+GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
+BACKUP="${HOME}/.claude/CLAUDE.md.bak-$(date +%Y%m%d-%H%M%S)"
+FORCE="${1:-}"
+
+if [ "${FORCE}" = "--help" ] || [ "${FORCE}" = "-h" ]; then
+  echo "Usage: ./setup [--force]"
+  echo ""
+  echo "Wires ~/.claude/CLAUDE.md -> this repo's CLAUDE.md and creates vault dirs."
+  echo ""
+  echo "Options:"
+  echo "  --force   Override an existing ~/.claude/CLAUDE.md symlink pointing elsewhere"
+  echo ""
+  echo "Prerequisites: bash >= 3.2, git, gstack (run /gstack-upgrade in Claude Code)"
+  echo "Docs: runbook.md"
+  exit 0
+fi
+
+trap '[ $? -ne 0 ] && echo "setup failed at line $LINENO with code $?"' EXIT
+
+# ── 1. check_prereqs ──────────────────────────────────────── ≤20 lines ──────
+check_prereqs() {
+  local bash_major
+  bash_major="${BASH_VERSINFO[0]}"
+  [ "${bash_major}" -ge 3 ] || { echo "ERROR: bash >= 3.2 required (got ${BASH_VERSION})"; exit 2; }
+  command -v git >/dev/null 2>&1 || { echo "ERROR: git not found on PATH"; exit 2; }
+  if ! command -v gstack >/dev/null 2>&1; then
+    echo "WARNING: gstack not found on PATH — vault wiring will complete, but /council and /p10 require it"
+    echo "  Install: open Claude Code and run /gstack-upgrade, or see https://garryslist.org"
+  fi
+}
+
+# ── 2. create_vault_dirs ──────────────────────────────────── ≤15 lines ──────
+create_vault_dirs() {
+  # LOOP BOUND: max 4 iterations, array is static
+  local -a REQUIRED_DIRS=(
+    "${VAULT_PATH}/P10-Plans"
+    "${VAULT_PATH}/Council/Congressional-Records"
+    "${VAULT_PATH}/wiki"
+    "${VAULT_PATH}/wiki/1-projects"
+  )
+  for dir in "${REQUIRED_DIRS[@]}"; do
+    mkdir -p "${dir}"
+  done
+}
+
+# ── 3. check_vault ────────────────────────────────────────── ≤15 lines ──────
+check_vault() {
+  [ -d "${VAULT_PATH}" ] || { echo "ERROR: vault not found at ${VAULT_PATH}"; exit 3; }
+  [ -w "${VAULT_PATH}" ] || { echo "ERROR: vault not writable at ${VAULT_PATH}"; exit 5; }
+}
+
+# ── 4. symlink_claude_md ──────────────────────────────────── ≤25 lines ──────
+symlink_claude_md() {
+  local force="${1:-}"
+
+  # Assertion A: source exists and is non-empty
+  [ -s "${REPO_CLAUDE_MD}" ] || { echo "ERROR: source CLAUDE.md missing or empty at ${REPO_CLAUDE_MD}"; exit 4; }
+
+  # Assertion B: idempotency — already correct symlink, no-op
+  if [ -L "${GLOBAL_CLAUDE_MD}" ]; then
+    local current_target
+    current_target="$(readlink "${GLOBAL_CLAUDE_MD}")"
+    if [ "${current_target}" = "${REPO_CLAUDE_MD}" ]; then
+      echo "already correct symlink — no-op"
+      return 0
+    fi
+    [ "${force}" = "--force" ] || { echo "ERROR: ${GLOBAL_CLAUDE_MD} already symlinks elsewhere — rerun with --force to override"; exit 4; }
+    rm "${GLOBAL_CLAUDE_MD}"
+  fi
+
+  # Assertion C: backup integrity before any mutation of regular file
+  if [ -e "${GLOBAL_CLAUDE_MD}" ]; then
+    cp "${GLOBAL_CLAUDE_MD}" "${BACKUP}"
+    [ -s "${BACKUP}" ] || { echo "ERROR: backup failed or is empty at ${BACKUP}"; exit 4; }
+    rm "${GLOBAL_CLAUDE_MD}"
+  fi
+
+  mkdir -p "${HOME}/.claude"
+  ln -s "${REPO_CLAUDE_MD}" "${GLOBAL_CLAUDE_MD}"
+}
+
+# ── 5. print_summary ──────────────────────────────────────── ≤10 lines ──────
+print_summary() {
+  echo ""
+  echo "Toto ready."
+  echo "  vault:        ${VAULT_PATH}"
+  echo "  council logs: ${VAULT_PATH}/Council/Congressional-Records"
+  echo "  p10 plans:    ${VAULT_PATH}/P10-Plans"
+  echo "  CLAUDE.md:    ${GLOBAL_CLAUDE_MD} -> ${REPO_CLAUDE_MD}"
+  echo ""
+  echo "Run /council to test."
+}
+
+# ── main ──────────────────────────────────────────────────────────────────────
+check_prereqs
+check_vault
+create_vault_dirs
+symlink_claude_md "${FORCE}"
+print_summary

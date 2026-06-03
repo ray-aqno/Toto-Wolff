@@ -1,5 +1,7 @@
 # Toto Wolff
 
+<img width="1200" height="800" alt="image" src="https://github.com/user-attachments/assets/b5172e7d-86f6-4fd7-8d91-36f8cebf413b" />
+
 A Claude Code persona stack for Navistone engineers. Installs the council + p10 + Karpathy engineering cycle globally on your machine.
 
 ```bash

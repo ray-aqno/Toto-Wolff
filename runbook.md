@@ -111,7 +111,7 @@ Vault writes succeed even when Obsidian is closed — they write directly to the
 
 ## Bus-Factor Test
 
-A new team member can run this checklist solo without Rayyan present:
+A new team member can run this checklist solo:
 
 - [ ] Read this runbook top to bottom
 - [ ] Run `./setup` and see "Toto ready." output
@@ -121,8 +121,6 @@ A new team member can run this checklist solo without Rayyan present:
 - [ ] Review `docs/linear-setup.md` and confirm Linear permissions status
 - [ ] Estimated time: 30 minutes
 - [ ] Record Loom walkthrough and paste link at top of this file
-
-This checklist must pass before the greenlight meeting.
 
 ---
 

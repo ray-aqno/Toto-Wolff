@@ -1,0 +1,11 @@
+# Toto Wolff team config — copy to .toto/config.yml and fill in your values.
+# .toto/config.yml is gitignored (never commit it; it contains local paths).
+
+# Required: path to your local Obsidian vault
+vault_path: /Users/you/Documents/Obsidian Vault
+
+# Optional: git remote URL for shared vault sync (E1 — vault sharing)
+# vault_remote: https://github.com/yourorg/toto-vault.git
+
+# Optional: Linear workspace ID for Linear plugin integration
+# linear_workspace: your-workspace-id

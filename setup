@@ -3,28 +3,48 @@
 # Exit codes: 2=missing prereq  3=vault error  4=symlink conflict/assertion failure  5=permission denied
 set -euo pipefail
 
-# Accept env var override for multi-developer installs; default is Rayyan's machine path
-VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_CLAUDE_MD="${REPO_DIR}/CLAUDE.md"
 GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
-BACKUP="${HOME}/.claude/CLAUDE.md.bak-$(date +%Y%m%d-%H%M%S)"
-FORCE="${1:-}"
 
-if [ "${FORCE}" = "--help" ] || [ "${FORCE}" = "-h" ]; then
-  echo "Usage: ./setup [--force]"
-  echo ""
-  echo "Wires ~/.claude/CLAUDE.md -> this repo's CLAUDE.md and creates vault dirs."
-  echo ""
-  echo "Options:"
-  echo "  --force   Override an existing ~/.claude/CLAUDE.md symlink pointing elsewhere"
-  echo ""
-  echo "Prerequisites: bash >= 3.2, git, gstack (run /gstack-upgrade in Claude Code)"
-  echo "Docs: runbook.md"
-  exit 0
-fi
+# ── arg parsing (D4: while/shift, any flag order) ─────────────────────────────
+FORCE=""
+ROLE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force)    FORCE="--force"; shift ;;
+    --role)     ROLE="${2:-}"; [ -n "$ROLE" ] || { echo "ERROR: --role requires a name"; exit 2; }; shift 2 ;;
+    --help|-h)
+      echo "Usage: ./setup [--force] [--role <name>]"
+      echo ""
+      echo "Without flags: wires ~/.claude/CLAUDE.md -> this repo's CLAUDE.md and creates vault dirs."
+      echo ""
+      echo "Options:"
+      echo "  --force         Override an existing ~/.claude/CLAUDE.md symlink pointing elsewhere"
+      echo "  --role <name>   Swap the # ROLE section to a named persona (requires .toto/config.yml)"
+      echo ""
+      echo "Available personas: engineering, devops, r-and-d, data"
+      echo ""
+      echo "Prerequisites: bash >= 3.2, git, python3, gstack (run /gstack-upgrade in Claude Code)"
+      echo "Docs: runbook.md"
+      exit 0
+      ;;
+    *) echo "ERROR: unknown argument: $1"; exit 2 ;;
+  esac
+done
 
 trap '[ $? -ne 0 ] && echo "setup failed at line $LINENO with code $?"' EXIT
+
+# ── 0. read_config ────────────────────────────────────────── ≤20 lines ──────
+# Sets VAULT_PATH from .toto/config.yml if present; falls back to default.
+VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
+read_config() {
+  local config_file="${REPO_DIR}/.toto/config.yml"
+  [ -f "$config_file" ] || return 0
+  local val
+  val=$(grep '^vault_path:' "$config_file" 2>/dev/null | sed 's/^vault_path: *//' | sed 's/ *#.*//' | tr -d '"' | tr -d "'" | xargs)
+  [ -n "$val" ] && VAULT_PATH="$val"
+}
 
 # ── 1. check_prereqs ──────────────────────────────────────── ≤20 lines ──────
 check_prereqs() {
@@ -32,6 +52,7 @@ check_prereqs() {
   bash_major="${BASH_VERSINFO[0]}"
   [ "${bash_major}" -ge 3 ] || { echo "ERROR: bash >= 3.2 required (got ${BASH_VERSION})"; exit 2; }
   command -v git >/dev/null 2>&1 || { echo "ERROR: git not found on PATH"; exit 2; }
+  command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not found on PATH — required for --role"; exit 2; }
   if ! command -v gstack >/dev/null 2>&1; then
     echo "WARNING: gstack not found on PATH — vault wiring will complete, but /council and /p10 require it"
     echo "  Install: open Claude Code and run /gstack-upgrade, or see https://garryslist.org"
@@ -79,8 +100,9 @@ symlink_claude_md() {
 
   # Assertion C: backup integrity before any mutation of regular file
   if [ -e "${GLOBAL_CLAUDE_MD}" ]; then
-    cp "${GLOBAL_CLAUDE_MD}" "${BACKUP}"
-    [ -s "${BACKUP}" ] || { echo "ERROR: backup failed or is empty at ${BACKUP}"; exit 4; }
+    local backup="${HOME}/.claude/CLAUDE.md.bak-$(date +%Y%m%d-%H%M%S)"
+    cp "${GLOBAL_CLAUDE_MD}" "${backup}"
+    [ -s "${backup}" ] || { echo "ERROR: backup failed or is empty at ${backup}"; exit 4; }
     rm "${GLOBAL_CLAUDE_MD}"
   fi
 
@@ -88,7 +110,91 @@ symlink_claude_md() {
   ln -s "${REPO_CLAUDE_MD}" "${GLOBAL_CLAUDE_MD}"
 }
 
-# ── 5. print_summary ──────────────────────────────────────── ≤10 lines ──────
+# ── 5. swap_role ─────────────────────────────────────────── ≤60 lines ──────
+# Replaces the # ROLE section in CLAUDE.md with the named persona file.
+# Requires .toto/config.yml to exist. Aborts if CLAUDE.md has tracked changes.
+swap_role() {
+  local role_name="$1"
+  local config_file="${REPO_DIR}/.toto/config.yml"
+  local persona_file="${REPO_DIR}/personas/${role_name}.md"
+
+  # Config guard (RC2)
+  [ -f "$config_file" ] || { echo "ERROR: .toto/config.yml not found — run ./setup first to configure."; exit 4; }
+
+  # Persona file guard
+  if [ ! -f "$persona_file" ]; then
+    echo "ERROR: persona '${role_name}' not found in personas/. Available: engineering, devops, r-and-d, data."
+    exit 4
+  fi
+
+  # Dirty check: tracked changes to CLAUDE.md only
+  git -C "${REPO_DIR}" diff --quiet HEAD -- CLAUDE.md 2>/dev/null || {
+    echo "ERROR: CLAUDE.md has uncommitted changes — commit or stash before switching roles."
+    exit 4
+  }
+
+  # Backup with rotation (max 5)
+  local backup="${HOME}/.claude/CLAUDE.md.bak-$(date +%Y%m%d-%H%M%S)"
+  cp "${REPO_CLAUDE_MD}" "${backup}"
+  [ -s "${backup}" ] || { echo "ERROR: backup failed at ${backup}"; exit 4; }
+  rotate_backups
+
+  # Python3 bounded section replacement (D5)
+  local result
+  result=$(python3 - "${REPO_CLAUDE_MD}" "${persona_file}" <<'PYEOF'
+import sys
+
+target_path = sys.argv[1]
+persona_path = sys.argv[2]
+
+with open(target_path, 'r') as f:
+    lines = f.read().split('\n')
+
+with open(persona_path, 'r') as f:
+    new_body = f.read().strip()
+
+# Find "# ROLE" heading
+start_idx = None
+for i, line in enumerate(lines):
+    if line == '# ROLE':
+        start_idx = i
+        break
+
+if start_idx is None:
+    print("ERROR: # ROLE heading not found in target", file=sys.stderr)
+    sys.exit(1)
+
+# Find end boundary: <!-- INVARIANT, "---" alone, next "# " heading, or EOF
+end_idx = len(lines)
+for i in range(start_idx + 1, len(lines)):
+    s = lines[i].strip()
+    if s == '---' or s.startswith('# ') or s.startswith('<!-- INVARIANT'):
+        end_idx = i
+        break
+
+new_lines = lines[:start_idx + 1] + [''] + new_body.split('\n') + [''] + lines[end_idx:]
+with open(target_path, 'w') as f:
+    f.write('\n'.join(new_lines))
+
+print("OK")
+PYEOF
+)
+  [ "$result" = "OK" ] || { echo "ERROR: role replacement failed — ${result}"; exit 4; }
+  echo "Role switched to '${role_name}'. Backup at ${backup}."
+}
+
+# ── rotate_backups ────────────────────────────────────────── ≤15 lines ──────
+# Keeps at most 5 CLAUDE.md backups; deletes oldest beyond that.
+rotate_backups() {
+  local count=0
+  while IFS= read -r f; do
+    count=$((count + 1))
+    [ "$count" -gt 5 ] && rm -f "$f"
+  done < <(find "${HOME}/.claude" -maxdepth 1 -name 'CLAUDE.md.bak-*' -type f 2>/dev/null | sort -r)
+  return 0
+}
+
+# ── 6. print_summary ──────────────────────────────────────── ≤10 lines ──────
 print_summary() {
   echo ""
   echo "Toto ready."
@@ -101,7 +207,14 @@ print_summary() {
 }
 
 # ── main ──────────────────────────────────────────────────────────────────────
+read_config
 check_prereqs
+
+if [ -n "$ROLE" ]; then
+  swap_role "$ROLE"
+  exit 0
+fi
+
 check_vault
 create_vault_dirs
 symlink_claude_md "${FORCE}"

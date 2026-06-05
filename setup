@@ -122,6 +122,11 @@ symlink_claude_md() {
 # Requires .toto/config.yml to exist. Aborts if CLAUDE.md has tracked changes.
 swap_role() {
   local role_name="$1"
+  # Allowlist: prevent path traversal (e.g. --role '../CHANGELOG')
+  case "$role_name" in
+    engineering|devops|r-and-d|data) ;;
+    *) echo "ERROR: unknown role '${role_name}' — valid: engineering, devops, r-and-d, data"; exit 4 ;;
+  esac
   local config_file="${REPO_DIR}/.toto/config.yml"
   local persona_file="${REPO_DIR}/personas/${role_name}.md"
 

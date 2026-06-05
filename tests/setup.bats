@@ -86,59 +86,40 @@ EOF
 # ── check_prereqs ─────────────────────────────────────────────────────────────
 
 @test "check_prereqs: missing git exits 2" {
-  run env PATH="/usr/bin:/bin" bash -c "
-    PATH_WITHOUT_GIT=\$(echo \"\$PATH\" | tr ':' '\n' | grep -v '/usr/local/bin' | tr '\n' ':')
-    source ${SETUP} 2>/dev/null
-    PATH=\"\$PATH_WITHOUT_GIT\" check_prereqs
-  " 2>/dev/null || true
-  # Just verify the exit code from a fresh no-git environment
-  run bash -c "command() { return 1; }; export -f command; source ${SETUP} 2>/dev/null; check_prereqs" 2>&1
-  # This test validates the structure rather than the exact PATH manipulation
-  true
+  TMP_BIN=$(mktemp -d)
+  # No git stub — TMP_BIN is empty, /bin has no git on macOS
+  run env PATH="${TMP_BIN}:/bin" bash -c "
+    $(awk '/^check_prereqs\(\)/,/^\}$/{print}' "${SETUP}")
+    ROLE='' check_prereqs
+  " 2>&1
+  rm -rf "$TMP_BIN"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"git not found"* ]]
 }
 
 @test "check_prereqs: missing python3 with --role set exits 2" {
-  ROLE="engineering"
-  export ROLE
-  run bash -c "
-    ROLE=engineering
-    export ROLE
-    # Override command to fake python3 missing
-    command() {
-      if [ \"\$2\" = 'python3' ]; then return 1; fi
-      builtin command \"\$@\"
-    }
-    export -f command
-    source '${SETUP}' 2>/dev/null
-    check_prereqs
+  TMP_BIN=$(mktemp -d)
+  # git present (stub exits 0); python3 absent from TMP_BIN and /bin
+  printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/git" && chmod +x "${TMP_BIN}/git"
+  run env PATH="${TMP_BIN}:/bin" bash -c "
+    $(awk '/^check_prereqs\(\)/,/^\}$/{print}' "${SETUP}")
+    ROLE='engineering' check_prereqs
   " 2>&1
-  [[ "$status" -ne 0 ]] || [[ "$output" == *"python3"* ]]
+  rm -rf "$TMP_BIN"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"python3"* ]]
 }
 
 @test "check_prereqs: missing python3 without --role emits WARNING not exit" {
-  run bash -c "
-    ROLE=
-    PATH_ORIG=\$PATH
-    # Use a wrapper that shadows python3
-    TMP_BIN=\$(mktemp -d)
-    # python3 absent: don't create wrapper
-    export PATH=\"\$TMP_BIN:\$PATH_ORIG\"
-    source '${SETUP}' 2>/dev/null
-    ROLE= check_prereqs
+  TMP_BIN=$(mktemp -d)
+  # git present; python3 and gstack absent from TMP_BIN and /bin
+  printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/git" && chmod +x "${TMP_BIN}/git"
+  run env PATH="${TMP_BIN}:/bin" bash -c "
+    $(awk '/^check_prereqs\(\)/,/^\}$/{print}' "${SETUP}")
+    ROLE='' check_prereqs
   " 2>&1
-  # If python3 is genuinely present (as it is on this machine), test the logic path
-  # by sourcing and running the conditional directly
-  run bash -c "
-    ROLE=
-    # Simulate the python3-absent logic path directly
-    bash -c \"
-      if ! command -v python3_FAKE >/dev/null 2>&1; then
-        [ -n '' ] && { echo 'ERROR: python3 not found'; exit 2; }
-        echo 'WARNING: python3 not found'
-      fi
-    \"
-  "
-  [[ "$status" -eq 0 ]]
+  rm -rf "$TMP_BIN"
+  [ "$status" -eq 0 ]
   [[ "$output" == *"WARNING"* ]]
 }
 
@@ -460,13 +441,17 @@ PYEOF
 # ── check_prereqs: prereq guards ──────────────────────────────────────────────
 
 @test "check_prereqs: gstack missing emits WARNING (not exit)" {
-  # Run setup with a fake PATH that omits gstack; vault must exist for setup to proceed
-  run env TOTO_VAULT_PATH="${TEST_VAULT}" PATH="/usr/local/bin:/usr/bin:/bin" "${SETUP}" 2>&1
-  # May fail due to vault dirs or symlink, but must NOT fail with exit 2
-  [ "$status" -ne 2 ]
-  # gstack warning should appear (gstack is not in the stripped PATH above if installed via brew)
-  # This test is valid as long as gstack is not in /usr/bin or /usr/local/bin
-  true
+  TMP_BIN=$(mktemp -d)
+  # git and python3 present; gstack absent from TMP_BIN and /bin
+  printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/git" && chmod +x "${TMP_BIN}/git"
+  printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/python3" && chmod +x "${TMP_BIN}/python3"
+  run env PATH="${TMP_BIN}:/bin" bash -c "
+    $(awk '/^check_prereqs\(\)/,/^\}$/{print}' "${SETUP}")
+    ROLE='' check_prereqs
+  " 2>&1
+  rm -rf "$TMP_BIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"WARNING"* ]]
 }
 
 # ── symlink_claude_md ─────────────────────────────────────────────────────────

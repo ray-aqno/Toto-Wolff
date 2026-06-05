@@ -4,5 +4,8 @@
 # Local Claude Code permission overrides — machine-specific, never commit
 .claude/settings.local.json
 
+# Local team config — contains machine-specific paths, never commit
+.toto/config.yml
+
 # macOS
 .DS_Store

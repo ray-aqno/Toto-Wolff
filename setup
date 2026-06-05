@@ -7,13 +7,13 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_CLAUDE_MD="${REPO_DIR}/CLAUDE.md"
 GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
 
-# ── arg parsing (D4: while/shift, any flag order) ─────────────────────────────
+# ── arg parsing (while/shift loop, any flag order) ────────────────────────────
 FORCE=""
 ROLE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --force)    FORCE="--force"; shift ;;
-    --role)     ROLE="${2:-}"; [ -n "$ROLE" ] || { echo "ERROR: --role requires a name"; exit 2; }; shift 2 ;;
+    --role)     [[ "${2:-}" != --* ]] || { echo "ERROR: --role requires a name, not a flag"; exit 2; }; ROLE="${2:-}"; [ -n "$ROLE" ] || { echo "ERROR: --role requires a name"; exit 2; }; shift 2 ;;
     --help|-h)
       echo "Usage: ./setup [--force] [--role <name>]"
       echo ""
@@ -159,7 +159,7 @@ swap_role() {
 
   # Python3 bounded section replacement (D5)
   local result
-  result=$(python3 - "${REPO_CLAUDE_MD}" "${persona_file}" <<'PYEOF'
+  result=$(python3 - "${REPO_CLAUDE_MD}" "${persona_file}" <<'PYEOF' 2>&1
 import sys
 
 target_path = sys.argv[1]
@@ -197,7 +197,7 @@ with open(target_path, 'w') as f:
 print("OK")
 PYEOF
 )
-  [ "$result" = "OK" ] || { echo "ERROR: role replacement failed — ${result}"; exit 4; }
+  [[ "$result" == "OK" ]] || { echo "ERROR: role replacement failed — ${result}"; exit 4; }
   echo "Role switched to '${role_name}'. Backup at ${backup}."
 }
 

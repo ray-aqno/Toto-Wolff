@@ -4,19 +4,22 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
-## P1 — Blocks Ship
+## Completed (v0.0.2.0)
 
-### T1: bats test suite for `setup` + `toto-report` scripts
+- **T1: bats test suite for `setup`** — 42 tests, ~84% coverage. `tests/setup.bats` covers read_config, check_prereqs, check_vault, symlink_claude_md, swap_role, rotate_backups, create_vault_dirs, print_summary, main flow. Shipped 2026-06-05.
+- **CSO-2026-06-05-001: path traversal via `--role`** — allowlist guard added at `setup:126`. Blocks `--role '../FILENAME'` patterns. Shipped 2026-06-05.
 
-**What:** ~250 LOC bats test files. `tests/setup.bats`: happy path, all 4 exit codes, `--role` flag, `install_hook()` with jq, `replace_role()` python3 boundaries (--- stop, # heading stop, EOF stop), backup rotation (6th triggers delete), `--role` when config absent. `tests/toto-report.bats`: no analytics dir → graceful exit, malformed frontmatter → unknown fields, happy path output.
+---
 
-**Why:** v0.0.2.0 adds jq JSON manipulation, python3 multiline string replacement, and git operations to setup. These are not trivially testable by inspection. A regression in any of them corrupts CLAUDE.md or silently fails to install the vault sync hook. Zero tests is a ship blocker. Promoted from P2 by the engineering review (2026-06-04).
+## P2 — Next Sprint
 
-**Effort:** human ~2 days / CC ~1 hour
+### T7: bats test suite for `toto-report`
 
-**Where to start:** `tests/setup.bats`. Install bats via `brew install bats-core`. Run with `bats tests/`.
+**What:** `tests/toto-report.bats` — no analytics dir → graceful exit, malformed frontmatter → unknown fields, happy path output. Deferred from T1 (toto-report not yet implemented).
 
-**Depends on:** Build after E2 and E5 are implemented (tests verify the new flags).
+**Effort:** CC ~30 min once toto-report is built.
+
+**Depends on:** E4 (metrics dashboard, toto-report implementation).
 
 ---
 

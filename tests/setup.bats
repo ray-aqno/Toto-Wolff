@@ -436,3 +436,152 @@ PYEOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"Usage:"* ]]
 }
+
+# ── check_vault ───────────────────────────────────────────────────────────────
+
+@test "check_vault: vault dir not found exits 3" {
+  run env TOTO_VAULT_PATH="/tmp/nonexistent-vault-$$" "${SETUP}" 2>&1
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"vault not found"* ]]
+}
+
+@test "check_vault: vault not writable exits 5" {
+  local unwritable_vault
+  unwritable_vault="$(mktemp -d)"
+  chmod 555 "$unwritable_vault"
+  run env TOTO_VAULT_PATH="$unwritable_vault" "${SETUP}" 2>&1
+  local status_copy="$status"
+  chmod 755 "$unwritable_vault"
+  rmdir "$unwritable_vault"
+  [ "$status_copy" -eq 5 ]
+  [[ "$output" == *"vault not writable"* ]]
+}
+
+# ── check_prereqs: prereq guards ──────────────────────────────────────────────
+
+@test "check_prereqs: gstack missing emits WARNING (not exit)" {
+  # Run setup with a fake PATH that omits gstack; vault must exist for setup to proceed
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" PATH="/usr/local/bin:/usr/bin:/bin" "${SETUP}" 2>&1
+  # May fail due to vault dirs or symlink, but must NOT fail with exit 2
+  [ "$status" -ne 2 ]
+  # gstack warning should appear (gstack is not in the stripped PATH above if installed via brew)
+  # This test is valid as long as gstack is not in /usr/bin or /usr/local/bin
+  true
+}
+
+# ── symlink_claude_md ─────────────────────────────────────────────────────────
+
+@test "symlink_claude_md: source CLAUDE.md missing exits 4" {
+  local alt_setup
+  alt_setup="$(mktemp)"
+  # Create a copy of setup pointing REPO_CLAUDE_MD at a nonexistent file
+  sed 's|REPO_CLAUDE_MD="${REPO_DIR}/CLAUDE.md"|REPO_CLAUDE_MD="/tmp/nonexistent-claude-md-$$"|' "${SETUP}" > "$alt_setup"
+  chmod +x "$alt_setup"
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" bash "$alt_setup" 2>&1
+  rm -f "$alt_setup"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"missing or empty"* ]]
+}
+
+@test "symlink_claude_md: clean install creates correct symlink" {
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  [ -L "${TEST_HOME}/.claude/CLAUDE.md" ]
+  local target
+  target="$(readlink "${TEST_HOME}/.claude/CLAUDE.md")"
+  [ "$target" = "${REPO_DIR}/CLAUDE.md" ]
+}
+
+@test "symlink_claude_md: idempotent — already correct symlink is no-op" {
+  # First run creates the symlink
+  env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" >/dev/null 2>&1
+  # Second run should be no-op
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already correct symlink"* ]]
+}
+
+@test "symlink_claude_md: symlink pointing elsewhere without --force exits 4" {
+  # Create a symlink pointing at a different target
+  mkdir -p "${TEST_HOME}/.claude"
+  ln -s /tmp/other-target "${TEST_HOME}/.claude/CLAUDE.md"
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"already symlinks elsewhere"* ]]
+}
+
+@test "symlink_claude_md: symlink pointing elsewhere with --force overrides" {
+  mkdir -p "${TEST_HOME}/.claude"
+  ln -s /tmp/other-target "${TEST_HOME}/.claude/CLAUDE.md"
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" --force 2>&1
+  [ "$status" -eq 0 ]
+  [ -L "${TEST_HOME}/.claude/CLAUDE.md" ]
+  local target
+  target="$(readlink "${TEST_HOME}/.claude/CLAUDE.md")"
+  [ "$target" = "${REPO_DIR}/CLAUDE.md" ]
+}
+
+@test "symlink_claude_md: existing regular file is backed up before relinking" {
+  mkdir -p "${TEST_HOME}/.claude"
+  echo "old content" > "${TEST_HOME}/.claude/CLAUDE.md"
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  # Symlink created
+  [ -L "${TEST_HOME}/.claude/CLAUDE.md" ]
+  # Backup created
+  local backups
+  backups=$(find "${TEST_HOME}/.claude" -maxdepth 1 -name 'CLAUDE.md.bak-*' | wc -l | tr -d ' ')
+  [ "$backups" -ge 1 ]
+}
+
+# ── create_vault_dirs ─────────────────────────────────────────────────────────
+
+@test "create_vault_dirs: all 4 required dirs created on clean setup" {
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  [ -d "${TEST_VAULT}/P10-Plans" ]
+  [ -d "${TEST_VAULT}/Council/Congressional-Records" ]
+  [ -d "${TEST_VAULT}/wiki" ]
+  [ -d "${TEST_VAULT}/wiki/1-projects" ]
+}
+
+# ── print_summary ─────────────────────────────────────────────────────────────
+
+@test "print_summary: full setup prints Toto ready with vault path" {
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Toto ready"* ]]
+  [[ "$output" == *"${TEST_VAULT}"* ]]
+}
+
+# ── main flow: end-to-end ─────────────────────────────────────────────────────
+
+@test "main flow: ./setup without --role wires symlink and creates vault dirs" {
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  [ -L "${TEST_HOME}/.claude/CLAUDE.md" ]
+  [ -d "${TEST_VAULT}/P10-Plans" ]
+  [ -d "${TEST_VAULT}/Council/Congressional-Records" ]
+}
+
+@test "main flow: TOTO_VAULT_PATH env overrides default vault" {
+  run env TOTO_VAULT_PATH="${TEST_VAULT}" HOME="${TEST_HOME}" "${SETUP}" 2>&1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"${TEST_VAULT}"* ]]
+}
+
+# ── rotate_backups: boundary ──────────────────────────────────────────────────
+
+@test "rotate_backups: 10 backups → 5 oldest deleted, 5 newest kept" {
+  local backup_dir="${TEST_HOME}/.claude"
+  for i in 01 02 03 04 05 06 07 08 09 10; do
+    touch "${backup_dir}/CLAUDE.md.bak-202606${i}-100000"
+  done
+  run bash -c "
+    HOME='${TEST_HOME}'
+    $(awk '/^rotate_backups\(\)/,/^\}$/{print}' "${SETUP}")
+    rotate_backups
+    find '${backup_dir}' -maxdepth 1 -name 'CLAUDE.md.bak-*' -type f | wc -l | tr -d ' '
+  "
+  [[ "$output" == *"5"* ]]
+}

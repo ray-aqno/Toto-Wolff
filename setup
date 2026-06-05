@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-trap '[ $? -ne 0 ] && echo "setup failed at line $LINENO with code $?"' EXIT
+trap '_EXIT=$?; [ "$_EXIT" -ne 0 ] && echo "setup failed at line $LINENO with code $_EXIT"' EXIT
 
 # ── 0. read_config ────────────────────────────────────────── ≤20 lines ──────
 # Sets VAULT_PATH from .toto/config.yml if present; falls back to default.
@@ -43,7 +43,11 @@ read_config() {
   [ -f "$config_file" ] || return 0
   local val
   val=$(grep '^vault_path:' "$config_file" 2>/dev/null | sed 's/^vault_path: *//' | sed 's/ *#.*//' | tr -d '"' | tr -d "'" | xargs)
-  [ -n "$val" ] && VAULT_PATH="$val"
+  if [ -n "$val" ]; then
+    VAULT_PATH="$val"
+  else
+    echo "WARNING: .toto/config.yml found but vault_path not set — using default: ${VAULT_PATH}"
+  fi
 }
 
 # ── 1. check_prereqs ──────────────────────────────────────── ≤20 lines ──────
@@ -52,7 +56,10 @@ check_prereqs() {
   bash_major="${BASH_VERSINFO[0]}"
   [ "${bash_major}" -ge 3 ] || { echo "ERROR: bash >= 3.2 required (got ${BASH_VERSION})"; exit 2; }
   command -v git >/dev/null 2>&1 || { echo "ERROR: git not found on PATH"; exit 2; }
-  command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not found on PATH — required for --role"; exit 2; }
+  if ! command -v python3 >/dev/null 2>&1; then
+    [ -n "$ROLE" ] && { echo "ERROR: python3 not found on PATH — required for --role"; exit 2; }
+    echo "WARNING: python3 not found on PATH — ./setup --role will not work until installed"
+  fi
   if ! command -v gstack >/dev/null 2>&1; then
     echo "WARNING: gstack not found on PATH — vault wiring will complete, but /council and /p10 require it"
     echo "  Install: open Claude Code and run /gstack-upgrade, or see https://garryslist.org"
@@ -126,6 +133,12 @@ swap_role() {
     echo "ERROR: persona '${role_name}' not found in personas/. Available: engineering, devops, r-and-d, data."
     exit 4
   fi
+
+  # Stub guard — refuse to activate incomplete personas
+  grep -q '# STUB' "${persona_file}" 2>/dev/null && {
+    echo "ERROR: persona '${role_name}' is a stub — fill in personas/${role_name}.md before activating."
+    exit 4
+  }
 
   # Dirty check: tracked changes to CLAUDE.md only
   git -C "${REPO_DIR}" diff --quiet HEAD -- CLAUDE.md 2>/dev/null || {

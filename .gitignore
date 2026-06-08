@@ -7,5 +7,10 @@
 # Local team config — contains machine-specific paths, never commit
 .toto/config.yml
 
+# Node / TypeScript build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
+
 # macOS
 .DS_Store

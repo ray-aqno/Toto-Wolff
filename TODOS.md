@@ -39,11 +39,9 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
-### ~~T3: Toto CLI (`toto status` + `toto search`)~~ — SUPERSEDED
+### ~~T3: Toto CLI (`toto status` + `toto search`)~~ — CLOSED 2026-06-08
 
-**Status:** Superseded by `packages/cli` (Phase 2). `toto status`, `toto search`, `toto doctor` cover this scope and more. The shell script approach is no longer the implementation path.
-
-**Superseded by:** Phase 2 CLI — `toto status`, `toto search "<query>"`, `toto doctor`, `toto last`, `toto audit` in `packages/cli`.
+Superseded by `packages/cli` (Phase 2). Closed per full TODOS eval.
 
 ---
 
@@ -96,6 +94,34 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 **Action:** Answer this before the E5 p10 implementation session. Candidate answer: whichever role has the most acute pain with the current fragmented setup (per original design doc — the "highest-pain role" question was deferred from June 2).
 
 **Depends on:** Conversation with team leads before E5 p10 starts.
+
+---
+
+## P2 — Council-Ruled (added 2026-06-08, council session toto-wolff-upgrade-sequencing)
+
+### U1: agentalloy + TheForge symlink
+
+**What:** Run `scripts/install-symlink.sh /path/to/agentalloy` and `scripts/install-symlink.sh /path/to/TheForge` to wire toto-wolff governance into both repos. CLAUDE.md in each repo symlinks to `personas/engineering.md`. Commit the symlink in each target repo.
+
+**Why:** Demonstrates the strangler fig seam working across repos. The demo story: "toto-wolff governs any repo in 30 seconds."
+
+**Effort:** CC ~5 min. Requires local access to agentalloy + TheForge repos.
+
+**Gate:** Symlink only. MCP integration blocked until eval-gate fires.
+
+**Depends on:** `scripts/install-symlink.sh` (shipped 2026-06-08).
+
+---
+
+### U5: Serena in P10 scouting
+
+**What:** P10Service scout prompts updated (shipped 2026-06-08) to instruct structured code analysis. When running inside Claude Code, p10 skill scouts should prefer `mcp__serena__get_symbols_overview` and `mcp__serena__find_symbol` over grep for codebase analysis. Document this in `.claude/skills/p10/P10.md` (or the equivalent skill file).
+
+**Why:** AST-level scouting catches structural violations that grep misses. The P10 plan quality improves materially with symbol-aware analysis.
+
+**Effort:** CC ~10 min. Prompt/doc change only — no package changes.
+
+**Gate:** None. `.serena/project.yml` is already committed, MCP tools are live.
 
 ---
 

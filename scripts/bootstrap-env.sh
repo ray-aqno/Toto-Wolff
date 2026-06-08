@@ -11,8 +11,8 @@ command -v rg    >/dev/null 2>&1 || { echo "ERROR: ripgrep not found. Run: brew 
 command -v node  >/dev/null 2>&1 || { echo "ERROR: node not found. Run: brew install node"; exit 2; }
 command -v pnpm  >/dev/null 2>&1 || { echo "ERROR: pnpm not found. Run: npm install -g pnpm"; exit 2; }
 
-# Idempotency-guarded git init — VAULT_PATH quoted throughout (path contains space)
-if [ ! -d "${VAULT_PATH}/.git" ]; then
+# Idempotency-guarded git init — worktree-safe check (CSO: -d .git fails for worktrees)
+if ! git -C "${VAULT_PATH}" rev-parse --git-dir >/dev/null 2>&1; then
   git init "${VAULT_PATH}"
   echo "INFO: vault initialized as git repo at ${VAULT_PATH}"
 else

@@ -39,17 +39,11 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
-### T3: Toto CLI (`toto status` + `toto search`)
+### ~~T3: Toto CLI (`toto status` + `toto search`)~~ — SUPERSEDED
 
-**What:** ~100 LOC shell script. `toto status`: vault health check, symlink check, last council session timestamp, sync error log summary. `toto search "<query>"`: grep/ripgrep wrapper over the vault directory with formatted output.
+**Status:** Superseded by `packages/cli` (Phase 2). `toto status`, `toto search`, `toto doctor` cover this scope and more. The shell script approach is no longer the implementation path.
 
-**Why:** The vault is currently Claude Code-only. Engineers not in a Claude Code session can't query institutional memory. `toto search "authentication"` from the terminal turns the vault from write-only to discoverable.
-
-**Effort:** human ~2 days / CC ~15 min
-
-**Seam filter note:** Adds a second entry point alongside Claude Code. Revisit after shared vault is live and vault volume justifies a terminal interface.
-
-**Depends on:** E1 (shared vault) for team-level search to be meaningful.
+**Superseded by:** Phase 2 CLI — `toto status`, `toto search "<query>"`, `toto doctor`, `toto last`, `toto audit` in `packages/cli`.
 
 ---
 
@@ -79,6 +73,20 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+### T10: Fast-path for trivial council questions
+
+**What:** `council_run` option that skips the 6-call chain (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling) for simple vault lookups. Fast-path: `vault_search` + single Sonnet call for questions that are factual ("which pattern did we use for X?") rather than deliberative.
+
+**Why:** Full chain costs ~$0.10-0.30 per session. Quick vault queries don't warrant Opus-level deliberation. A fast-path reduces per-query cost to ~$0.01 and makes council more usable for routine lookups without cheapening deliberative sessions.
+
+**Trigger heuristic (proposed):** If `question` contains no tradeoff language and vault_search returns a direct match, skip to Sonnet summary. Otherwise full chain.
+
+**Effort:** human ~0.5 days / CC ~10 min
+
+**Depends on:** Phase 1 (`council_run` baseline) must ship first; fast-path is a post-baseline optimization.
+
+---
+
 ### T6: Resolve Q2 — first persona to ship with real content
 
 **What:** Decide which of the 4 roles (Engineering, R&D, DevOps, Data) gets the most authoring investment in the E5 persona library. The other 3 can ship as stubs initially.
@@ -88,3 +96,43 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 **Action:** Answer this before the E5 p10 implementation session. Candidate answer: whichever role has the most acute pain with the current fragmented setup (per original design doc — the "highest-pain role" question was deferred from June 2).
 
 **Depends on:** Conversation with team leads before E5 p10 starts.
+
+---
+
+## P1 — v2 Phase 1 Gates (added 2026-06-07, /plan-eng-review)
+
+### T11: CI/CD pipeline for TypeScript monorepo
+
+**What:** `.github/workflows/ci.yml` — install pnpm, run `tsc --noEmit` across all packages, run `vitest`. CI job must also `apt-get install ripgrep` (required for `vault_read` tests). Run on every PR and push to main.
+
+**Why:** Without CI, TypeScript compilation failures are only caught locally. The 2-week Phase 1 parallel run requires a reliable green/red gate. This is a Phase 1 blocker — no Phase 1 ship without it.
+
+**Effort:** human ~2h / CC ~5min
+
+**Depends on:** TypeScript monorepo scaffold (Phase 1 first commit).
+
+---
+
+## P2 — v2 Implementation (added 2026-06-05, /plan-ceo-review SCOPE EXPANSION)
+
+### T8: Linear integration spec (pre-Phase-3 gate)
+
+**What:** One-page spec for `packages/linear-sync` covering: auth model (keytar-stored API key, service account vs personal token), error handling for deleted Linear issues (log + skip, don't fail the council write), rate limit strategy (exponential backoff, max 3 retries), and API key rotation procedure.
+
+**Why:** Linear sync was accepted in the v2 CEO plan with no auth or error model specified. The spec doc prevents implementation drift and ensures Phase 3 starts with a verified design, not an open question.
+
+**Effort:** human ~2h / CC ~10min
+
+**Depends on:** Phase 2 (CLI + keytar) complete before Phase 3 starts.
+
+---
+
+### T9: Dashboard empty-state copy
+
+**What:** Write empty-state copy for all 4 dashboard views before Phase 4 ships: decision velocity ("No sessions yet — run /council to start"), reversal rate ("0 reversals recorded"), p10 compliance ("No p10 plans yet — run /p10 to start"), role adoption ("No personas active — run toto persona add").
+
+**Why:** For a new install, all 4 dashboard panels show blank charts. Without intentional copy, users think the dashboard is broken. Empty state is the most common state for the first 30 days of use.
+
+**Effort:** human ~30min / CC ~5min
+
+**Depends on:** Phase 4 (dashboard) design underway.

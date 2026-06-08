@@ -14,3 +14,6 @@ dist/
 
 # macOS
 .DS_Store
+
+# Local retro snapshots — machine-specific, never commit
+.context/

@@ -34,10 +34,14 @@ export class P10Service {
     while (ruling.status === 'revision-required' && revisionCount < MAX_REVISIONS) {
       revisionCount++;
       draft = await withLLMTimeout(
-        (opts) => this.callModel('claude-sonnet-4-6', `Revise per: ${ruling.requiredChanges ?? ''}\n\nDraft:\n${draft}`, opts),
+        (opts) => this.callModel('claude-sonnet-4-6', P10_REVISE(draft, ruling.requiredChanges ?? ''), opts),
         'draft-revision',
       );
       ruling = await this.runArbiter(draft);
+    }
+    // Revision cap reached without terminal status — treat as blocked (CSO: no silent AssertionError)
+    if (ruling.status === 'revision-required') {
+      ruling = { status: 'blocked', summary: 'Blocked: revision cap reached without arbiter approval.' };
     }
 
     const planPath = await this.commitPlan(ruling, draft);
@@ -169,6 +173,33 @@ status: [leave blank — arbiter sets this]
 [Any implementation approaches the analysis ruled out, and why.]
 
 Keep under 400 words. Be specific — name files, functions, types where known.`;
+
+const P10_REVISE = (draft: string, requiredChanges: string) => `\
+You are the P10 Draft Writer revising a plan after arbiter feedback.
+
+REQUIRED CHANGES:
+${requiredChanges}
+
+ORIGINAL DRAFT:
+${draft}
+
+Apply the required changes. Preserve the plan format exactly:
+---
+status: [leave blank — arbiter sets this]
+---
+
+# P10 Plan
+
+## Stages
+[Keep unchanged stages, revise only what the arbiter flagged]
+
+## Invariants
+[Update if needed]
+
+## Blocked Paths
+[Update if needed]
+
+Keep under 400 words.`;
 
 const P10_ARBITER = (draft: string) => `\
 You are the Arbiter for a P10 pre-execution plan. Your job: approve, request revision, or block.

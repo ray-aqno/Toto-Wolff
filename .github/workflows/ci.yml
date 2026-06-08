@@ -62,4 +62,6 @@ jobs:
         run: |
           mkdir -p "$TOTO_VAULT_PATH"
           git -C "$TOTO_VAULT_PATH" init
-          npx tsx --tsconfig scripts/tsconfig.json scripts/eval-gate.ts
+          git -C "$TOTO_VAULT_PATH" config user.email "ci@toto-wolff"
+          git -C "$TOTO_VAULT_PATH" config user.name "toto-wolff-ci"
+          pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/eval-gate.ts

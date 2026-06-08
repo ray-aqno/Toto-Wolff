@@ -49,21 +49,27 @@ export class P10Service {
 
   private async runScouts(task: string): Promise<string[]> {
     return Promise.all([
-      withLLMTimeout((opts) => this.callModel('claude-haiku-4-5-20251001', `P10 Scout 1: ${task}`, opts), 'p10-scout-1'),
-      withLLMTimeout((opts) => this.callModel('claude-haiku-4-5-20251001', `P10 Scout 2: ${task}`, opts), 'p10-scout-2'),
+      withLLMTimeout(
+        (opts) => this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_SKEPTIC(task), opts),
+        'p10-scout-skeptic',
+      ),
+      withLLMTimeout(
+        (opts) => this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_MINIMALIST(task), opts),
+        'p10-scout-minimalist',
+      ),
     ]);
   }
 
   private async runAnalyzer(task: string, scouts: string[]): Promise<string> {
     return withLLMTimeout(
-      (opts) => this.callModel('claude-sonnet-4-6', `Analyze:\n${task}\n\nScouts:\n${scouts.join('\n')}`, opts),
+      (opts) => this.callModel('claude-sonnet-4-6', P10_ANALYZER(task, scouts), opts),
       'p10-analyzer',
     );
   }
 
   private async runDraftWriter(analysis: string): Promise<string> {
     return withLLMTimeout(
-      (opts) => this.callModel('claude-sonnet-4-6', `Write P10 plan from analysis:\n${analysis}`, opts),
+      (opts) => this.callModel('claude-sonnet-4-6', P10_DRAFT_WRITER(analysis), opts),
       'p10-draft',
     );
   }
@@ -71,7 +77,7 @@ export class P10Service {
   private async runArbiter(draft: string): Promise<P10Ruling> {
     assert(draft.length > 0, 'draft must not be empty');
     const raw = await withLLMTimeout(
-      (opts) => this.callModel('claude-opus-4-8', `Arbitrate P10 plan:\n${draft}`, opts),
+      (opts) => this.callModel('claude-opus-4-8', P10_ARBITER(draft), opts),
       'p10-arbiter',
     );
     const ruling = parseP10Ruling(raw);
@@ -97,6 +103,92 @@ export class P10Service {
     return block?.type === 'text' ? block.text : '';
   }
 }
+
+const P10_SCOUT_SKEPTIC = (task: string) => `\
+You are the Skeptic scout in a NASA Power of 10 pre-execution analysis. Be concise (under 150 words).
+
+TASK: ${task}
+
+Find failure modes. Check for:
+- Unbounded loops or recursion without a fixed upper bound
+- Error paths that silently swallow failures (empty catch, ignored return values)
+- External boundaries with no validation (user input, file paths, env vars)
+- Functions likely to exceed 60 lines or have more than one responsibility
+- Missing assertions on invariants that could corrupt state
+
+Use available code navigation tools (get_symbols_overview, find_symbol) if accessible.
+Return a bulleted list of specific concerns with file references where possible. If none, say "No P10 concerns detected."`;
+
+const P10_SCOUT_MINIMALIST = (task: string) => `\
+You are the Minimalist scout in a NASA Power of 10 pre-execution analysis. Be concise (under 150 words).
+
+TASK: ${task}
+
+Find scope creep and over-engineering. Check for:
+- Features or abstractions not required by the task
+- Code that could be 20 lines but will likely be written as 80
+- New seams (interfaces, services, files) that could be avoided
+- Dependencies that could be replaced by simpler stdlib alternatives
+- Anything that adds indirection without adding safety
+
+Return a bulleted list of scope risks. If the task is already minimal, say "Scope looks right."`;
+
+const P10_ANALYZER = (task: string, scouts: string[]) => `\
+You are the P10 Analyzer. Synthesize the scout findings into a structured risk analysis (under 250 words).
+
+TASK: ${task}
+
+SCOUT FINDINGS:
+${scouts.map((s, i) => `Scout ${i + 1}:\n${s}`).join('\n\n')}
+
+Produce:
+1. Risk Summary — top 3 risks ranked by severity
+2. P10 Rules at stake — which NASA Power of 10 rules apply (bounds, assertions, single exit, etc.)
+3. Implementation constraints — what the execution agent must enforce
+4. Success criteria — 3 verifiable assertions that must pass before declaring the stage done`;
+
+const P10_DRAFT_WRITER = (analysis: string) => `\
+You are the P10 Draft Writer. Produce a P10 execution plan from the analysis below.
+
+${analysis}
+
+Format the plan as:
+---
+status: [leave blank — arbiter sets this]
+---
+
+# P10 Plan
+
+## Stages
+[Number each stage. Each stage: name, what to build, P10 constraints, verification assertion.]
+
+## Invariants
+[List 3-5 invariants that must hold across all stages.]
+
+## Blocked Paths
+[Any implementation approaches the analysis ruled out, and why.]
+
+Keep under 400 words. Be specific — name files, functions, types where known.`;
+
+const P10_ARBITER = (draft: string) => `\
+You are the Arbiter for a P10 pre-execution plan. Your job: approve, request revision, or block.
+
+${draft}
+
+Evaluate against NASA Power of 10 rules:
+1. Every loop has a fixed bound
+2. No dynamic allocation after initialization
+3. Max 60 lines per function
+4. Assertions on all non-trivial return values and inputs
+5. Single point of exit per function (except at validated boundaries)
+6. Data scope minimized — no globals, no shared mutable state without explicit justification
+7. No shell interpolation — subprocess calls use argv arrays
+8. Security boundaries validated at ingress, not deep in the call graph
+
+Respond with EXACTLY this format:
+status: approved | revision-required | blocked
+summary: [one paragraph — what you approved or why you blocked]
+required-changes: [if revision-required, list the specific changes needed]`;
 
 function parseP10Ruling(raw: string): P10Ruling {
   const match = raw.match(/status:\s*(approved|revision-required|blocked)/i);

@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.0.3.0 — 2026-06-08
+
+### Added
+
+- `.github/workflows/ci.yml` — CI pipeline: typecheck (`tsc --noEmit`) + test (`vitest --passWithNoTests`) on every PR and push; `eval-gate` job gates main pushes on `ANTHROPIC_API_KEY` secret being set and all 3 assertions passing. (T11)
+- `scripts/install-symlink.sh` — wire toto-wolff governance into any repo in ~30 seconds. Backs up existing `CLAUDE.md`, symlinks to the active persona. `TOTO_ROLE` env var selects role. Validates target is a git repo (worktree-aware) and role slug is allowlisted.
+- Phase 1 MCP foundation: `packages/core` (VaultService, CouncilService, P10Service, withLLMTimeout), `packages/mcp-server` (vault_write, vault_search, council_run, p10_plan handlers, HTTP server), `scripts/eval-gate.ts` (3/3 exit gate).
+
+### Changed
+
+- `personas/engineering.md` — rewritten: welcoming tone, explains council/p10/role-switch commands, first-run onboarding line.
+- `packages/core/src/P10Service.ts` — scout/analyzer/arbiter prompts replaced with structured role-specific templates: Skeptic scout (failure modes), Minimalist scout (scope creep), ranked risk Analyzer, structured DraftWriter, 8-rule Arbiter. Revision prompt now uses `P10_REVISE` template matching arbiter's expected format.
+- `package.json` — `pnpm test` now passes with no test files (`--passWithNoTests`) so CI does not fail during the pre-unit-test phase.
+
+### Fixed
+
+- `packages/core/src/P10Service.ts` — revision cap exhaustion now forces `status: blocked` instead of falling through to an `AssertionError` in `commitPlan`.
+- `packages/core/src/CouncilService.ts` — added `drainQueue()` after `vault.write` in `runSession`; council records were written to disk but never committed to vault git history.
+- `.github/workflows/ci.yml` — eval-gate job now sets `user.email` and `user.name` on the ephemeral vault before running; git commit in VaultService would otherwise fail on runners with no global git identity.
+- `.github/workflows/ci.yml` — eval-gate now uses `pnpm exec tsx` (locked version) instead of `npx tsx` (unversioned download).
+- `scripts/install-symlink.sh` — git repo check now uses `git rev-parse --git-dir` (worktree-safe) instead of `-d .git` directory check; path traversal guard added for `TOTO_ROLE` env var.
+
+### Security
+
+- `scripts/install-symlink.sh:30` — `TOTO_ROLE` validated against `^[a-z][a-z0-9-]+$` before constructing persona file path; blocks path traversal via `TOTO_ROLE=../../../tmp/payload`.
+
+---
+
 ## 0.0.2.0 — 2026-06-05
 
 ### Added

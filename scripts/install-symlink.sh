@@ -17,12 +17,16 @@ if [ ! -d "$TARGET_REPO" ]; then
   exit 1
 fi
 
-if [ ! -d "$TARGET_REPO/.git" ]; then
+if ! git -C "$TARGET_REPO" rev-parse --git-dir >/dev/null 2>&1; then
   echo "ERROR: $TARGET_REPO is not a git repo" >&2
   exit 1
 fi
 
 ROLE="${TOTO_ROLE:-engineering}"
+if ! echo "$ROLE" | grep -qE '^[a-z][a-z0-9-]*$'; then
+  echo "ERROR: TOTO_ROLE must match [a-z][a-z0-9-]+ (got: $ROLE)" >&2
+  exit 1
+fi
 PERSONA_FILE="${PERSONAS_DIR}/${ROLE}.md"
 
 if [ ! -f "$PERSONA_FILE" ]; then

@@ -28,6 +28,7 @@ export class CouncilService {
     const ruling = await this.runChairman(brief);
     const planPath = `Council/Congressional-Records/${Date.now()}-council.md`;
     await this.vault.write(planPath, formatRecord(question, ruling));
+    await this.vault.drainQueue();
     return { status: 'ok', ruling, planPath };
   }
 

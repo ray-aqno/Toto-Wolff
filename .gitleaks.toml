@@ -1,0 +1,29 @@
+title = "toto-wolff gitleaks config"
+
+[allowlist]
+description = "Allow example placeholders and test fixtures"
+regexes = [
+  '''<YOUR_[A-Z_]+>''',
+  '''example-key''',
+  '''test-key''',
+  '''placeholder''',
+]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API Key"
+regex = '''sk-ant-[a-zA-Z0-9\-_]{40,}'''
+tags = ["key", "anthropic"]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key assignment"
+regex = '''(?i)(api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['""]?[a-zA-Z0-9\-_]{20,}['""]?'''
+tags = ["key", "generic"]
+[rules.allowlist]
+regexes = [
+  '''process\.env''',
+  '''secrets\.''',
+  '''\$\{\{''',
+  '''YOUR_''',
+]

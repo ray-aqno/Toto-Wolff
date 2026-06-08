@@ -24,11 +24,20 @@ const TOOLS: Record<string, (body: unknown) => Promise<unknown>> = {
   p10_plan:     (body) => handleP10Plan(body, p10),
 };
 
+const MAX_BODY_BYTES = 65_536;
+
 const server = createServer((req, res) => {
   let raw = '';
-  req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+  req.on('data', (chunk: Buffer) => {
+    raw += chunk.toString();
+    if (raw.length > MAX_BODY_BYTES) {
+      res.writeHead(413, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ error: 'request body too large' }));
+      req.destroy();
+    }
+  });
   req.on('end', () => {
-    void handleRequest(req.url ?? '', raw, res);
+    if (!res.headersSent) void handleRequest(req.url ?? '', raw, res);
   });
 });
 
@@ -53,7 +62,8 @@ async function handleRequest(url: string, raw: string, res: import('node:http').
 }
 
 // LOOP BOUND: 1 attempt — fail loud on EADDRINUSE, no retry (Condition 3)
-server.listen(PORT, () => {
+// CSO: bind loopback only — prevents LAN access to unauthenticated LLM proxy
+server.listen(PORT, '127.0.0.1', () => {
   process.stdout.write(`toto-mcp listening on port ${PORT}\n`);
 });
 server.on('error', (err: NodeJS.ErrnoException) => {

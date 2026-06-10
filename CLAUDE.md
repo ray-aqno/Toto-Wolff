@@ -224,3 +224,28 @@ Stage N: [name from P10 plan]
 ```
 
 Strong success criteria let execution loop independently. If a stage's verification criteria are unclear, stop and surface the ambiguity before writing code.
+
+@RTK.md
+
+## Code Exploration Policy
+
+Always use jCodeMunch-MCP tools — never fall back to Read, Grep, Glob, or Bash for code exploration.
+
+- Before reading a file: use get_file_outline or get_file_content
+- Before searching: use search_symbols or search_text
+- Before exploring structure: use get_file_tree or get_repo_outline
+- Call list_repos first; if the project is not indexed, call index_folder with the current directory.
+
+## Docstring Policy
+
+jCodeMunch builds symbol summaries from docstrings. Without docstrings,
+summaries fall back to the function signature alone, which is less useful
+for search and navigation.
+
+When writing or modifying code:
+- Write a concise docstring for every public function, method, and class.
+- Write a docstring for private functions when their name + signature isn't
+  self-explanatory (e.g. `_reconcile_state` yes, `_add(a, b)` no).
+- Docstrings should say WHAT the function does and WHY, not repeat the
+  parameter types.
+- When modifying an existing function that lacks a docstring, add one.

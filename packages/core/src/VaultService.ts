@@ -64,22 +64,49 @@ export class VaultService {
       const absPath = this.queue[0];
       assert(absPath !== undefined, 'queue entry must exist');
       const filename = absPath.split('/').pop() ?? 'file';
-      await this.commitFile(absPath, `vault: write ${filename}`);
+      const commit = await this.commitFile(absPath, `vault: write ${filename}`);
+      if (!commit.committed) {
+        process.stderr.write(`vault: commit skipped (${commit.reason ?? 'unknown'}) for ${filename}\n`);
+      }
       this.queue.shift();
     }
   }
 
-  private async commitFile(absPath: string, message: string): Promise<void> {
+  private async commitFile(absPath: string, message: string): Promise<{ committed: boolean; reason?: string }> {
     assert(isAbsolute(absPath), 'absPath must be absolute');
     // CSO: null byte would escape execFile argv boundary
     assert(!absPath.includes('\0'), 'absPath must not contain null bytes');
 
+    // git is the audit trail, not the source of truth — a vault without .git
+    // still persists writes. Skip the commit observably rather than crash.
+    if (!(await this.isGitRepo())) {
+      return { committed: false, reason: 'no-git-repo' };
+    }
     try {
       await execFileAsync('git', ['-C', this.vaultPath, 'add', absPath], { timeout: GIT_TIMEOUT_MS });
       await execFileAsync('git', ['-C', this.vaultPath, 'commit', '-m', message], { timeout: GIT_TIMEOUT_MS });
+      return { committed: true };
     } catch (err) {
       // CSO: do not expose internal paths in error message
       throw new VaultCommitError(`git commit failed: ${(err as Error).message}`);
+    }
+  }
+
+  private async isGitRepo(): Promise<boolean> {
+    assert(this.vaultPath.length > 0, 'vaultPath must be non-empty');
+    try {
+      await execFileAsync('git', ['-C', this.vaultPath, 'rev-parse', '--git-dir'], { timeout: GIT_TIMEOUT_MS });
+      return true;
+    } catch (err) {
+      // git exits 128 with "not a git repository" when the vault has no repo —
+      // the only case we treat as "skip the commit". Anything else (git missing,
+      // timeout, permission denied) is a real failure and must surface, not be
+      // masked as no-git-repo.
+      const e = err as { code?: number | string; stderr?: string };
+      if (e.code === 128 || /not a git repository/i.test(e.stderr ?? '')) {
+        return false;
+      }
+      throw err;
     }
   }
 }

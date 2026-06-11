@@ -225,8 +225,6 @@ Stage N: [name from P10 plan]
 
 Strong success criteria let execution loop independently. If a stage's verification criteria are unclear, stop and surface the ambiguity before writing code.
 
-@RTK.md
-
 ## Code Exploration Policy
 
 Always use jCodeMunch-MCP tools — never fall back to Read, Grep, Glob, or Bash for code exploration.

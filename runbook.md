@@ -14,6 +14,10 @@ Loom link: *(record and paste here before greenlight)*
 - Claude Code CLI installed and authenticated (`claude --version` exits 0)
 - gstack installed (`gstack --version` exits 0) — required for `/council` and `/p10` at runtime; setup warns but completes without it. Install via `/gstack-upgrade` in Claude Code.
 - Obsidian vault at `~/Documents/Obsidian Vault` — if your vault is elsewhere, update `VAULT_PATH` in both `CLAUDE.md` and `setup` before running
+- **Anthropic API credentials** (required only for `/council`, `/p10`, and MCP server tools — the plain symlink install needs no key):
+  - Option A: `ANTHROPIC_API_KEY` environment variable (personal Anthropic key)
+  - Option B: `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` together (enterprise/proxy, e.g. Manifest)
+  - If neither is set, council and p10 fail fast with a clear error
 
 ---
 
@@ -71,6 +75,20 @@ Expected: p10 plan draft appears at:
 ```
 
 Both vault writes confirm the closed training loop is running.
+
+**Step 3 — Test MCP server + demo script (requires Anthropic credentials):**
+
+In one terminal, start the MCP server:
+```bash
+pnpm -C packages/mcp-server start
+```
+
+In a second terminal, run the demo client:
+```bash
+./scripts/demo.sh
+```
+
+Expected: the script runs a `council_run` call and a `p10_plan` call, prints each ruling, and points at the vault artifacts it wrote. A `blocked` p10 result is printed as `status: blocked` — that is governance working, not an error.
 
 ---
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.4.0] - 2026-06-11
+
+### Added
+
+- `scripts/demo.sh` — drives the full governance cycle end-to-end: preflight check on the MCP server, `council_run` with a real architectural question, `p10_plan` with a real task. A `blocked` p10 result returns HTTP 200 with `status: blocked` — governance working, not an error.
+- `packages/core/src/utils/anthropic.ts` — universal Anthropic client factory. Accepts `ANTHROPIC_API_KEY` alone (personal key) or `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` together (enterprise/proxy path, e.g. Manifest). Fails fast with a clear error if neither is set.
+- `packages/core/src/utils/anthropic.test.ts` — 5 tests covering both auth paths, both-set precedence, and the missing-credentials fast-fail.
+- `packages/core/src/VaultService.test.ts` — real (no-mock) integration test: writes to a temp directory with no `.git`, asserts `drainQueue()` resolves without throwing and the file persists.
+- `packages/mcp-server/src/handlers/p10_plan.test.ts` — two tests: `P10BlockedError` → `{status:'blocked'}` (HTTP 200, no vault path in logs), and non-blocked errors rethrow cleanly.
+
+### Fixed
+
+- `P10Service` was hard-asserting `ANTHROPIC_API_KEY` at construction time, crashing on any Manifest/enterprise-token setup. Migrated to `createAnthropicClient()` — same fix applied to `CouncilService` in `4c5fed5`.
+- `VaultService.commitFile` would crash on a fresh clone with no `.git`. Now detects via `git rev-parse --git-dir` exit-128, skips the commit observably (`{committed: false, reason: 'not a git repo'}`), and still writes the file — write is source of truth, commit is audit-trail nicety.
+- `p10_plan` handler was letting `P10BlockedError` bubble as a 500. A blocked arbiter ruling is a governance outcome, not a server fault — now returns HTTP 200 `{status:'blocked'}` and writes a fixed string to stderr (no vault path leak).
+
+### Changed
+
+- `README.md` — plain-language intro, two-altitude auth section (Option A / Option B with precedence note), MCP server v2 roadmap line, and "Try the cycle on stage" runblock.
+- `CLAUDE.md` — jCodeMunch code exploration policy and docstring rules added.
+
 ## 0.0.3.0 — 2026-06-08
 
 ### Added

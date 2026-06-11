@@ -1,6 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import assert from 'node:assert';
 import { withLLMTimeout } from './utils/timeout.js';
+import { createAnthropicClient } from './utils/anthropic.js';
 import type { VaultService } from './VaultService.js';
 import type { CouncilResult, CouncilRuling, CouncilStatus } from './types.js';
 
@@ -11,10 +12,7 @@ export class CouncilService {
   private readonly vault: VaultService;
 
   constructor(vault: VaultService) {
-    // CSO: API key narrowed in Node, never logged or exposed in errors
-    const apiKey = process.env['ANTHROPIC_API_KEY'];
-    assert(typeof apiKey === 'string' && apiKey.length > 0, 'ANTHROPIC_API_KEY must be set and non-empty');
-    this.client = new Anthropic({ apiKey });
+    this.client = createAnthropicClient();
     this.vault = vault;
   }
 

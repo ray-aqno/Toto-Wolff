@@ -6,7 +6,17 @@ set -euo pipefail
 VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
 
 # 4 assertions — loud failure with one-liner remediation messages
-[ -n "${ANTHROPIC_API_KEY:-}" ] || { echo "ERROR: ANTHROPIC_API_KEY not set. Run: export ANTHROPIC_API_KEY=<key>"; exit 2; }
+# Accept either a personal API key (Option A) or the enterprise token pair (Option B).
+if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
+  echo "ERROR: no Anthropic credentials found."
+  echo "  Option A: export ANTHROPIC_API_KEY=<key>"
+  echo "  Option B: export ANTHROPIC_AUTH_TOKEN=<token> && export ANTHROPIC_BASE_URL=<url>"
+  exit 2
+fi
+if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_BASE_URL:-}" ]; then
+  echo "ERROR: ANTHROPIC_AUTH_TOKEN is set but ANTHROPIC_BASE_URL is missing. Both are required for Option B."
+  exit 2
+fi
 command -v rg    >/dev/null 2>&1 || { echo "ERROR: ripgrep not found. Run: brew install ripgrep"; exit 2; }
 command -v node  >/dev/null 2>&1 || { echo "ERROR: node not found. Run: brew install node"; exit 2; }
 command -v pnpm  >/dev/null 2>&1 || { echo "ERROR: pnpm not found. Run: npm install -g pnpm"; exit 2; }

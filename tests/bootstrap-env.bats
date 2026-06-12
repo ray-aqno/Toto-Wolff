@@ -45,6 +45,10 @@ tools_absent() { echo "/usr/bin:/bin"; }
     bash "${BOOTSTRAP}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"bootstrap-env: OK"* ]]
+  # No phantom failures on a clean system. Guards against the count-guard being
+  # dropped in favour of "${FAILURES[@]:-}", which prints a bare "ERROR:" line
+  # and exits 2 on the all-pass path (the rejected set -u "fix").
+  [[ "$output" != *"ERROR:"* ]]
 }
 
 # ── report-all contract (the set -e safety invariant) ─────────────────────────

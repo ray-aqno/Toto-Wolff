@@ -5,22 +5,33 @@ set -euo pipefail
 
 VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
 
-# 4 assertions — loud failure with one-liner remediation messages
+# Failure accumulator — checks report all misses, then exit once.
+# fail() appends and returns 0 (array append), so set -e never fires in the check zone.
+FAILURES=()
+fail() { FAILURES+=("$1"); }
+
 # Accept either a personal API key (Option A) or the enterprise token pair (Option B).
 if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
-  echo "ERROR: no Anthropic credentials found."
-  echo "  Option A: export ANTHROPIC_API_KEY=<key>"
-  echo "  Option B: export ANTHROPIC_AUTH_TOKEN=<token> && export ANTHROPIC_BASE_URL=<url>"
-  exit 2
+  fail "no Anthropic credentials found.
+  Option A: export ANTHROPIC_API_KEY=<key>
+  Option B: export ANTHROPIC_AUTH_TOKEN=<token> && export ANTHROPIC_BASE_URL=<url>"
 fi
 if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_BASE_URL:-}" ]; then
-  echo "ERROR: ANTHROPIC_AUTH_TOKEN is set but ANTHROPIC_BASE_URL is missing. Both are required for Option B."
+  fail "ANTHROPIC_AUTH_TOKEN is set but ANTHROPIC_BASE_URL is missing. Both are required for Option B."
+fi
+command -v rg    >/dev/null 2>&1 || fail "ripgrep not found. Run: brew install ripgrep"
+command -v node  >/dev/null 2>&1 || fail "node not found. Run: brew install node"
+command -v pnpm  >/dev/null 2>&1 || fail "pnpm not found. Run: npm install -g pnpm"
+
+# Report all failures, then exit once. LOOP BOUND: max 5 (one per check above). [P10-R2]
+if [ "${#FAILURES[@]}" -gt 0 ]; then
+  for msg in "${FAILURES[@]}"; do
+    echo "ERROR: ${msg}"
+  done
   exit 2
 fi
-command -v rg    >/dev/null 2>&1 || { echo "ERROR: ripgrep not found. Run: brew install ripgrep"; exit 2; }
-command -v node  >/dev/null 2>&1 || { echo "ERROR: node not found. Run: brew install node"; exit 2; }
-command -v pnpm  >/dev/null 2>&1 || { echo "ERROR: pnpm not found. Run: npm install -g pnpm"; exit 2; }
 
+# All checks passed — state mutation only below this line.
 # Idempotency-guarded git init — worktree-safe check (CSO: -d .git fails for worktrees)
 if ! git -C "${VAULT_PATH}" rev-parse --git-dir >/dev/null 2>&1; then
   git init "${VAULT_PATH}"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4.1] - 2026-06-12
+
+### Changed
+
+- `scripts/bootstrap-env.sh` — preflight now reports **all** failed prerequisites in one pass, then exits once, instead of failing on the first miss. A fresh evaluator with three missing tools and no credentials sees four `ERROR:` lines and the four remediation one-liners in a single run, not one error per re-run. Exit codes unchanged (0 pass / 2 fail). State mutation (`git init`) still gated behind a clean preflight. (P10 plan `2026-06-12-bootstrap-env-report-all`, council `toto-wolff-ux-optimization`.)
+- `README.md` — leads with a paste-into-Claude setup prompt as the primary install path, plus a before/after table of what the protocol changes. Preflight runs before `./setup`, so a missing prerequisite surfaces at install time rather than at first `/council`. Manual `git clone`/`./setup` path retained.
+
 ## [0.0.4.0] - 2026-06-11
 
 ### Added

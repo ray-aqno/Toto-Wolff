@@ -2,6 +2,10 @@
 
 ## [0.0.4.1] - 2026-06-12
 
+### Added
+
+- `tests/bootstrap-env.bats` — 7 tests covering the preflight gate: all-pass path, the report-all contract (no-creds + no-tools surfaces all four errors in one pass, proving `set -e` does not abort mid-check), the Option B partial/complete credential paths, and git init gated behind a clean preflight (failed preflight creates no `.git`). Tool presence is stubbed so the suite runs without ripgrep/node/pnpm on the host.
+
 ### Changed
 
 - `scripts/bootstrap-env.sh` — preflight now reports **all** failed prerequisites in one pass, then exits once, instead of failing on the first miss. A fresh evaluator with three missing tools and no credentials sees four `ERROR:` lines and the four remediation one-liners in a single run, not one error per re-run. Exit codes unchanged (0 pass / 2 fail). State mutation (`git init`) still gated behind a clean preflight. (P10 plan `2026-06-12-bootstrap-env-report-all`, council `toto-wolff-ux-optimization`.)

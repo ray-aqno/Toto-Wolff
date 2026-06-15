@@ -23,7 +23,8 @@ command -v rg    >/dev/null 2>&1 || fail "ripgrep not found. Run: brew install r
 command -v node  >/dev/null 2>&1 || fail "node not found. Run: brew install node"
 command -v pnpm  >/dev/null 2>&1 || fail "pnpm not found. Run: npm install -g pnpm"
 
-# Report all failures, then exit once. LOOP BOUND: max 5 (one per check above). [P10-R2]
+# Report all failures, then exit once. LOOP BOUND: 5 fail sites, but the two
+# credential branches are mutually exclusive, so a single run yields max 4. [P10-R2]
 if [ "${#FAILURES[@]}" -gt 0 ]; then
   for msg in "${FAILURES[@]}"; do
     echo "ERROR: ${msg}"

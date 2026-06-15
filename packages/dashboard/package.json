@@ -1,0 +1,19 @@
+{
+  "name": "@toto-wolff/dashboard",
+  "version": "0.0.1",
+  "description": "Terminal governance dashboard for toto-wolff",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "toto-dash": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0"
+  }
+}

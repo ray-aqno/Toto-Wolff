@@ -247,3 +247,9 @@ When writing or modifying code:
 - Docstrings should say WHAT the function does and WHY, not repeat the
   parameter types.
 - When modifying an existing function that lacks a docstring, add one.
+
+# MCP Server
+
+The toto-wolff MCP server (packages/mcp-server) is registered in ~/.claude.json under mcpServers["toto-wolff"]. Run `pnpm -C packages/mcp-server build` before first use.
+
+Start command: `node /Users/rayyanaquino/Documents/GitHub/toto-wolff/packages/mcp-server/dist/index.js`

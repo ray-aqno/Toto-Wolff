@@ -67,7 +67,7 @@ cd ~/toto-wolff
 - Claude Code CLI (authenticated — `claude --version` exits 0)
 - Obsidian vault (default path: `~/Documents/Obsidian Vault`)
 - macOS or Linux, bash ≥ 3.2, git
-- gstack — required at runtime for `/council` and `/p10`; setup warns but completes without it
+- gstack (optional) — provides commodity skills (`/ship`, `/review`, `/browse`); `/council` and `/p10` are this repo's own skills and run without it. setup notes if gstack is absent but completes.
 
 ---
 

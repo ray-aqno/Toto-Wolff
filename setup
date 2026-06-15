@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
       echo ""
       echo "Available personas: engineering, devops, r-and-d, data"
       echo ""
-      echo "Prerequisites: bash >= 3.2, git, python3, gstack (run /gstack-upgrade in Claude Code)"
+      echo "Prerequisites: bash >= 3.2, git, python3. Optional: gstack (commodity skills /ship /review /browse) — run /gstack-upgrade in Claude Code."
       echo "Docs: runbook.md"
       exit 0
       ;;
@@ -61,7 +61,8 @@ check_prereqs() {
     echo "WARNING: python3 not found on PATH — ./setup --role will not work until installed"
   fi
   if ! command -v gstack >/dev/null 2>&1; then
-    echo "WARNING: gstack not found on PATH — vault wiring will complete, but /council and /p10 require it"
+    echo "NOTE: gstack not found on PATH — /council and /p10 do not need it (they run on Claude Code + the vault)."
+    echo "  gstack adds commodity skills (/ship, /review, /browse) and an optional /freeze integration."
     echo "  Install: open Claude Code and run /gstack-upgrade, or see https://garryslist.org"
   fi
 }

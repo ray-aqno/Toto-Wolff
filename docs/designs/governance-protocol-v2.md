@@ -18,7 +18,10 @@ The current solution (a shell script that wires CLAUDE.md) solves the individual
 
 **Approach C: Hybrid strangler fig** — confirmed and extended by expansion ceremony.
 
-The seam is the gstack dependency on council/p10/vault. We replace exactly that with a TypeScript MCP server. Everything else (ship, review, browse) stays in gstack.
+> [!note] PREMISE CORRECTION 2026-06-15
+> The seam is **not** a gstack dependency on council/p10. Council and p10 are **repo-native custom skills** in `~/.claude/skills/llm-council/` and `~/.claude/skills/p10/` — they have never been gstack skills and run without it. What the v2 MCP server actually replaces is the **model-routing + persistence** layer (the council/p10 implementations that today run as host-spawned subagents), making the protocol portable beyond a single Claude Code session. See `Council/Congressional-Records/2026-06-12-does-the-governance-server-need-a-brain.md` for the latest ruling (server is a gate, not a brain; intelligence stays host-native).
+
+The seam is the host-native subagent routing of council/p10 logic. We replace exactly that with a TypeScript MCP server. Everything else (ship, review, browse) stays in gstack.
 
 ```
 toto (TypeScript monorepo)

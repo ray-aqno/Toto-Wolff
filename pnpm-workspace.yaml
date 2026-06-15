@@ -3,4 +3,4 @@ packages:
 onlyBuiltDependencies:
   - esbuild
 allowBuilds:
-  esbuild: true
+  esbuild: set this to true or false

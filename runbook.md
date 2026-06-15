@@ -1,8 +1,6 @@
 # Toto Wolff Runbook
 
-A new team member should be able to complete this solo in 30 minutes. Record a Loom walkthrough and link it here before the greenlight meeting.
-
-Loom link: *(record and paste here before greenlight)*
+A new team member should be able to complete this solo in 30 minutes. Demo runs directly via ./scripts/demo.sh — no recording required.
 
 ---
 
@@ -12,7 +10,7 @@ Loom link: *(record and paste here before greenlight)*
 - bash ≥ 3.2 (macOS default is fine)
 - git
 - Claude Code CLI installed and authenticated (`claude --version` exits 0)
-- gstack installed (`gstack --version` exits 0) — required for `/council` and `/p10` at runtime; setup warns but completes without it. Install via `/gstack-upgrade` in Claude Code.
+- gstack (optional) — provides commodity skills (`/ship`, `/review`, `/browse`) and an optional `/freeze` integration. `/council` and `/p10` are this repo's own skills (in `~/.claude/skills/`) and run without gstack. Install via `/gstack-upgrade` in Claude Code if you want the commodity skills.
 - Obsidian vault at `~/Documents/Obsidian Vault` — if your vault is elsewhere, update `VAULT_PATH` in both `CLAUDE.md` and `setup` before running
 - **Anthropic API credentials** (required only for `/council`, `/p10`, and MCP server tools — the plain symlink install needs no key):
   - Option A: `ANTHROPIC_API_KEY` environment variable (personal Anthropic key)
@@ -49,7 +47,7 @@ If setup exits with an error code, see **Troubleshooting** below.
 
 ## First Run Verification
 
-> **Note:** `/council` and `/p10` require gstack on PATH. If `./setup` exited 2 with "ERROR: gstack not found", install gstack first before this step.
+> **Note:** `/council` and `/p10` need only Claude Code + your vault — gstack is not required. setup only notes if gstack is absent; it does not block on it.
 
 **Step 1 — Test council:**
 
@@ -119,8 +117,8 @@ For a different vault path: `TOTO_VAULT_PATH=/your/path ./setup` handles the scr
 **2. CLAUDE.md symlink = live attack surface once a remote exists.**
 `~/.claude/CLAUDE.md` is a live symlink to the repo. A `git pull` that modifies `CLAUDE.md` takes effect on the next Claude Code session with no confirmation prompt. Before adding a remote: restrict push access to the repo (branch protection, required reviews). Never `git pull --no-verify` or skip hooks on this repo.
 
-**3. gstack upgrades may change skill invocation syntax.**
-After running `/gstack-upgrade`, re-test `/council` and `/p10` end-to-end. Skill interfaces are stable across minor versions but can change on major bumps.
+**3. gstack upgrades may change commodity-skill invocation syntax.**
+After running `/gstack-upgrade`, re-test the gstack commodity skills (`/ship`, `/review`) end-to-end. `/council` and `/p10` are repo-native skills and are unaffected by gstack upgrades.
 
 **4. Obsidian is invisible to the team by design.**
 Vault writes succeed even when Obsidian is closed — they write directly to the filesystem. To verify a write happened, check the filesystem path, not the Obsidian UI. The UI is a viewer; the vault is just a directory of Markdown files.
@@ -138,7 +136,7 @@ A new team member can run this checklist solo:
 - [ ] Trigger one `/council` session, confirm Congressional Record appears in vault
 - [ ] Review `docs/linear-setup.md` and confirm Linear permissions status
 - [ ] Estimated time: 30 minutes
-- [ ] Record Loom walkthrough and paste link at top of this file
+- [ ] Run ./scripts/demo.sh and confirm governance cycle completes end-to-end
 
 ---
 

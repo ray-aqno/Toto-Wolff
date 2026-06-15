@@ -6,9 +6,11 @@ set -euo pipefail
 VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
 
 # Failure accumulator — checks report all misses, then exit once.
-# fail() appends and returns 0 (array append), so set -e never fires in the check zone.
+# fail() returns 0 explicitly so `cmd || fail` never trips set -e mid-check.
+# The explicit return is load-bearing: without it a future trailing statement
+# could return non-zero and silently collapse report-all back to fail-fast.
 FAILURES=()
-fail() { FAILURES+=("$1"); }
+fail() { FAILURES+=("$1"); return 0; }
 
 # Accept either a personal API key (Option A) or the enterprise token pair (Option B).
 if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then

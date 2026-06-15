@@ -4,54 +4,93 @@
 
 A strangler fig for your engineering practice.
 
-In plain terms: it makes Claude Code stop and think before it writes code — deliberate, plan, then execute — instead of letting AI run unchecked.
+Makes Claude Code deliberate before it executes: every session routes through `/council` (deliberate) → `/p10` (plan safely) → Karpathy discipline (execute). One symlink install. No changes to your existing workflow until you're ready.
 
-It installs a seam — `~/.claude/CLAUDE.md` — that intercepts every Claude Code session and routes it through a governed cycle: deliberate with `/council`, plan safely with `/p10`, execute with Karpathy discipline. The old way is raw, ungoverned AI usage. The seam replaces it incrementally, without downtime.
+---
 
-The `.NET migration skill` is included because it's the same pattern at the code level: gradual controller replacement, feature flag routing, behavioral parity, zero downtime.
+## Quick Start
+
+Paste this into any Claude Code session:
+
+```
+Set up Toto Wolff for me.
+
+1. Ask me: where did you clone the repo? Save that path as REPO.
+2. Ask me: where is your Obsidian vault? (default: ~/Documents/Obsidian Vault). Save that path as VAULT.
+3. Run the preflight: TOTO_VAULT_PATH=VAULT REPO/scripts/bootstrap-env.sh — substitute the actual paths from steps 1 and 2.
+   If it fails, surface each error and the remediation one-liner, then wait for me to fix it before continuing.
+4. Run setup: cd to REPO, then run TOTO_VAULT_PATH=VAULT ./setup (omit the env var if VAULT is the default).
+5. Verify: readlink ~/.claude/CLAUDE.md should point to REPO/CLAUDE.md.
+6. Once preflight and setup both pass, run: /council this: "What is the highest-risk technical decision our team is about to make?"
+
+After everything is confirmed, explain what changes about how you will work with me from this point forward.
+```
+
+Step 6 fires your first council session — the record lands in your Obsidian vault and the protocol is live.
+
+Or run manually:
 
 ```bash
+git clone <repo-url> ~/toto-wolff
+cd ~/toto-wolff
 ./setup
+# Vault elsewhere? TOTO_VAULT_PATH=/your/vault/path ./setup
 ```
 
-**Full install guide:** [runbook.md](runbook.md)
+**Full install guide and troubleshooting:** [runbook.md](runbook.md)
 
-## How it works
+---
 
-`./setup` symlinks this repo's `CLAUDE.md` to `~/.claude/CLAUDE.md`. Claude Code reads that file at the start of every session. From that point, every session runs through the protocol — no other changes to your machine.
+## What changes after setup
 
-The MCP server already exists (`packages/mcp-server`) and exposes the same cycle as four tools (`council_run`, `p10_plan`, `vault_write`, `vault_search`). Today the default install is the symlink above; v2 flips the default to the server, so the seam is enforced by infrastructure instead of relying on the model reading a file. Same governance, harder to bypass.
+| Before | After |
+|--------|-------|
+| Claude writes code immediately on request | `/p10` drafts a plan first; Opus must approve before any file is touched |
+| No record of why architectural decisions were made | `/council` writes a Congressional Record to your Obsidian vault after every deliberation |
+| AI usage is ungoverned and hard to audit | Karpathy rules enforce: think first, surgical changes only, verify against stated goals |
+| Switching AI behavior requires editing prompts | Swap the entire persona with `./setup --role <name>` — one command, git-tracked |
 
-### Try the cycle on stage
-
-With auth set (see [Authentication](#authentication)), start the server and run the included client in a second terminal:
-
-```bash
-pnpm -C packages/mcp-server start   # terminal 1: server on 127.0.0.1:3099
-./scripts/demo.sh                   # terminal 2: drives council_run + p10_plan
-```
-
-`demo.sh` prints each ruling and points at the vault artifacts it wrote. A `blocked` p10 result comes back as HTTP 200 with `status: blocked` — that is governance working, not a server error.
+---
 
 ## What you get
 
-- `/council` — tiered deliberation (Haiku scouts → Sonnet analysis → Opus ruling). Every architectural decision gets a Congressional Record written to your Obsidian vault.
-- `/p10` — NASA Power of 10 pre-execution planning. Opus must approve before any code is touched. Blockers halt execution.
-- Karpathy execution discipline — think before coding, surgical changes only, verify against stated goals.
+- `/council` — tiered deliberation: Haiku scouts → Sonnet analysis → Opus ruling. Every architectural decision gets a record in your vault.
+- `/p10` — NASA Power of 10 pre-execution planning. Opus must approve before any code is touched. Blockers halt execution and escalate back to `/council`.
+- **Karpathy execution discipline** — think before coding, surgical changes only, verify against stated goals.
 - `/strangler-pattern-guide` — step-by-step .NET Framework → Minimal API migration with MediatR, feature flag routing, and TDD behavioral parity checks.
-- Four personas (`engineering`, `devops`, `r-and-d`, `data`) — swap with `./setup --role <name>`.
+- **Four personas** (`engineering`, `devops`, `r-and-d`, `data`) — swap with `./setup --role <name>`.
+
+---
 
 ## Prerequisites
 
-- Claude Code CLI + gstack ([install gstack](https://garryslist.org) if missing)
-- Obsidian vault at `~/Documents/Obsidian Vault` (if yours is elsewhere: `TOTO_VAULT_PATH=/your/path ./setup`)
+- Claude Code CLI (authenticated — `claude --version` exits 0)
+- Obsidian vault (default path: `~/Documents/Obsidian Vault`)
 - macOS or Linux, bash ≥ 3.2, git
+- gstack — required at runtime for `/council` and `/p10`; setup warns but completes without it
+
+---
 
 ## Authentication
 
-`/council`, `/p10`, and the MCP server tools call the Anthropic API (only these — the plain symlink install needs no key). Set up **one** of these, not both:
+`/council`, `/p10`, and the MCP server tools call the Anthropic API. The plain symlink install needs no key. Set **one** of these:
 
-- **Option A —** `ANTHROPIC_API_KEY` alone: a personal Anthropic API key (the common case).
-- **Option B —** `ANTHROPIC_AUTH_TOKEN` *and* `ANTHROPIC_BASE_URL` together: a bearer token routed through a proxy (e.g. a Manifest account, no personal key required).
+- **Option A** — `ANTHROPIC_API_KEY`: a personal Anthropic API key.
+- **Option B** — `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` together: a bearer token through a proxy (e.g. Manifest). Do not set both — if a personal key is present, it wins.
 
-If you set a personal key alongside the token pair, the key wins and the proxy is ignored. If neither is set, council and p10 fail fast with a clear error instead of running silently. Claude Code reads these from your environment at session start.
+If neither is set, `/council` and `/p10` fail fast with a clear error.
+
+---
+
+## MCP Server (optional, v2 default)
+
+The MCP server exposes the same cycle as four tools (`council_run`, `p10_plan`, `vault_write`, `vault_search`). Today the default install is the symlink; v2 flips the default to the server so governance is enforced by infrastructure rather than by the model reading a file.
+
+To try it now:
+
+```bash
+pnpm -C packages/mcp-server start   # terminal 1 — server on 127.0.0.1:3099
+./scripts/demo.sh                   # terminal 2 — drives council_run + p10_plan
+```
+
+A `blocked` p10 result returns HTTP 200 with `status: blocked` — that is governance working, not an error.

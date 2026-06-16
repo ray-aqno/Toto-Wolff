@@ -97,7 +97,7 @@ function parseFileContent(content: string): { status: string | null; excerpt: st
  * Read all markdown files from a directory and return parsed Session objects.
  * Silently skips the directory if it does not exist.
  */
-async function scanDirectory(dir: string, type: 'council' | 'p10'): Promise<Session[]> {
+async function scanDirectory(dir: string): Promise<Session[]> {
   let entries: string[];
   try {
     entries = await readdir(dir);
@@ -135,8 +135,8 @@ export async function getDashboardData(): Promise<DashboardData> {
   const p10Dir     = join(vaultPath, 'P10-Plans');
 
   const [council, p10] = await Promise.all([
-    scanDirectory(councilDir, 'council'),
-    scanDirectory(p10Dir, 'p10'),
+    scanDirectory(councilDir),
+    scanDirectory(p10Dir),
   ]);
 
   const blocked: BlockedItem[] = [
@@ -157,7 +157,7 @@ function sessionLine(session: Session): string {
 }
 
 /** Render the full dashboard to stdout. */
-async function render(data: DashboardData): Promise<void> {
+function render(data: DashboardData): void {
   const w = process.stdout.write.bind(process.stdout);
 
   w(`\n${BOLD}╔══════════════════════════════════════╗${RESET}\n`);
@@ -202,7 +202,7 @@ async function render(data: DashboardData): Promise<void> {
 /** Main entry point: fetch dashboard data and render it. */
 export async function main(): Promise<void> {
   const data = await getDashboardData();
-  await render(data);
+  render(data);
 }
 
 // Run when executed directly

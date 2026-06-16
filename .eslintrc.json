@@ -1,8 +1,9 @@
 {
   "root": true,
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "*.config.ts", "*.config.js"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "project": "./tsconfig.json",
+    "project": ["./packages/*/tsconfig.json"],
     "ecmaVersion": 2022,
     "sourceType": "module"
   },

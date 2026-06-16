@@ -69,3 +69,18 @@ jobs:
           git -C "$TOTO_VAULT_PATH" config user.email "ci@toto-wolff"
           git -C "$TOTO_VAULT_PATH" config user.name "toto-wolff-ci"
           pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/eval-gate.ts
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+
+      - name: Scan for secrets
+        run: gitleaks detect --config .gitleaks.toml --redact --no-banner --exit-code 1

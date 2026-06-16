@@ -10,6 +10,10 @@
 - MCP server: dashboard_status tool
 - packages/dashboard: terminal governance dashboard
 - .github/workflows/ci.yml: CI pipeline (T11 — Phase 1 eval-gate unblocked)
+### Fixed
+- CLAUDE.md MCP Server: replaced hardcoded absolute start-command path with a `<repo>` placeholder so the setup reference works on any clone (install-ux defect from council ruling 2026-06-16)
+### Security
+- CLAUDE.md: documented per-user MCP credentials — `ANTHROPIC_AUTH_TOKEN` supplied via each developer's `~/.claude.json` (never committed); placeholder-only example
 ### Removed
 - runbook.md: Loom tutorial placeholder (demo runs directly via demo.sh)
 

@@ -12,8 +12,13 @@
 - .github/workflows/ci.yml: CI pipeline (T11 — Phase 1 eval-gate unblocked)
 ### Fixed
 - CLAUDE.md MCP Server: replaced hardcoded absolute start-command path with a `<repo>` placeholder so the setup reference works on any clone (install-ux defect from council ruling 2026-06-16)
+- Build tooling: repaired the dead `pnpm lint` gate — eslint `parserOptions.project` now targets per-package tsconfigs (the solution-style root config resolved zero source files); added `dist`/config `ignorePatterns`
+- packages/dashboard: aligned tsconfig with core/mcp-server (extends base, `composite`, `exclude`) and added it to the root project references; removed a vestigial `scanDirectory` parameter; made the sync `render` function non-async
+- P10Service: added explicit return types on the six prompt-builder functions
+- Workspace: synced `core`/`mcp-server`/`dashboard` package versions to 0.0.5.0
 ### Security
 - CLAUDE.md: documented per-user MCP credentials — `ANTHROPIC_AUTH_TOKEN` supplied via each developer's `~/.claude.json` (never committed); placeholder-only example
+- CI: added a gitleaks secret-scan job wiring the existing `.gitleaks.toml` into the pipeline
 ### Removed
 - runbook.md: Loom tutorial placeholder (demo runs directly via demo.sh)
 

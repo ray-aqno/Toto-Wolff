@@ -10,6 +10,8 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 - **Universal auth** — `createAnthropicClient()` in `packages/core/src/utils/anthropic.ts` accepts `ANTHROPIC_API_KEY` alone (personal key) or `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` (enterprise/Manifest path). P10Service and CouncilService both migrated. Shipped 2026-06-11.
 - **Git-tolerant vault** — `VaultService.commitFile` detects missing `.git` via `git rev-parse --git-dir` exit-128, skips commit observably, write is source of truth. Fresh evaluator clones no longer crash on vault write. Shipped 2026-06-11.
 - **P10BlockedError seam** — `p10_plan` handler catches `P10BlockedError` before generic handler; returns HTTP 200 `{status:'blocked'}`, writes fixed string to stderr (no vault path leak). Shipped 2026-06-11.
+- **Dashboard package** — `packages/dashboard` implemented — terminal governance dashboard. Shipped 2026-06-15.
+- **Self-integration** — toto-wolff MCP server registered in Claude Code settings. Shipped 2026-06-15.
 
 ## Completed (v0.0.2.0)
 
@@ -134,15 +136,9 @@ Superseded by `packages/cli` (Phase 2). Closed per full TODOS eval.
 
 ## P1 — v2 Phase 1 Gates (added 2026-06-07, /plan-eng-review)
 
-### T11: CI/CD pipeline for TypeScript monorepo
+### ~~T11: CI/CD pipeline for TypeScript monorepo~~ — DONE 2026-06-15
 
-**What:** `.github/workflows/ci.yml` — install pnpm, run `tsc --noEmit` across all packages, run `vitest`. CI job must also `apt-get install ripgrep` (required for `vault_read` tests). Run on every PR and push to main.
-
-**Why:** Without CI, TypeScript compilation failures are only caught locally. The 2-week Phase 1 parallel run requires a reliable green/red gate. This is a Phase 1 blocker — no Phase 1 ship without it.
-
-**Effort:** human ~2h / CC ~5min
-
-**Depends on:** TypeScript monorepo scaffold (Phase 1 first commit).
+Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 
 ---
 

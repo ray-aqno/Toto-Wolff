@@ -25,18 +25,29 @@ setup() {
     printf '#!/usr/bin/env bash\nexit 0\n' > "${STUB_BIN}/${tool}"
     chmod +x "${STUB_BIN}/${tool}"
   done
+
+  # Hermetic "tools absent" PATH: a dir holding symlinks to ONLY the binaries
+  # the script legitimately needs — bash (to run it) and git (for the init
+  # gate). rg/node/pnpm are deliberately absent. Symlinking the specific tools
+  # (not adding /usr/bin:/bin) keeps the absence real on any host layout
+  # (Apple Silicon homebrew, Nix, etc.) where rg/node could leak in via a
+  # shared system dir, and guarantees bash+git resolve regardless of location.
+  export ABSENT_BIN
+  ABSENT_BIN="$(mktemp -d)"
+  ln -s "$(command -v bash)" "${ABSENT_BIN}/bash"
+  ln -s "$(command -v git)"  "${ABSENT_BIN}/git"
 }
 
 teardown() {
-  rm -rf "${TEST_VAULT}" "${STUB_BIN}"
+  rm -rf "${TEST_VAULT}" "${STUB_BIN}" "${ABSENT_BIN}"
 }
 
 # PATH with the three tool stubs prepended (everything present).
 tools_present() { echo "${STUB_BIN}:${PATH}"; }
 
-# PATH stripped of the project tools but keeping git (system bins only,
-# minus the stub dir) — rg/node/pnpm resolve to nothing.
-tools_absent() { echo "/usr/bin:/bin"; }
+# PATH with bash + git only — rg/node/pnpm resolve to nothing, while the
+# git-init gate stays exercisable on any host. Fully hermetic (see setup()).
+tools_absent() { echo "${ABSENT_BIN}"; }
 
 # ── all-pass path ─────────────────────────────────────────────────────────────
 
@@ -59,6 +70,42 @@ tools_absent() { echo "/usr/bin:/bin"; }
   [ "$status" -eq 2 ]
   # set -e must NOT have fired after the first fail — all four must appear.
   [[ "$output" == *"no Anthropic credentials found"* ]]
+  [[ "$output" == *"ripgrep not found"* ]]
+  [[ "$output" == *"node not found"* ]]
+  [[ "$output" == *"pnpm not found"* ]]
+}
+
+@test "one missing tool (rg) + creds present → only that tool's error" {
+  # Isolates a single command -v failure. The all-fail test above misses all
+  # three at once, so a regression in one specific `command -v ... || fail`
+  # line (wrong tool name, broken short-circuit) would hide behind the others.
+  # node+pnpm stubbed present, rg absent, creds valid.
+  local only_node_pnpm
+  only_node_pnpm="$(mktemp -d)"
+  for tool in node pnpm; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${only_node_pnpm}/${tool}"
+    chmod +x "${only_node_pnpm}/${tool}"
+  done
+  run env -i HOME="${HOME}" PATH="${only_node_pnpm}:${ABSENT_BIN}" \
+    ANTHROPIC_API_KEY=sk-test TOTO_VAULT_PATH="${TEST_VAULT}" \
+    bash "${BOOTSTRAP}"
+  rm -rf "${only_node_pnpm}"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"ripgrep not found"* ]]
+  [[ "$output" != *"node not found"* ]]
+  [[ "$output" != *"pnpm not found"* ]]
+  [[ "$output" != *"no Anthropic credentials found"* ]]
+}
+
+@test "Option B partial + missing tools → credential AND tool errors in one pass" {
+  # Multi-source accumulation: a credential failure (Option B, BASE_URL missing)
+  # and tool failures must both surface in a single run. Exercises the
+  # accumulator across two distinct failure branches, not just the no-creds one.
+  run env -i HOME="${HOME}" PATH="${ABSENT_BIN}" \
+    ANTHROPIC_AUTH_TOKEN=tok TOTO_VAULT_PATH="${TEST_VAULT}" \
+    bash "${BOOTSTRAP}"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"ANTHROPIC_BASE_URL is missing"* ]]
   [[ "$output" == *"ripgrep not found"* ]]
   [[ "$output" == *"node not found"* ]]
   [[ "$output" == *"pnpm not found"* ]]

@@ -163,6 +163,7 @@ Key routing rules:
 - Author a backlog-ready spec / issue → invoke /spec
 - Engineering decision requiring deliberation → invoke /council
 - Pre-execution safety plan → invoke /p10
+- Record an architecturally significant decision → invoke /adr
 - .NET controller migration (express-web-api → actions.api) → invoke /strangler-pattern-guide
 
 ---
@@ -247,3 +248,34 @@ When writing or modifying code:
 - Docstrings should say WHAT the function does and WHY, not repeat the
   parameter types.
 - When modifying an existing function that lacks a docstring, add one.
+
+# MCP Server
+
+The toto-wolff MCP server (packages/mcp-server) is registered in ~/.claude.json under mcpServers["toto-wolff"]. Run `pnpm -C packages/mcp-server build` before first use.
+
+Start command: `node <repo>/packages/mcp-server/dist/index.js`
+
+## Credentials (required)
+
+The server calls the Anthropic API and exits on startup if no credentials are present
+(`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty`).
+Supply them per-user via the `env` block of the `toto-wolff` entry in your own
+`~/.claude.json`. Never commit a real token to this repo:
+
+```jsonc
+"toto-wolff": {
+  "type": "stdio",
+  "command": "node",
+  "args": ["<repo>/packages/mcp-server/dist/index.js"],
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:2099",
+    "ANTHROPIC_AUTH_TOKEN": "<your-manifest-token>"
+  }
+}
+```
+
+Tokens are per-user (issued by Manifest). Each developer provisions their own; the value
+lives only in `~/.claude.json`, which is outside this repo. Do not paste a real token into
+CLAUDE.md, README, or any tracked file.
+
+@RTK.md

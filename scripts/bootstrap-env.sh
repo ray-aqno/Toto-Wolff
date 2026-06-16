@@ -6,9 +6,11 @@ set -euo pipefail
 VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
 
 # Failure accumulator — checks report all misses, then exit once.
-# fail() appends and returns 0 (array append), so set -e never fires in the check zone.
+# fail() returns 0 explicitly so `cmd || fail` never trips set -e mid-check.
+# The explicit return is load-bearing: without it a future trailing statement
+# could return non-zero and silently collapse report-all back to fail-fast.
 FAILURES=()
-fail() { FAILURES+=("$1"); }
+fail() { FAILURES+=("$1"); return 0; }
 
 # Accept either a personal API key (Option A) or the enterprise token pair (Option B).
 if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
@@ -23,7 +25,8 @@ command -v rg    >/dev/null 2>&1 || fail "ripgrep not found. Run: brew install r
 command -v node  >/dev/null 2>&1 || fail "node not found. Run: brew install node"
 command -v pnpm  >/dev/null 2>&1 || fail "pnpm not found. Run: npm install -g pnpm"
 
-# Report all failures, then exit once. LOOP BOUND: max 5 (one per check above). [P10-R2]
+# Report all failures, then exit once. LOOP BOUND: 5 fail sites, but the two
+# credential branches are mutually exclusive, so a single run yields max 4. [P10-R2]
 if [ "${#FAILURES[@]}" -gt 0 ]; then
   for msg in "${FAILURES[@]}"; do
     echo "ERROR: ${msg}"

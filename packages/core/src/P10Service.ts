@@ -19,23 +19,36 @@ export class P10Service {
     this.vault = vault;
   }
 
+  /**
+   * Run a full P10 pre-execution planning cycle for the given task.
+   * Scouts run in parallel, outputs are compressed, then passed through
+   * analyzer → draft writer → arbiter. One revision cycle is permitted.
+   * Throws P10BlockedError if the arbiter blocks or the revision cap is hit.
+   */
   async runPlan(task: string): Promise<P10Result> {
     assert(typeof task === 'string' && task.length > 0, 'task must be non-empty');
     assert(task.length <= 4000, 'task must not exceed 4000 chars');
 
     const scouts = await this.runScouts(task);
-    const analysis = await this.runAnalyzer(task, scouts);
-    let draft = await this.runDraftWriter(analysis);
-    let ruling = await this.runArbiter(draft);
+    const compressed = await this.compressScouts(scouts);
+    const analysis = await this.runAnalyzer(task, compressed);
+    let draft = await this.runDraftWriter(task, analysis);
+    let ruling = await this.runArbiter(task, draft);
 
     let revisionCount = 0;
     while (ruling.status === 'revision-required' && revisionCount < MAX_REVISIONS) {
       revisionCount++;
       draft = await withLLMTimeout(
-        (opts) => this.callModel('claude-sonnet-4-6', P10_REVISE(draft, ruling.requiredChanges ?? ''), opts),
+        (opts) =>
+          this.callModel(
+            'claude-sonnet-4-6',
+            P10_REVISE(draft, ruling.requiredChanges ?? ''),
+            undefined,
+            opts,
+          ),
         'draft-revision',
       );
-      ruling = await this.runArbiter(draft);
+      ruling = await this.runArbiter(task, draft);
     }
     // Revision cap reached without terminal status — treat as blocked (CSO: no silent AssertionError)
     if (ruling.status === 'revision-required') {
@@ -49,37 +62,79 @@ export class P10Service {
     return { status: ruling.status, planPath };
   }
 
+  /**
+   * Run the two scouts in parallel. Each scout receives only the task description
+   * as its user message (no prior context) — per lost-in-the-middle positioning.
+   */
   private async runScouts(task: string): Promise<string[]> {
     return Promise.all([
       withLLMTimeout(
-        (opts) => this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_SKEPTIC(task), opts),
+        (opts) =>
+          this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_SKEPTIC(task), undefined, opts),
         'p10-scout-skeptic',
       ),
       withLLMTimeout(
-        (opts) => this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_MINIMALIST(task), opts),
+        (opts) =>
+          this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_MINIMALIST(task), undefined, opts),
         'p10-scout-minimalist',
       ),
     ]);
   }
 
-  private async runAnalyzer(task: string, scouts: string[]): Promise<string> {
+  /**
+   * Compress each scout output to 5 terse bullet points before passing to the
+   * analyzer. Prevents context rot and format tax from verbose scout prose.
+   */
+  private async compressScouts(scouts: string[]): Promise<string[]> {
+    return Promise.all(
+      scouts.map((scout, i) =>
+        withLLMTimeout(
+          (opts) =>
+            this.callModel(
+              'claude-sonnet-4-6',
+              scout,
+              'Extract the 5 most important findings as terse bullet points. One sentence each.',
+              opts,
+            ),
+          `p10-compress-scout-${i}`,
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Run the analyzer with compressed scout summaries at the top and the task at
+   * the bottom — critical context first to avoid lost-in-the-middle degradation.
+   */
+  private async runAnalyzer(task: string, compressedScouts: string[]): Promise<string> {
     return withLLMTimeout(
-      (opts) => this.callModel('claude-sonnet-4-6', P10_ANALYZER(task, scouts), opts),
+      (opts) =>
+        this.callModel('claude-sonnet-4-6', P10_ANALYZER(task, compressedScouts), undefined, opts),
       'p10-analyzer',
     );
   }
 
-  private async runDraftWriter(analysis: string): Promise<string> {
+  /**
+   * Run the draft writer with analyzer output at the top and the task at the
+   * bottom — preserves primacy of analysis context.
+   */
+  private async runDraftWriter(task: string, analysis: string): Promise<string> {
     return withLLMTimeout(
-      (opts) => this.callModel('claude-sonnet-4-6', P10_DRAFT_WRITER(analysis), opts),
+      (opts) =>
+        this.callModel('claude-sonnet-4-6', P10_DRAFT_WRITER(task, analysis), undefined, opts),
       'p10-draft',
     );
   }
 
-  private async runArbiter(draft: string): Promise<P10Ruling> {
+  /**
+   * Run the Opus arbiter with the draft plan at the top and the task at the
+   * bottom — arbiter sees the artifact first, task last for grounding.
+   */
+  private async runArbiter(task: string, draft: string): Promise<P10Ruling> {
     assert(draft.length > 0, 'draft must not be empty');
     const raw = await withLLMTimeout(
-      (opts) => this.callModel('claude-opus-4-8', P10_ARBITER(draft), opts),
+      (opts) =>
+        this.callModel('claude-opus-4-8', P10_ARBITER(task, draft), undefined, opts),
       'p10-arbiter',
     );
     const ruling = parseP10Ruling(raw);
@@ -96,9 +151,24 @@ export class P10Service {
     return filename;
   }
 
-  private async callModel(model: string, prompt: string, opts: { signal: AbortSignal }): Promise<string> {
+  /**
+   * Call a model with temperature: 0 for deterministic planning output.
+   * system prompt is optional; when provided it is passed as the system field.
+   */
+  private async callModel(
+    model: string,
+    userMessage: string,
+    system: string | undefined,
+    opts: { signal: AbortSignal },
+  ): Promise<string> {
     const msg = await this.client.messages.create(
-      { model, max_tokens: 2048, messages: [{ role: 'user', content: prompt }] },
+      {
+        model,
+        max_tokens: 2048,
+        temperature: 0,
+        ...(system !== undefined ? { system } : {}),
+        messages: [{ role: 'user', content: userMessage }],
+      },
       { signal: opts.signal },
     );
     const block = msg.content[0];
@@ -106,6 +176,7 @@ export class P10Service {
   }
 }
 
+// Scout prompts: task description only as user message (no prior context injected here).
 const P10_SCOUT_SKEPTIC = (task: string) => `\
 You are the Skeptic scout in a NASA Power of 10 pre-execution analysis. Be concise (under 150 words).
 
@@ -135,13 +206,16 @@ Find scope creep and over-engineering. Check for:
 
 Return a bulleted list of scope risks. If the task is already minimal, say "Scope looks right."`;
 
+// Analyzer: compressed scout summaries at top, task at bottom.
 const P10_ANALYZER = (task: string, scouts: string[]) => `\
-You are the P10 Analyzer. Synthesize the scout findings into a structured risk analysis (under 250 words).
-
-TASK: ${task}
-
 SCOUT FINDINGS:
 ${scouts.map((s, i) => `Scout ${i + 1}:\n${s}`).join('\n\n')}
+
+---
+
+You are the P10 Analyzer. Synthesize the scout findings above into a structured risk analysis (under 250 words).
+
+TASK: ${task}
 
 Produce:
 1. Risk Summary — top 3 risks ranked by severity
@@ -149,10 +223,15 @@ Produce:
 3. Implementation constraints — what the execution agent must enforce
 4. Success criteria — 3 verifiable assertions that must pass before declaring the stage done`;
 
-const P10_DRAFT_WRITER = (analysis: string) => `\
-You are the P10 Draft Writer. Produce a P10 execution plan from the analysis below.
-
+// Draft writer: analyzer output at top, task at bottom.
+const P10_DRAFT_WRITER = (task: string, analysis: string) => `\
 ${analysis}
+
+---
+
+You are the P10 Draft Writer. Produce a P10 execution plan from the analysis above.
+
+TASK: ${task}
 
 Format the plan as:
 ---
@@ -199,10 +278,15 @@ status: [leave blank — arbiter sets this]
 
 Keep under 400 words.`;
 
-const P10_ARBITER = (draft: string) => `\
+// Arbiter: draft plan at top, task at bottom.
+const P10_ARBITER = (task: string, draft: string) => `\
+${draft}
+
+---
+
 You are the Arbiter for a P10 pre-execution plan. Your job: approve, request revision, or block.
 
-${draft}
+TASK: ${task}
 
 Evaluate against NASA Power of 10 rules:
 1. Every loop has a fixed bound

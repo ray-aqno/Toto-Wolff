@@ -20,5 +20,5 @@ function validateInput(raw: unknown): CouncilRunInput {
 
 export async function handleCouncilRun(input: unknown, council: CouncilService): Promise<CouncilResult> {
   const { question } = validateInput(input);
-  return council.runSession(question);
+  return council.run(question);
 }

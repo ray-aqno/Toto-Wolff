@@ -22,14 +22,14 @@ const p10 = new P10Service(vault);
 /** Extract YYYY-MM-DD from a filename. Returns 'unknown' if no date found. */
 function extractDate(filename: string): string {
   const match = filename.match(/(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : 'unknown';
+  return match ? (match[1] ?? 'unknown') : 'unknown';
 }
 
 /** Extract status from file content by scanning for "Status:" lines. */
 function extractStatus(content: string): string {
   const match = content.match(/[Ss]tatus:\s*(.+)/);
   if (!match) return 'unknown';
-  const raw = match[1].trim().toLowerCase();
+  const raw = (match[1] ?? '').trim().toLowerCase();
   if (raw.includes('approved')) return 'approved';
   if (raw.includes('blocked')) return 'blocked';
   if (raw.includes('revision')) return 'revision-required';

@@ -52,13 +52,6 @@ export interface P10Ruling {
   requiredChanges?: string;
 }
 
-export interface CouncilResult {
-  status: 'ok' | 'error';
-  ruling?: CouncilRuling;
-  planPath?: string;
-  error?: string;
-}
-
 export interface P10Result {
   status: P10Status | 'error';
   planPath?: string;

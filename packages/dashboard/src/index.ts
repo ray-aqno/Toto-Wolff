@@ -60,7 +60,7 @@ function colorStatus(status: string | null): string {
 /** Extract a YYYY-MM-DD date prefix from a filename, or return 'unknown'. */
 function parseDateFromFilename(filename: string): string {
   const m = filename.match(/^(\d{4}-\d{2}-\d{2})/);
-  return m ? m[1] : 'unknown';
+  return m ? (m[1] ?? 'unknown') : 'unknown';
 }
 
 /**
@@ -76,7 +76,7 @@ function parseFileContent(content: string): { status: string | null; excerpt: st
   for (const line of lines) {
     const statusMatch = line.match(/[Ss]tatus:\s*(approved|revision-required|blocked)/i);
     if (statusMatch && !status) {
-      status = statusMatch[1].toLowerCase();
+      status = (statusMatch[1] ?? '').toLowerCase();
     }
     if (!excerpt) {
       const trimmed = line.trim();

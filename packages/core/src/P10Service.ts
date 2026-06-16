@@ -177,7 +177,7 @@ export class P10Service {
 }
 
 // Scout prompts: task description only as user message (no prior context injected here).
-const P10_SCOUT_SKEPTIC = (task: string) => `\
+const P10_SCOUT_SKEPTIC = (task: string): string => `\
 You are the Skeptic scout in a NASA Power of 10 pre-execution analysis. Be concise (under 150 words).
 
 TASK: ${task}
@@ -192,7 +192,7 @@ Find failure modes. Check for:
 Use available code navigation tools (get_symbols_overview, find_symbol) if accessible.
 Return a bulleted list of specific concerns with file references where possible. If none, say "No P10 concerns detected."`;
 
-const P10_SCOUT_MINIMALIST = (task: string) => `\
+const P10_SCOUT_MINIMALIST = (task: string): string => `\
 You are the Minimalist scout in a NASA Power of 10 pre-execution analysis. Be concise (under 150 words).
 
 TASK: ${task}
@@ -207,7 +207,7 @@ Find scope creep and over-engineering. Check for:
 Return a bulleted list of scope risks. If the task is already minimal, say "Scope looks right."`;
 
 // Analyzer: compressed scout summaries at top, task at bottom.
-const P10_ANALYZER = (task: string, scouts: string[]) => `\
+const P10_ANALYZER = (task: string, scouts: string[]): string => `\
 SCOUT FINDINGS:
 ${scouts.map((s, i) => `Scout ${i + 1}:\n${s}`).join('\n\n')}
 
@@ -224,7 +224,7 @@ Produce:
 4. Success criteria — 3 verifiable assertions that must pass before declaring the stage done`;
 
 // Draft writer: analyzer output at top, task at bottom.
-const P10_DRAFT_WRITER = (task: string, analysis: string) => `\
+const P10_DRAFT_WRITER = (task: string, analysis: string): string => `\
 ${analysis}
 
 ---
@@ -251,7 +251,7 @@ status: [leave blank — arbiter sets this]
 
 Keep under 400 words. Be specific — name files, functions, types where known.`;
 
-const P10_REVISE = (draft: string, requiredChanges: string) => `\
+const P10_REVISE = (draft: string, requiredChanges: string): string => `\
 You are the P10 Draft Writer revising a plan after arbiter feedback.
 
 REQUIRED CHANGES:
@@ -279,7 +279,7 @@ status: [leave blank — arbiter sets this]
 Keep under 400 words.`;
 
 // Arbiter: draft plan at top, task at bottom.
-const P10_ARBITER = (task: string, draft: string) => `\
+const P10_ARBITER = (task: string, draft: string): string => `\
 ${draft}
 
 ---

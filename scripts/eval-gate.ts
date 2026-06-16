@@ -34,9 +34,14 @@ async function runEvalGate(): Promise<void> {
     'p10 arbiter must return terminal status',
   );
 
-  // Gate 3: council session does not error
-  const councilResult: CouncilResult = await council.runSession('eval-gate smoke: verify council pipeline runs');
-  assert(councilResult.status !== 'error', 'council session must not error');
+  // Gate 3: council session runs without throwing and returns a terminal status
+  const councilResult: CouncilResult = await council.run('eval-gate smoke: verify council pipeline runs');
+  assert(
+    councilResult.status === 'approved' ||
+      councilResult.status === 'revision-required' ||
+      councilResult.status === 'blocked',
+    'council session must return terminal status',
+  );
 
   const report = formatReport(vaultWriteResult.path, p10Result, councilResult);
   const reportPath = join(VAULT_PATH, 'P10-Plans/eval-gate-result.md');

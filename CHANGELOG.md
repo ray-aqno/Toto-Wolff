@@ -1,14 +1,32 @@
 # Changelog
 
+## v0.0.5 — 2026-06-15
+### Added
+- CouncilService: persona injection for all 5 roles (scout1, scout2, analyst1, analyst2, chairman)
+- CouncilService: 2-turn compression between scouts and analysts (Format Tax paper)
+- CouncilService: context positioning — important context at primacy position (Lost in the Middle paper)
+- CouncilService: temperature=0 on all governance calls (deterministic governance)
+- P10Service: same context positioning, 2-turn compression, and temperature=0 pattern
+- MCP server: dashboard_status tool
+- packages/dashboard: terminal governance dashboard
+- .github/workflows/ci.yml: CI pipeline (T11 — Phase 1 eval-gate unblocked)
+### Fixed
+- CLAUDE.md MCP Server: replaced hardcoded absolute start-command path with a `<repo>` placeholder so the setup reference works on any clone (install-ux defect from council ruling 2026-06-16)
+### Security
+- CLAUDE.md: documented per-user MCP credentials — `ANTHROPIC_AUTH_TOKEN` supplied via each developer's `~/.claude.json` (never committed); placeholder-only example
+### Removed
+- runbook.md: Loom tutorial placeholder (demo runs directly via demo.sh)
+
 ## [0.0.4.1] - 2026-06-12
 
 ### Added
 
-- `tests/bootstrap-env.bats` — 7 tests covering the preflight gate: all-pass path, the report-all contract (no-creds + no-tools surfaces all four errors in one pass, proving `set -e` does not abort mid-check), the Option B partial/complete credential paths, and git init gated behind a clean preflight (failed preflight creates no `.git`). Tool presence is stubbed so the suite runs without ripgrep/node/pnpm on the host.
+- `tests/bootstrap-env.bats` — 9 tests covering the preflight gate: all-pass path (asserts no phantom `ERROR:` line on a clean system), the report-all contract (no-creds + no-tools surfaces all four errors in one pass, proving `set -e` does not abort mid-check), per-tool isolation (only the missing tool's error appears, ruling out a regression in any one `command -v` line), multi-source accumulation (Option B partial-credential failure surfaces alongside tool failures in a single run), the Option B partial/complete credential paths, and git init gated behind a clean preflight (failed preflight creates no `.git`). Tool presence is stubbed via symlinked `STUB_BIN` and `ABSENT_BIN` dirs so the suite is hermetic — runs without ripgrep/node/pnpm on the host, and survives the count-guard-vs-`set -u` footgun that would print a phantom `ERROR:` on the all-pass path.
 
 ### Changed
 
 - `scripts/bootstrap-env.sh` — preflight now reports **all** failed prerequisites in one pass, then exits once, instead of failing on the first miss. A fresh evaluator with three missing tools and no credentials sees four `ERROR:` lines and the four remediation one-liners in a single run, not one error per re-run. Exit codes unchanged (0 pass / 2 fail). State mutation (`git init`) still gated behind a clean preflight. (P10 plan `2026-06-12-bootstrap-env-report-all`, council `toto-wolff-ux-optimization`.)
+- `scripts/bootstrap-env.sh` — `fail()` now returns `0` explicitly. Belt-and-suspenders against a future maintainer adding a non-zero trailing statement: the `cmd || fail` sites would otherwise trip `set -e` mid-check and silently collapse report-all back to fail-fast with no test catching it. The 9-test bats suite already proves the report-all contract holds; this just removes the implicit-dependency footgun.
 - `README.md` — leads with a paste-into-Claude setup prompt as the primary install path, plus a before/after table of what the protocol changes. Preflight runs before `./setup`, so a missing prerequisite surfaces at install time rather than at first `/council`. Manual `git clone`/`./setup` path retained.
 
 ## [0.0.4.0] - 2026-06-11

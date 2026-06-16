@@ -50,7 +50,7 @@ Pre-execution planning contract grounded in NASA JPL Power of 10 rules.
 
 **Trigger:** `/p10 [task]`, "plan this with p10", "bridge to execution", or any task following a /council ruling before execution begins.
 
-**Skill location:** `.claude/skills/p10/P10.md`
+**Skill location:** `.claude/skills/p10/SKILL.md`
 
 **Config:**
 - VAULT_PATH=~/Documents/Obsidian Vault

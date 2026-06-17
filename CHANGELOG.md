@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.5.1 — 2026-06-17
+### Fixed
+- Build: migrate esbuild build-approval to pnpm 11 `allowBuilds` (pnpm 10's `onlyBuiltDependencies` is removed in pnpm 11.5.1, which silently broke the local typecheck/lint/test/build gate via `ERR_PNPM_IGNORED_BUILDS`).
+- Docs: correct `/p10` skill path in CLAUDE.md (`p10/P10.md` → `p10/SKILL.md`).
+### Changed
+- CI/toolchain: pin pnpm 11.5.1 (`packageManager`) and Node 24 (`.nvmrc`) as single sources of truth; CI jobs read `packageManager` + `node-version-file` instead of hardcoded pnpm 9 / Node 20. Moves CI off end-of-life Node 20 (EOL 2026-04-30).
+
 ## v0.0.5 — 2026-06-15
 ### Added
 - CouncilService: persona injection for all 5 roles (scout1, scout2, analyst1, analyst2, chairman)

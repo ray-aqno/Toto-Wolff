@@ -1,6 +1,6 @@
 {
   "name": "@toto-wolff/dashboard",
-  "version": "0.0.5.0",
+  "version": "0.0.5",
   "description": "Terminal governance dashboard for toto-wolff",
   "type": "module",
   "main": "dist/index.js",

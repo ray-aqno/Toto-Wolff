@@ -73,6 +73,38 @@ Pre-execution planning contract grounded in NASA JPL Power of 10 rules.
 
 ---
 
+# cabinet
+
+The final voice before a tagged release. Three equal seats, no chair, no tiebreaker.
+
+**Trigger:** `/cabinet`, "convene the cabinet", "cabinet this", or any release/tag/v-number
+gate (e.g. "ready for v1.0.0?") after the build/review/ship stack has run.
+
+**Skill location:** `.claude/skills/the-cabinet/SKILL.md`
+
+**Config:**
+- VAULT_PATH=~/Documents/Obsidian Vault
+- CABINET_LOG_DIR=Cabinet
+
+**Seats (equal seating, all claude-opus-4-8):**
+- Garry Tan — product & market truth
+- Richard Feynman — first-principles correctness
+- Andrej Karpathy — engineering execution
+
+**Behavior:**
+- Assemble a shared release-evidence brief (reads /review, /p10, /ship records — does not re-run them)
+- Spawn 3 parallel Opus subagents, one per seat; each rules independently
+- Each seat returns SHIP / CONDITIONAL / BLOCK; a BLOCK must name a release-critical defect
+- Decision rule: any-seat veto (unanimous-to-ship). No majority override, no chair
+- Synthesis reconciles only — no new opinions; records convergence and dissent
+- Write a Cabinet Record to the Obsidian vault after every session
+- Human may override, but the override is recorded as an override, not a pass
+
+**Usage:**
+/cabinet [subject + version under judgment]
+
+---
+
 # gstack skills
 
 Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.

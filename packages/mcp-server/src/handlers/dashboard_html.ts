@@ -16,9 +16,19 @@ export interface DashboardResult {
   generatedAt: string;
 }
 
+/** Escapes HTML special characters to prevent XSS from vault-sourced strings. */
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /** Renders a two-cell table row with a label and value. */
 function buildRow(label: string, value: string | number): string {
-  return `<tr><td class="lbl">${label}</td><td class="val">${value}</td></tr>`;
+  const safeValue = typeof value === 'string' ? esc(value) : value;
+  return `<tr><td class="lbl">${label}</td><td class="val">${safeValue}</td></tr>`;
 }
 
 /**
@@ -44,7 +54,7 @@ export function renderDashboardHtml(data: DashboardResult): string {
   const blockedRows = data.blockedItems.length === 0
     ? '<tr><td colspan="3" class="empty">No blocked items</td></tr>'
     : data.blockedItems.map((b) =>
-        `<tr><td>${b.type}</td><td>${b.date}</td><td>${b.excerpt}</td></tr>`
+        `<tr><td>${esc(b.type)}</td><td>${esc(b.date)}</td><td>${esc(b.excerpt)}</td></tr>`
       ).join('');
 
   return `<!DOCTYPE html>

@@ -132,9 +132,15 @@ async function isOrphanedRuling(
   }
 
   let anyExists = false;
+  const vaultRoot = vaultPath.endsWith(path.sep) ? vaultPath : vaultPath + path.sep;
   for (let i = 0; i < refs.length; i++) {
     const ref = refs[i] ?? "";
-    const candidate = ref.startsWith("/") ? ref : path.join(vaultPath, ref);
+    // Clamp to vault — never probe paths outside it (filesystem oracle risk)
+    const raw = ref.startsWith("/") ? ref.slice(1) : ref;
+    const candidate = path.resolve(vaultPath, raw);
+    if (!candidate.startsWith(vaultRoot) && candidate !== vaultPath) {
+      continue;
+    }
     try {
       await fs.access(candidate);
       anyExists = true;

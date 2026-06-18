@@ -27,6 +27,14 @@ const QUOTES: string[] = [
   "We need to talk about the engine mode.",
   "Copy that. Looking after the tyres now.",
   "Pit window is open. Box this lap.",
+  "Council is convened. Scouts are in the tunnel.",
+  "P10 plan approved. Execution window is open.",
+  "BLOCKED item on the wall. This needs a ruling before we move.",
+  "Architecture decision logged. Congressional record filed.",
+  "Chairman has ruled. Conditional: address the T8 spec.",
+  "Compliance at 67%. Push for full green before the sprint.",
+  "Reversal rate zero. All rulings clean. That's how we do it.",
+  "Persona hot-swap confirmed. Engineering stack is live.",
 ];
 
 /** Return a deterministic quote based on day-of-year so it changes daily. */
@@ -51,6 +59,31 @@ async function countVaultFiles(subdir: string): Promise<number | null> {
   }
 }
 
+/**
+ * Count P10 plans with BLOCKED status by scanning plan files for the status line.
+ * Returns 0 on any read error.
+ */
+async function countBlockedPlans(): Promise<number> {
+  const vaultPath = process.env["VAULT_PATH"] ??
+    path.join(os.homedir(), "Documents", "Obsidian Vault");
+  const dir = path.join(vaultPath, "P10-Plans");
+  try {
+    const entries = await fs.readdir(dir);
+    let blocked = 0;
+    await Promise.all(
+      entries.filter((e) => e.endsWith(".md")).map(async (e) => {
+        try {
+          const content = await fs.readFile(path.join(dir, e), "utf8");
+          if (/status:\s*blocked/i.test(content)) blocked++;
+        } catch { /* skip unreadable files */ }
+      })
+    );
+    return blocked;
+  } catch {
+    return 0;
+  }
+}
+
 /** Right-pad a string to width with spaces. */
 function pad(s: string, width: number): string {
   return s.length >= width ? s : s + " ".repeat(width - s.length);
@@ -62,24 +95,32 @@ function pad(s: string, width: number): string {
  * readable, and a daily team-radio quote.
  */
 export async function printLandingUI(): Promise<void> {
-  const [councilCount, p10Count] = await Promise.all([
+  const [councilCount, p10Count, blockedCount] = await Promise.all([
     countVaultFiles("Council/Congressional-Records"),
     countVaultFiles("P10-Plans"),
+    countBlockedPlans(),
   ]);
 
-  const statsLine = councilCount !== null && p10Count !== null
+  const vaultConnected = councilCount !== null && p10Count !== null;
+  const statsLine = vaultConnected
     ? `${T}${councilCount}${R} council sessions  ${T}${p10Count}${R} P10 plans`
     : `${D}vault not connected — run ${T}toto doctor${R}`;
 
+  const pitStatus = !vaultConnected
+    ? ""
+    : blockedCount > 0
+      ? `\n  ${"\x1b[31m"}⚠  ${blockedCount} BLOCKED${R}${D} — execution halted on ${blockedCount} plan${blockedCount > 1 ? "s" : ""}. Run ${R}${T}toto audit${R}${D} for details.${R}`
+      : `\n  ${G}●${R}${D}  pit lane clear — no blocked plans${R}`;
+
   const cmds: Array<[string, string]> = [
     ["init",      "Register MCP server in Claude Code"],
-    ["doctor",    "Check credentials, vault, MCP entry"],
+    ["doctor",    "Credentials · vault · MCP health check"],
     ["whoami",    "Active persona + pending P10 count"],
-    ["search",    "Ripgrep across vault files"],
-    ["last",      "Last 5 governance decisions"],
-    ["audit",     "Stale plans + orphaned rulings"],
-    ["dashboard", "Open web dashboard in browser"],
-    ["radio",     "🎙  Pit wall chat  (requires API key)"],
+    ["search",    "Grep the vault — find any ruling or plan"],
+    ["last",      "Last 5 rulings off the wall"],
+    ["audit",     "Stale plans · orphaned rulings · blocked items"],
+    ["dashboard", "Paddock interface — live in browser"],
+    ["radio",     "Pit wall chat with Toto  (requires API key)"],
   ];
 
   const cmdLines = cmds
@@ -97,7 +138,7 @@ ${T}${B}╔═══════════════════════
 ${cmdLines}
 
   ${D}──────────────────────────────────────────────────${R}
-  ${statsLine}
+  ${statsLine}${pitStatus}
 
   ${D}"${quote}"${R}
 

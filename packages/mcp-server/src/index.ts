@@ -8,6 +8,8 @@ import { MCPValidationError, handleVaultWrite } from './handlers/vault_write.js'
 import { handleVaultSearch } from './handlers/vault_search.js';
 import { handleCouncilRun } from './handlers/council_run.js';
 import { handleP10Plan } from './handlers/p10_plan.js';
+import { renderDashboardHtml } from './handlers/dashboard_html.js';
+import type { DashboardResult, DashboardItem } from './handlers/dashboard_html.js';
 
 const PORT = parseInt(process.env['TOTO_MCP_PORT'] ?? '3099', 10);
 const VAULT_PATH = process.env['TOTO_VAULT_PATH'] ?? `${process.env['HOME'] ?? ''}/Documents/Obsidian Vault`;
@@ -34,19 +36,6 @@ function extractStatus(content: string): string {
   if (raw.includes('blocked')) return 'blocked';
   if (raw.includes('revision')) return 'revision-required';
   return raw.slice(0, 40);
-}
-
-interface DashboardItem {
-  date: string;
-  excerpt: string;
-  status: string;
-}
-
-interface DashboardResult {
-  councilSessions: { count: number; recent: DashboardItem[] };
-  p10Plans: { count: number; recent: DashboardItem[] };
-  blockedItems: Array<{ type: 'council' | 'p10'; date: string; excerpt: string }>;
-  generatedAt: string;
 }
 
 /**
@@ -131,11 +120,25 @@ const server = createServer((req, res) => {
     }
   });
   req.on('end', () => {
-    if (!res.headersSent) void handleRequest(req.url ?? '', raw, res);
+    if (!res.headersSent) void handleRequest(req.url ?? '', req.method ?? 'GET', raw, res);
   });
 });
 
-async function handleRequest(url: string, raw: string, res: import('node:http').ServerResponse): Promise<void> {
+/**
+ * Routes an incoming HTTP request to the appropriate tool handler or the HTML dashboard.
+ * Intercepts GET /dashboard before the TOOLS lookup and returns server-rendered HTML.
+ * Returns 405 for non-GET requests to /dashboard, 404 for unknown tool paths.
+ */
+async function handleRequest(url: string, method: string, raw: string, res: import('node:http').ServerResponse): Promise<void> {
+  if (url === '/dashboard') {
+    if (method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'method not allowed' }));
+      return;
+    }
+    const data = await handleDashboardStatus();
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(renderDashboardHtml(data));
+    return;
+  }
   const tool = url.replace(/^\//, '');
   const handler = TOOLS[tool];
   if (handler === undefined) {

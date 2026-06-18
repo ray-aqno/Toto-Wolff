@@ -1,0 +1,6 @@
+{
+  "name": "@toto-wolff/personas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persona markdown stubs for toto-wolff AI-assisted development stack"
+}

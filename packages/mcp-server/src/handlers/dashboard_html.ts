@@ -49,7 +49,7 @@ function arcGauge(pct: number, color: string, label: string, id: string): string
     <path d="${arc(startAngle, trackEnd, r)}" fill="none" stroke="#2a2a2a" stroke-width="10" stroke-linecap="round"/>
     <path class="gauge-fill" d="${arc(startAngle, trackEnd, r)}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="0 ${arcLen.toFixed(2)}" style="transition:stroke-dasharray 1.2s cubic-bezier(.4,0,.2,1)"/>
     <text class="gauge-val" x="${cx}" y="${cy - 4}" text-anchor="middle" fill="white" font-family="'JetBrains Mono',monospace" font-size="20" font-weight="700">0%</text>
-    <text x="${cx}" y="${cy + 16}" text-anchor="middle" fill="#666" font-family="system-ui,sans-serif" font-size="10">${label}</text>
+    <text x="${cx}" y="${cy + 16}" text-anchor="middle" fill="#666" font-family="'JetBrains Mono',monospace" font-size="9">${label}</text>
   </svg>`;
 }
 
@@ -132,11 +132,10 @@ export function renderDashboardHtml(data: DashboardResult): string {
     --bg: #0d0d0d; --surf: #121212; --card: #181818; --border: #242424;
     --text: #f0f0f0; --dim: #555; --red: #e03030; --amber: #e09020;
     --mono: 'JetBrains Mono', 'Courier New', monospace;
-    --sans: system-ui, -apple-system, sans-serif;
     --panel-w: 420px;
   }
   html, body { height: 100%; background: var(--bg); color: var(--text) }
-  body { font-family: var(--sans); font-size: 14px; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden }
+  body { font-family: var(--mono); font-size: 14px; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden }
 
   /* ── Header ─────────────────────────────────────────────────────────── */
   .header {
@@ -150,6 +149,7 @@ export function renderDashboardHtml(data: DashboardResult): string {
   .header-badge { background: var(--teal); color: #0d0d0d; font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 2px 7px; border-radius: 2px; letter-spacing: .1em; animation: badge-blink 3s ease-in-out infinite }
   @keyframes badge-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
   .header-ts    { font-family: var(--mono); font-size: .65rem; color: var(--dim); letter-spacing: .04em; text-align: right }
+  @media (max-width: 600px) { .header-ts { display: none } }
   .header-ts .val { color: var(--silver) }
   .wcc-badge    { font-family: var(--mono); font-size: .52rem; color: #2a2a2a; letter-spacing: .08em; margin-top: 2px; user-select: none; transition: color .3s; text-align: right }
   .wcc-badge:hover { color: var(--dim) }
@@ -237,9 +237,9 @@ export function renderDashboardHtml(data: DashboardResult): string {
   .panel-sub   { font-family: var(--mono); font-size: .6rem; color: var(--dim); margin-top: 3px; letter-spacing: .06em }
   .panel-close {
     background: none; border: 1px solid var(--border); color: var(--dim);
-    font-family: var(--mono); font-size: .65rem; padding: 3px 8px; border-radius: 2px;
+    font-family: var(--mono); font-size: .65rem; padding: 0 10px; border-radius: 2px;
     cursor: pointer; flex-shrink: 0; transition: border-color .15s, color .15s;
-    letter-spacing: .08em;
+    letter-spacing: .08em; min-height: 44px; display: flex; align-items: center;
   }
   .panel-close:hover { border-color: var(--teal); color: var(--teal) }
   .panel-close:focus { outline: 2px solid var(--teal); outline-offset: 2px }
@@ -329,7 +329,7 @@ ${empty ? `
     <div class="stat-big" data-count="${data.p10Plans.count}" style="color:var(--silver)">0</div>
     <div class="stat-unit">Execution Plans</div>
     <hr class="sep">
-    ${sparkline(data.p10Plans.recent.map((_, i) => i + 1), '#C0C0C0', 'spark-p10')}
+    ${sparkline(data.p10Plans.recent.map((_, i) => i + 1), '#00D2BE', 'spark-p10')}
   </div>
 
   <div class="card gauge-card" id="card-compliance" data-panel="compliance" style="--delay:.15s">

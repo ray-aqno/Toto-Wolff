@@ -1,0 +1,24 @@
+{
+  "name": "@toto-wolff/cli",
+  "version": "0.0.5",
+  "description": "CLI for toto-wolff governance tooling",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "toto": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"import('fs').then(fs=>{fs.default.chmodSync('dist/index.js',0o755)})\"",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@toto-wolff/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "tsx": "^4.0.0",
+    "vitest": "^3.0.0"
+  }
+}

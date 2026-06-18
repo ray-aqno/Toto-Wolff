@@ -12,33 +12,12 @@ import { runSearch } from "./commands/search.js";
 import { runLast } from "./commands/last.js";
 import { runAudit } from "./commands/audit.js";
 import { runDashboard } from "./commands/dashboard.js";
-
-const USAGE = `toto — governance CLI for toto-wolff
-
-Usage:
-  toto <command> [options]
-
-Commands:
-  init       Register the toto-wolff MCP server in ~/.claude/settings.json
-  doctor     Check environment, MCP entry, and vault path
-  whoami     Print active persona, vault path, and pending P10 plan count
-  search     Search vault files with ripgrep (usage: toto search <query>)
-  last       List the 5 most recently modified council/P10 records
-  audit      Scan vault for stale P10 plans and orphaned council rulings
-  dashboard  Open the toto-wolff web dashboard in the default browser
-
-Run 'toto --help' for this message.
-`;
-
-/** Print usage to stdout and exit 0. */
-function printHelp(): void {
-  process.stdout.write(USAGE);
-  process.exit(0);
-}
+import { runRadio } from "./commands/radio.js";
+import { printLandingUI, plainUsage } from "./ui.js";
 
 /** Print an "unknown command" error to stderr and exit 1. */
 function unknownCommand(cmd: string): void {
-  process.stderr.write(`toto: unknown command '${cmd}'\n\n${USAGE}`);
+  process.stderr.write(`toto: unknown command '${cmd}'\n\n${plainUsage()}`);
   process.exit(1);
 }
 
@@ -46,8 +25,15 @@ function unknownCommand(cmd: string): void {
 async function main(): Promise<void> {
   const cmd = process.argv[2];
 
-  if (cmd === undefined || cmd === "--help" || cmd === "-h") {
-    printHelp();
+  if (cmd === undefined) {
+    await printLandingUI();
+    process.exit(0);
+    return;
+  }
+
+  if (cmd === "--help" || cmd === "-h") {
+    process.stdout.write(plainUsage());
+    process.exit(0);
     return;
   }
 
@@ -83,6 +69,11 @@ async function main(): Promise<void> {
 
   if (cmd === "dashboard") {
     await runDashboard();
+    return;
+  }
+
+  if (cmd === "radio") {
+    await runRadio();
     return;
   }
 

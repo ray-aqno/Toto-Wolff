@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 import os from "node:os";
 
@@ -87,32 +89,91 @@ async function checkVaultPath(): Promise<CheckResult> {
   }
 }
 
+/**
+ * INFO-level check: probe Ollama's /api/tags endpoint.
+ * Never exits 1 — Ollama is optional. Shows available models when reachable.
+ */
+async function checkOllama(): Promise<CheckResult> {
+  const host = process.env["OLLAMA_HOST"] ?? "http://localhost:11434";
+  const label = `Ollama (${host})`;
+
+  return new Promise((resolve) => {
+    const url = new URL("/api/tags", host);
+    const lib = url.protocol === "https:" ? https : http;
+
+    const req = lib.request(
+      {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === "https:" ? 443 : 80),
+        path: url.pathname,
+        method: "GET",
+      },
+      (res) => {
+        let raw = "";
+        res.on("data", (chunk: Buffer) => { raw += chunk.toString(); });
+        res.on("end", () => {
+          if (res.statusCode !== 200) {
+            resolve({ label, passed: false, detail: `HTTP ${res.statusCode ?? "unknown"}` });
+            return;
+          }
+          try {
+            const body = JSON.parse(raw) as { models?: Array<{ name: string }> };
+            const names = (body.models ?? []).map((m) => m.name);
+            const detail = names.length > 0
+              ? `running · ${names.length} model${names.length > 1 ? "s" : ""}: ${names.slice(0, 3).join(", ")}${names.length > 3 ? ` +${names.length - 3} more` : ""}`
+              : "running · no models pulled yet";
+            resolve({ label, passed: true, detail });
+          } catch {
+            resolve({ label, passed: true, detail: "running" });
+          }
+        });
+      },
+    );
+
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve({ label, passed: false, detail: "not running (timeout) — set TOTO_RADIO_PROVIDER=ollama to use as radio backend" });
+    });
+
+    req.on("error", (err: NodeJS.ErrnoException) => {
+      const detail = err.code === "ECONNREFUSED"
+        ? "not running — start with: ollama serve"
+        : `unreachable — ${err.message}`;
+      resolve({ label, passed: false, detail });
+    });
+
+    req.end();
+  });
+}
+
 /** Format and print a check result line. */
-function printCheck(result: CheckResult): void {
-  const icon = result.passed ? "PASS" : "FAIL";
+function printCheck(result: CheckResult, info = false): void {
+  const icon = info ? "INFO" : result.passed ? "PASS" : "FAIL";
   process.stdout.write(`  [${icon}] ${result.label}: ${result.detail}\n`);
 }
 
 /**
- * Run the doctor command: check auth token, MCP entry, and vault path.
- * Exits 1 if any check fails.
+ * Run the doctor command: check auth token, MCP entry, vault path, and Ollama (INFO).
+ * Exits 1 if any required check fails. Ollama failure is informational only.
  */
 export async function runDoctor(): Promise<void> {
   process.stdout.write("toto doctor\n\n");
 
   const authResult = checkAuthToken();
-  const [mcpResult, vaultResult] = await Promise.all([
+  const [mcpResult, vaultResult, ollamaResult] = await Promise.all([
     checkMcpEntry(),
     checkVaultPath(),
+    checkOllama(),
   ]);
 
-  const results: CheckResult[] = [authResult, mcpResult, vaultResult];
-  for (const r of results) {
+  const required: CheckResult[] = [authResult, mcpResult, vaultResult];
+  for (const r of required) {
     printCheck(r);
   }
+  printCheck(ollamaResult, true);
 
   process.stdout.write("\n");
-  const anyFailed = results.some((r) => !r.passed);
+  const anyFailed = required.some((r) => !r.passed);
   if (anyFailed) {
     process.stdout.write("doctor: one or more checks failed\n");
     process.exit(1);

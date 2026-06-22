@@ -4,6 +4,8 @@
  * monospace data values, SVG charts, click-to-detail slide panel.
  */
 
+import assert from 'node:assert';
+
 export interface DashboardItem {
   date: string;
   excerpt: string;
@@ -15,6 +17,103 @@ export interface DashboardResult {
   p10Plans: { count: number; recent: DashboardItem[] };
   blockedItems: Array<{ type: 'council' | 'p10'; date: string; excerpt: string }>;
   generatedAt: string;
+}
+
+/**
+ * Returns the inline <script> block that wires SSE live updates to the dashboard.
+ * TypeScript layer: assert inputs. Browser JS layer: defensive guards only (no assert).
+ */
+function injectSseScript(endpoint: string): string {
+  assert(typeof endpoint === 'string' && endpoint.startsWith('/'), 'injectSseScript: endpoint must be root-relative');
+  const html = `<script>
+(function () {
+  var es = new EventSource('${endpoint}');
+  es.addEventListener('stats', function (e) {
+    var data;
+    try { data = JSON.parse(e.data); } catch { return; }
+    if (!data || typeof data !== 'object') return;
+    var bc = document.getElementById('blocked-count');
+    var cs = document.getElementById('connection-status');
+    if (bc) {
+      var n = typeof data.blockedCount === 'number' ? data.blockedCount : 0;
+      bc.textContent = n > 0 ? n + ' FLAG' + (n > 1 ? 'S' : '') : 'CLEAR';
+      bc.style.color = n > 0 ? 'var(--red)' : 'var(--dim)';
+    }
+    if (cs) { cs.textContent = '· LIVE'; cs.className = 'live'; }
+  });
+  es.addEventListener('error', function (e) {
+    var data;
+    try { data = JSON.parse(e.data); } catch { data = null; }
+    var cs = document.getElementById('connection-status');
+    if (!cs) return;
+    cs.textContent = data && data.message ? '· ' + data.message : '· vault error';
+    cs.className = 'error';
+  });
+  es.onerror = function () {
+    var cs = document.getElementById('connection-status');
+    if (!cs) return;
+    cs.textContent = '· reconnecting';
+    cs.className = '';
+  };
+  es.addEventListener('connected', function () {
+    var cs = document.getElementById('connection-status');
+    if (!cs) return;
+    cs.textContent = '· LIVE';
+    cs.className = 'live';
+  });
+})();
+<\/script>`;
+  assert(html.length > 0, 'injectSseScript: html must not be empty');
+  return html;
+}
+
+/**
+ * Returns the inline <script> block that adds record drill-down to the panel.
+ * TypeScript layer: assert inputs. Browser JS layer: defensive guards only (no assert).
+ */
+function injectPanelScript(): string {
+  const html = `<script>
+(function () {
+  document.querySelectorAll('[data-record-type]').forEach(function (row) {
+    row.addEventListener('click', function () {
+      var type = row.getAttribute('data-record-type');
+      var file = row.getAttribute('data-record-file');
+      if (!type || !file) return;
+      var spinner = document.getElementById('panel-spinner');
+      var body = document.getElementById('panel-body');
+      var panel = document.getElementById('panel');
+      var closeBtn = document.getElementById('panel-close');
+      if (!panel || !body) return;
+      if (spinner) { spinner.className = 'visible'; }
+      body.style.display = 'none';
+      panel.classList.add('open');
+      document.body.classList.add('panel-open');
+      if (closeBtn) { closeBtn.focus(); }
+      fetch('/dashboard/record?type=' + encodeURIComponent(type) + '&file=' + encodeURIComponent(file))
+        .then(function (r) {
+          if (!r.ok) { return Promise.reject(r.status); }
+          return r.text();
+        })
+        .then(function (text) {
+          if (spinner) { spinner.className = ''; }
+          body.style.display = '';
+          var pre = document.createElement('pre');
+          pre.style.cssText = 'white-space:pre-wrap;font-family:\\'JetBrains Mono\\',monospace;font-size:12px;color:#f0f0f0;line-height:1.5';
+          pre.textContent = text;
+          body.innerHTML = '';
+          body.appendChild(pre);
+        })
+        .catch(function () {
+          if (spinner) { spinner.className = ''; }
+          body.style.display = '';
+          body.textContent = 'Record not found.';
+        });
+    });
+  });
+})();
+<\/script>`;
+  assert(html.length > 0, 'injectPanelScript: html must not be empty');
+  return html;
 }
 
 /** Escapes HTML special characters to prevent XSS from vault-sourced strings. */
@@ -285,6 +384,24 @@ export function renderDashboardHtml(data: DashboardResult): string {
   .empty-state { grid-column: 1/-1; text-align: center; padding: 4rem 1rem }
   .empty-heading { font-family: var(--mono); font-size: .9rem; color: var(--teal); letter-spacing: .14em; margin-bottom: .6rem }
   .empty-sub     { font-family: var(--mono); font-size: .7rem; color: var(--dim); letter-spacing: .06em }
+
+  /* ── SSE connection status ───────────────────────────────────────────── */
+  #connection-status { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .06em; margin-left: .75rem }
+  #connection-status.live { color: var(--teal) }
+  #connection-status.error { color: var(--red) }
+
+  /* ── Panel spinner ───────────────────────────────────────────────────── */
+  #panel-spinner { display: none; padding: 1rem; text-align: center }
+  #panel-spinner.visible { display: block }
+
+  /* ── Mobile overlay — 768–1024px ─────────────────────────────────────── */
+  @media (min-width: 768px) and (max-width: 1024px) {
+    #panel { position: fixed; right: 0; top: 0; width: 40vw; height: 100vh; z-index: 100; overflow-y: auto; backdrop-filter: blur(4px); background: rgba(13,13,13,.92) }
+  }
+  /* ── Mobile overlay — <768px ─────────────────────────────────────────── */
+  @media (max-width: 767px) {
+    #panel { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100; overflow-y: auto; background: rgba(13,13,13,.97) }
+  }
 </style>
 </head>
 <body>
@@ -296,6 +413,7 @@ export function renderDashboardHtml(data: DashboardResult): string {
       <div class="header-sub">PADDOCK INTERFACE &nbsp;·&nbsp; BRACKLEY HQ</div>
     </div>
     <span class="header-badge">LIVE</span>
+    <span id="connection-status" aria-live="polite"></span>
   </div>
   <div>
     <div class="header-ts">GENERATED &nbsp;<span class="val">${esc(data.generatedAt)}</span></div>
@@ -362,7 +480,7 @@ ${empty ? `
 
   <div class="card wide" id="card-blocked" data-panel="blocked" style="--delay:.3s">
     <div class="card-header">
-      <span class="card-label">Blocked Items &nbsp;<span style="font-family:var(--mono);font-size:.6rem;color:${data.blockedItems.length > 0 ? 'var(--red)' : 'var(--dim)'}">${data.blockedItems.length > 0 ? data.blockedItems.length + ' FLAG' + (data.blockedItems.length > 1 ? 'S' : '') : 'CLEAR'}</span></span>
+      <span class="card-label">Blocked Items &nbsp;<span id="blocked-count" aria-live="polite" style="font-family:var(--mono);font-size:.6rem;color:${data.blockedItems.length > 0 ? 'var(--red)' : 'var(--dim)'}">${data.blockedItems.length > 0 ? data.blockedItems.length + ' FLAG' + (data.blockedItems.length > 1 ? 'S' : '') : 'CLEAR'}</span></span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${data.blockedItems.length > 0 ? 'red' : ''}"></span><span class="card-chevron">▶</span></span>
     </div>
     ${blockedRows}
@@ -388,6 +506,7 @@ ${empty ? `
     </div>
     <button class="panel-close" id="panel-close" aria-label="Close panel">ESC</button>
   </div>
+  <div id="panel-spinner"><span class="live-dot"></span></div>
   <div class="panel-body" id="panel-body"></div>
 </aside>
 
@@ -727,7 +846,8 @@ ${empty ? `
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
 })();
 </script>
-
+${injectSseScript('/dashboard/events')}
+${injectPanelScript()}
 </body>
 </html>`;
 }

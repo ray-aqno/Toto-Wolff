@@ -310,4 +310,52 @@ Tokens are per-user (issued by Manifest). Each developer provisions their own; t
 lives only in `~/.claude.json`, which is outside this repo. Do not paste a real token into
 CLAUDE.md, README, or any tracked file.
 
+## HTTP API
+
+The MCP server exposes HTTP endpoints beyond the MCP tool calls.
+
+### GET /dashboard
+
+Returns the full dashboard HTML page. Served by `renderDashboardHtml` in `dashboard_html.ts`.
+
+### GET /dashboard/events
+
+SSE stream. Emits:
+- `event: connected` — on connect
+- `event: stats` — vault stats every 15s (`councilCount`, `p10Count`, `blockedCount`, `generatedAt`)
+- `event: error` — if vault read fails
+- `: keep-alive` comment — every 10s
+
+```bash
+curl -N http://127.0.0.1:3099/dashboard/events
+```
+
+Max 50 concurrent clients. HTTP 503 when at capacity.
+
+### GET /dashboard/record
+
+Serves a raw vault record file.
+
+**Query params:**
+- `type` — `council` or `p10` (required)
+- `file` — filename only, no path separators (required)
+
+**Type to directory mapping:**
+| type | vault subdirectory |
+|------|--------------------|
+| `council` | `Council/Congressional-Records/` |
+| `p10` | `P10-Plans/` |
+
+**Status codes:**
+- `200` — file content, `text/plain; charset=utf-8`
+- `400` — missing `type` or `file` param
+- `404` — unknown type, path traversal attempt, or file not found
+- `413` — file exceeds 100 KB
+- `500` — unexpected read error
+
+```bash
+curl "http://127.0.0.1:3099/dashboard/record?type=council&file=2026-06-22-session.md"
+curl "http://127.0.0.1:3099/dashboard/record?type=p10&file=2026-06-22-plan.md"
+```
+
 @RTK.md

@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.0 — 2026-06-22
+### Added
+- `packages/cli`: 8 commands — init, doctor, whoami, search, last, audit, dashboard, radio
+- `toto radio`: interactive pit wall chat; Anthropic streaming or Ollama NDJSON fallback; `TOTO_RADIO_PROVIDER`, `TOTO_RADIO_MODEL`, `OLLAMA_HOST` env controls
+- `toto doctor`: added INFO-level Ollama probe (lists available models; non-blocking)
+- `toto` landing UI: pit lane status (blocked P10 count), governance-voiced command descriptions, daily team-radio quote
+- `packages/mcp-server`: 5 MCP tools (vault_write, vault_search, council_run, p10_plan, dashboard_status) + `GET /dashboard` server-rendered HTML paddock interface
+- Dashboard: Mercedes design tokens, JetBrains Mono, slide panel, mobile-responsive, WCAG 44px touch targets
+- `packages/personas`: engineering, devops, r-and-d, data persona stubs (runtime persona switching deferred to v1.0.0)
+### Scope declarations (declared incomplete — not defects)
+- Dashboard is static server-rendered HTML; real-time updates and WebSocket interactivity deferred to v1.0.0
+- Personas package contains stubs only; no runtime persona switching in this release
+- Phase 3 (Linear sync) blocked on T8 spec; not included
+### Changed
+- Version synced across all workspace packages (root, cli, core, mcp-server, dashboard, personas) to `0.1.0`
+
 ## v0.0.5.1 — 2026-06-17
 ### Fixed
 - Build: migrate esbuild build-approval to pnpm 11 `allowBuilds` (pnpm 10's `onlyBuiltDependencies` is removed in pnpm 11.5.1, which silently broke the local typecheck/lint/test/build gate via `ERR_PNPM_IGNORED_BUILDS`).

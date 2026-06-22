@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.2.0 — 2026-06-22
+### Added
+- `GET /dashboard/events` — SSE endpoint; live vault stats (councilCount, p10Count, blockedCount) broadcast every 15s; keep-alive comment every 10s; `event: error` on vault failure; max 50 clients (HTTP 503 before headers commit)
+- `GET /dashboard/record` — raw vault record endpoint; serves council and P10 markdown files; path traversal guard with `path.sep` suffix; 100KB cap (HTTP 413); ENOENT→404, other errors→500 (no stack trace in response)
+- `packages/mcp-server/src/handlers/sse_registry.ts` — singleton SSE broadcast registry; shared intervals start on 0→1, cleared on N→0; `res.destroyed` guard on every write; `isAtCapacity()` export
+- `packages/mcp-server/src/handlers/sse_handler.ts` — `handleSseRequest`; capacity check fires before `writeHead(200)` to prevent `ERR_HTTP_HEADERS_SENT` on 503 path
+- `packages/mcp-server/src/handlers/record_handler.ts` — `handleRecordRequest`; sibling-prefix traversal protection via `path.sep`
+- `packages/mcp-server/src/handlers/dashboard_status.ts` — `handleDashboardStatus` extracted from `index.ts`; `DashboardStats` interface; `isValidItemType` guard
+- Dashboard UI: live `#connection-status` (aria-live), `#panel-spinner`, slide-in record panel, mobile overlay (768px) / full-screen (<768px), `#blocked-count` aria-live
+- 23 new tests: 9 SSE unit + 14 record unit + 1 real-socket integration test (hard disconnect → clean interval teardown verified)
+- README Live Dashboard section; CLAUDE.md HTTP API docs
+### Changed
+- `packages/mcp-server/src/index.ts` — net -88 lines; `handleRequest` now takes `req: IncomingMessage`; SSE and record routes registered before TOOLS lookup
+- `packages/cli/src/commands/dashboard.ts` — ANTHROPIC_AUTH_TOKEN credential hint in server-unreachable error message
+
 ## v0.1.0 — 2026-06-22
 ### Added
 - `packages/cli`: 8 commands — init, doctor, whoami, search, last, audit, dashboard, radio

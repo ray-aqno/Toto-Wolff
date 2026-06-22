@@ -94,3 +94,39 @@ pnpm -C packages/mcp-server start   # terminal 1 — server on 127.0.0.1:3099
 ```
 
 A `blocked` p10 result returns HTTP 200 with `status: blocked` — that is governance working, not an error.
+
+---
+
+## Live Dashboard
+
+The dashboard shows recent council sessions, P10 plans, and blocked items from your Obsidian vault.
+
+```bash
+pnpm -C packages/mcp-server start   # start the MCP server (port 3099 default)
+toto dashboard                       # open http://127.0.0.1:3099/dashboard in your browser
+```
+
+Override the port:
+
+```bash
+TOTO_MCP_PORT=4000 node packages/mcp-server/dist/index.js
+TOTO_MCP_PORT=4000 toto dashboard
+```
+
+The dashboard page connects over SSE (`/dashboard/events`) for live stats updates every 15 seconds. To inspect the raw stream:
+
+```bash
+curl -N http://127.0.0.1:3099/dashboard/events
+```
+
+To fetch a council or P10 record directly:
+
+```bash
+# council record
+curl "http://127.0.0.1:3099/dashboard/record?type=council&file=2026-06-22-session.md"
+
+# p10 record
+curl "http://127.0.0.1:3099/dashboard/record?type=p10&file=2026-06-22-dashboard-interactive-v0.2.0.md"
+```
+
+The server binds loopback only (`127.0.0.1`) — no LAN exposure.

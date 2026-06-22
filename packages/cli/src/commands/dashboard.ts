@@ -68,7 +68,8 @@ export async function runDashboard(): Promise<void> {
   if (!reachable) {
     process.stderr.write(
       `toto dashboard: MCP server not reachable at ${url}\n` +
-        `Start the MCP server first, then run 'toto dashboard' again.\n`
+        `Start the MCP server first, then run 'toto dashboard' again.\n` +
+        `If the server crashes on startup, check that ANTHROPIC_AUTH_TOKEN is set in ~/.claude.json.\n`
     );
     process.exit(1);
   }

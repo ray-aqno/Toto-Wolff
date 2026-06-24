@@ -8,12 +8,12 @@
 # Usage:  ./scripts/demo.sh
 # Needs:  the MCP server running ->  pnpm -C packages/mcp-server start
 # Env:    TOTO_MCP_PORT    (default 3099)
-#         TOTO_VAULT_PATH  (default ~/Documents/Obsidian Vault — shown for confirmation)
+#         TOTO_VAULT_PATH  (default ~/.toto/vault — shown for confirmation)
 set -euo pipefail
 
 PORT="${TOTO_MCP_PORT:-3099}"
 BASE="http://127.0.0.1:${PORT}"
-VAULT="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
+VAULT="${TOTO_VAULT_PATH:-${HOME}/.toto/vault}"
 
 echo "toto-wolff MCP demo"
 echo "  server: ${BASE}"

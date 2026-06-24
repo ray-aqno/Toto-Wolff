@@ -44,7 +44,7 @@ toto (TypeScript monorepo)
 Current state:
   ./setup ──▶ ~/.claude/CLAUDE.md ──▶ gstack skills (/council, /p10, /vault)
                                               │
-                                              └──▶ Obsidian vault (flat files)
+                                              └──▶ governance vault (flat files)
 
 Target state (Approach C):
   brew/npm ──▶ toto CLI
@@ -63,12 +63,12 @@ Target state (Approach C):
        │
        ├── council_run ──▶ Claude API (Haiku scouts / Sonnet analysts / Opus chairman)
        │                         │
-       │                         └──▶ vault_write ──▶ Obsidian vault (git-committed)
+       │                         └──▶ vault_write ──▶ governance vault (git-committed)
        │                                                     │
        │                                                     └──▶ linear_sync ──▶ Linear API
        │
        ├── p10_plan ──▶ Claude API ──▶ vault_write
-       ├── vault_search ──▶ Obsidian vault (ripgrep)
+       ├── vault_search ──▶ governance vault (ripgrep)
        └── dashboard ──▶ React UI (localhost:PORT)
 
   Phase 1 exit gate (MIGRATION CUTOVER):
@@ -199,7 +199,7 @@ Build `packages/dashboard` and persona registry:
 
 | Sub-problem | Existing code | Reuse or rebuild? |
 |---|---|---|
-| Vault path resolution | `setup:40-51` — TOTO_VAULT_PATH env → .toto/config.yml → ~/Documents/Obsidian Vault | **Reuse** — toto init must match this order exactly (D6) |
+| Vault path resolution | `setup:40-51` — TOTO_VAULT_PATH env → .toto/config.yml → ~/.toto/vault | **Reuse** — toto init must match this order exactly (D6) |
 | Prerequisites checking | `setup:54-67` — bash, git, python3, gstack | **Rebuild** — packages/core adds ripgrep check; toto doctor (Phase 2) replaces full check |
 | CLAUDE.md symlink management | `setup:90-118` — symlink, backup, force | **Rebuild** — TypeScript CLI replicates in Phase 2 |
 | Persona section replacement | `setup:162-200` — Python3 bounded section replacement | **Rebuild** — TypeScript CLI replaces in Phase 2 |

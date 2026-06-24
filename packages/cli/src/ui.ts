@@ -49,7 +49,7 @@ function dailyQuote(): string {
  */
 async function countVaultFiles(subdir: string): Promise<number | null> {
   const vaultPath = process.env["VAULT_PATH"] ??
-    path.join(os.homedir(), "Documents", "Obsidian Vault");
+    path.join(os.homedir(), ".toto", "vault");
   const dir = path.join(vaultPath, subdir);
   try {
     const entries = await fs.readdir(dir);
@@ -65,7 +65,7 @@ async function countVaultFiles(subdir: string): Promise<number | null> {
  */
 async function countBlockedPlans(): Promise<number> {
   const vaultPath = process.env["VAULT_PATH"] ??
-    path.join(os.homedir(), "Documents", "Obsidian Vault");
+    path.join(os.homedir(), ".toto", "vault");
   const dir = path.join(vaultPath, "P10-Plans");
   try {
     const entries = await fs.readdir(dir);

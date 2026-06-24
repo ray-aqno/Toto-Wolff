@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 
-const DEFAULT_VAULT_PATH = path.join(os.homedir(), "Documents", "Obsidian Vault");
+const DEFAULT_VAULT_PATH = path.join(os.homedir(), ".toto", "vault");
 const MAX_RESULT_LINES = 200;
 
 /**

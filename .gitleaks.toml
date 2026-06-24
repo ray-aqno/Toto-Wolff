@@ -10,6 +10,16 @@ regexes = [
 ]
 
 [[rules]]
+id = "manifest-auth-token"
+description = "Manifest auth token"
+regex = '''mnfst_[A-Za-z0-9_\-]{20,}'''
+tags = ["token", "manifest"]
+[rules.allowlist]
+regexes = [
+  '''<your-manifest-token>''',
+]
+
+[[rules]]
 id = "anthropic-api-key"
 description = "Anthropic API Key"
 regex = '''sk-ant-[a-zA-Z0-9\-_]{40,}'''

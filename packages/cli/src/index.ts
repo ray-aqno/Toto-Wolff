@@ -13,6 +13,7 @@ import { runLast } from "./commands/last.js";
 import { runAudit } from "./commands/audit.js";
 import { runDashboard } from "./commands/dashboard.js";
 import { runRadio } from "./commands/radio.js";
+import { runBackfill } from "./commands/backfill.js";
 import { printLandingUI, plainUsage } from "./ui.js";
 
 /** Print an "unknown command" error to stderr and exit 1. */
@@ -74,6 +75,11 @@ async function main(): Promise<void> {
 
   if (cmd === "radio") {
     await runRadio();
+    return;
+  }
+
+  if (cmd === "backfill") {
+    await runBackfill();
     return;
   }
 

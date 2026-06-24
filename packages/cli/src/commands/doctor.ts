@@ -6,11 +6,7 @@ import os from "node:os";
 
 const SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 const MCP_KEY = "toto-wolff";
-const DEFAULT_VAULT_PATH = path.join(
-  os.homedir(),
-  "Documents",
-  "Obsidian Vault"
-);
+const DEFAULT_VAULT_PATH = path.join(os.homedir(), ".toto", "vault");
 
 interface CheckResult {
   label: string;
@@ -66,8 +62,8 @@ async function checkMcpEntry(): Promise<CheckResult> {
 }
 
 /**
- * Check that the Obsidian vault directory exists. Reads VAULT_PATH env var
- * first; falls back to ~/Documents/Obsidian Vault.
+ * Check that the vault directory exists. Reads VAULT_PATH env var
+ * first; falls back to ~/.toto/vault.
  */
 async function checkVaultPath(): Promise<CheckResult> {
   const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;

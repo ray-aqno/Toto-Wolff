@@ -10,9 +10,12 @@ import { renderDashboardHtml } from './handlers/dashboard_html.js';
 import { handleDashboardStatus } from './handlers/dashboard_status.js';
 import { handleSseRequest } from './handlers/sse_handler.js';
 import { handleRecordRequest } from './handlers/record_handler.js';
+import { handleVaultSignal } from './handlers/vault_signal.js';
+import { handleVaultReversed } from './handlers/vault_reversed.js';
+import { handleScoreConfidence } from './handlers/score_confidence_tool.js';
 
 const PORT = parseInt(process.env['TOTO_MCP_PORT'] ?? '3099', 10);
-const VAULT_PATH = process.env['TOTO_VAULT_PATH'] ?? `${process.env['HOME'] ?? ''}/Documents/Obsidian Vault`;
+const VAULT_PATH = process.env['TOTO_VAULT_PATH'] ?? `${process.env['HOME'] ?? ''}/.toto/vault`;
 
 assert(isAbsolute(VAULT_PATH), 'VAULT_PATH must be absolute');
 // CSO: API key presence checked at service construction, not here — avoids logging it
@@ -21,12 +24,13 @@ const vault = new VaultService(VAULT_PATH);
 const council = new CouncilService(vault);
 const p10 = new P10Service(vault);
 
-const TOOLS: Record<string, (body: unknown) => Promise<unknown>> = {
-  vault_write:       (body) => handleVaultWrite(body, vault),
-  vault_search:      (body) => handleVaultSearch(body, vault),
-  council_run:       (body) => handleCouncilRun(body, council),
-  p10_plan:          (body) => handleP10Plan(body, p10),
-  dashboard_status:  ()     => handleDashboardStatus(VAULT_PATH),
+const TOOLS: Record<string, (body: unknown) => Promise<unknown> | unknown> = {
+  vault_write:        (body) => handleVaultWrite(body, vault),
+  vault_search:       (body) => handleVaultSearch(body, vault),
+  council_run:        (body) => handleCouncilRun(body, council),
+  p10_plan:           (body) => handleP10Plan(body, p10),
+  dashboard_status:   ()     => handleDashboardStatus(VAULT_PATH),
+  score_confidence:   (body) => handleScoreConfidence(body),
 };
 
 const MAX_BODY_BYTES = 65_536;
@@ -62,6 +66,22 @@ async function handleRequest(req: import('node:http').IncomingMessage, url: stri
   }
   if (url.startsWith('/dashboard/record')) {
     await handleRecordRequest(req, res, VAULT_PATH);
+    return;
+  }
+  if (url.startsWith('/vault/reversed')) {
+    if (method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'method not allowed' }));
+      return;
+    }
+    await handleVaultReversed(req, res, VAULT_PATH);
+    return;
+  }
+  if (url === '/vault/signal') {
+    if (method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'method not allowed' }));
+      return;
+    }
+    await handleVaultSignal(req, res, VAULT_PATH);
     return;
   }
   if (url === '/dashboard') {

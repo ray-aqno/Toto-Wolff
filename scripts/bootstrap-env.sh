@@ -3,7 +3,7 @@
 # CSO: no user-controlled input; all assertions fail-loud with remediation messages
 set -euo pipefail
 
-VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
+VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/.toto/vault}"
 
 # Failure accumulator — checks report all misses, then exit once.
 # fail() returns 0 explicitly so `cmd || fail` never trips set -e mid-check.

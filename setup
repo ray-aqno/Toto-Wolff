@@ -37,7 +37,7 @@ trap '_EXIT=$?; [ "$_EXIT" -ne 0 ] && echo "setup failed at line $LINENO with co
 
 # ── 0. read_config ────────────────────────────────────────── ≤20 lines ──────
 # Sets VAULT_PATH from .toto/config.yml if present; falls back to default.
-VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/Documents/Obsidian Vault}"
+VAULT_PATH="${TOTO_VAULT_PATH:-${HOME}/.toto/vault}"
 read_config() {
   local config_file="${REPO_DIR}/.toto/config.yml"
   [ -f "$config_file" ] || return 0

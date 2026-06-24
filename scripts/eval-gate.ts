@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { VaultService, CouncilService, P10Service } from '@toto-wolff/core';
 import type { CouncilResult, P10Result } from '@toto-wolff/core';
 
-const VAULT_PATH = process.env['TOTO_VAULT_PATH'] ?? `${process.env['HOME'] ?? ''}/Documents/Obsidian Vault`;
+const VAULT_PATH = process.env['TOTO_VAULT_PATH'] ?? `${process.env['HOME'] ?? ''}/.toto/vault`;
 
 async function runEvalGate(): Promise<void> {
   const vault = new VaultService(VAULT_PATH);

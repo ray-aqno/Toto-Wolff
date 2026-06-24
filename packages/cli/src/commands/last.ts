@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
-const DEFAULT_VAULT_PATH = path.join(os.homedir(), "Documents", "Obsidian Vault");
+const DEFAULT_VAULT_PATH = path.join(os.homedir(), ".toto", "vault");
 const COUNCIL_DIR = "Council/Congressional-Records";
 const P10_DIR = "P10-Plans";
 const MAX_DISPLAY = 5;

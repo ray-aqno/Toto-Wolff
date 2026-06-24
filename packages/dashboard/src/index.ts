@@ -130,7 +130,7 @@ async function scanDirectory(dir: string): Promise<Session[]> {
 
 /** Gather council and P10 data from the vault and return structured DashboardData. */
 export async function getDashboardData(): Promise<DashboardData> {
-  const vaultPath = process.env['VAULT_PATH'] ?? ((process.env['HOME'] ?? '') + '/Documents/Obsidian Vault');
+  const vaultPath = process.env['VAULT_PATH'] ?? ((process.env['HOME'] ?? '') + '/.toto/vault');
   const councilDir = join(vaultPath, 'Council', 'Congressional-Records');
   const p10Dir     = join(vaultPath, 'P10-Plans');
 

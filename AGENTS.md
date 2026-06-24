@@ -21,16 +21,16 @@ Slash command that convenes a tiered deliberative council for engineering decisi
 
 **Trigger:** Any message starting with `/council` or containing "council this".
 
-**Skill location:** `.claude/skills/llm-council/SKILL.md`
+**Skill location:** `.Codex/skills/llm-council/SKILL.md`
 
 **Config:**
 - VAULT_PATH=~/.toto/vault
 - COUNCIL_LOG_DIR=Council/Congressional-Records
 
 **Model routing:**
-- Scouts: claude-haiku-4-5-20251001
-- Analysts: claude-sonnet-4-6
-- Chairman (final ruling): claude-opus-4-8
+- Scouts: Codex-haiku-4-5-20251001
+- Analysts: Codex-sonnet-4-6
+- Chairman (final ruling): Codex-opus-4-8
 
 **Behavior:**
 - Decompose problem → spawn 4 parallel subagents (2 scouts, 2 analysts)
@@ -50,16 +50,16 @@ Pre-execution planning contract grounded in NASA JPL Power of 10 rules.
 
 **Trigger:** `/p10 [task]`, "plan this with p10", "bridge to execution", or any task following a /council ruling before execution begins.
 
-**Skill location:** `.claude/skills/p10/SKILL.md`
+**Skill location:** `.Codex/skills/p10/SKILL.md`
 
 **Config:**
 - VAULT_PATH=~/.toto/vault
 - P10_PLAN_DIR=P10-Plans
 
 **Model routing:**
-- Scouts: claude-haiku-4-5-20251001
-- Analyzer + Draft Writer: claude-sonnet-4-6
-- Arbiter (approval gate): claude-opus-4-8
+- Scouts: Codex-haiku-4-5-20251001
+- Analyzer + Draft Writer: Codex-sonnet-4-6
+- Arbiter (approval gate): Codex-opus-4-8
 
 **Behavior:**
 - Scout codebase → P10 analysis → draft plan → Opus arbitration → Obsidian commit
@@ -80,13 +80,13 @@ The final voice before a tagged release. Three equal seats, no chair, no tiebrea
 **Trigger:** `/cabinet`, "convene the cabinet", "cabinet this", or any release/tag/v-number
 gate (e.g. "ready for v1.0.0?") after the build/review/ship stack has run.
 
-**Skill location:** `.claude/skills/the-cabinet/SKILL.md`
+**Skill location:** `.Codex/skills/the-cabinet/SKILL.md`
 
 **Config:**
 - VAULT_PATH=~/.toto/vault
 - CABINET_LOG_DIR=Cabinet
 
-**Seats (equal seating, all claude-opus-4-8):**
+**Seats (equal seating, all Codex-opus-4-8):**
 - Garry Tan — product & market truth
 - Richard Feynman — first-principles correctness
 - Andrej Karpathy — engineering execution
@@ -150,7 +150,7 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 
 # vault
 
-<!-- INVARIANT: VAULT_PATH is hardcoded below. Any fork or second developer must update this value explicitly. No environment variable substitution occurs at CLAUDE.md parse time. -->
+<!-- INVARIANT: VAULT_PATH is hardcoded below. Any fork or second developer must update this value explicitly. No environment variable substitution occurs at AGENTS.md parse time. -->
 
 VAULT_PATH=~/.toto/vault
 
@@ -171,7 +171,7 @@ Do NOT read the wiki for general coding questions, language syntax, or things al
 
 # constraints
 
-<!-- INVARIANT 1: VAULT_PATH defaults to ~/.toto/vault. Override at runtime via TOTO_VAULT_PATH env var. To change the default, update three locations in this file (council VAULT_PATH, p10 VAULT_PATH, vault VAULT_PATH=) AND update setup + scripts/bootstrap-env.sh in the same PR. All values must stay in lockstep. -->
+<!-- INVARIANT 1: VAULT_PATH is hardcoded to ~/.toto/vault. If the Obsidian vault moves, update three locations in this file (## council VAULT_PATH, ## p10 VAULT_PATH, ## vault VAULT_PATH=) AND update setup in the same PR. All four values must stay in lockstep — a partial update breaks council or p10 vault writes silently. -->
 
 <!-- INVARIANT 2: The ## ROLE section above is the sole strangler fig seam. The 13-skill gstack listing in ## gstack skills is carried forward unchanged from the previous setup — old and new coexist. Removing skills from that list is not part of a role swap. Only the ROLE section changes when switching personas. -->
 
@@ -283,7 +283,7 @@ When writing or modifying code:
 
 # MCP Server
 
-The toto-wolff MCP server (packages/mcp-server) is registered in ~/.claude.json under mcpServers["toto-wolff"]. Run `pnpm -C packages/mcp-server build` before first use.
+The toto-wolff MCP server (packages/mcp-server) is registered in ~/.Codex.json under mcpServers["toto-wolff"]. Run `pnpm -C packages/mcp-server build` before first use.
 
 Start command: `node <repo>/packages/mcp-server/dist/index.js`
 
@@ -292,7 +292,7 @@ Start command: `node <repo>/packages/mcp-server/dist/index.js`
 The server calls the Anthropic API and exits on startup if no credentials are present
 (`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty`).
 Supply them per-user via the `env` block of the `toto-wolff` entry in your own
-`~/.claude.json`. Never commit a real token to this repo:
+`~/.Codex.json`. Never commit a real token to this repo:
 
 ```jsonc
 "toto-wolff": {
@@ -307,8 +307,8 @@ Supply them per-user via the `env` block of the `toto-wolff` entry in your own
 ```
 
 Tokens are per-user (issued by Manifest). Each developer provisions their own; the value
-lives only in `~/.claude.json`, which is outside this repo. Do not paste a real token into
-CLAUDE.md, README, or any tracked file.
+lives only in `~/.Codex.json`, which is outside this repo. Do not paste a real token into
+AGENTS.md, README, or any tracked file.
 
 ## HTTP API
 

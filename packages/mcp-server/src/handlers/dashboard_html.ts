@@ -664,7 +664,7 @@ ${empty ? `
     html += '</div><div class="psec"><div class="psec-label">Session Log</div>';
     if (!sessions.length) { html += '<div class="panel-empty">No sessions yet</div>'; }
     sessions.slice().reverse().forEach((item) => {
-      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + item.date.slice(0, 10) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
     html += '</div>';
     return html;
@@ -680,7 +680,7 @@ ${empty ? `
     html += '</div><div class="psec"><div class="psec-label">Plan Log</div>';
     if (!plans.length) { html += '<div class="panel-empty">No plans yet</div>'; }
     plans.slice().reverse().forEach((item) => {
-      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + item.date.slice(0, 10) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
     html += '</div>';
     return html;
@@ -721,7 +721,7 @@ ${empty ? `
     const revItems = sessions.filter((i) => i.status === 'revision-required');
     if (!revItems.length) { html += '<div class="panel-empty" style="color:#00D2BE">No reversals — all rulings clean</div>'; }
     revItems.forEach((item) => {
-      html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:#e0303020;color:#e03030;border:1px solid #e0303040">REVISE</span><span class="prec-date">' + item.date.slice(0, 10) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:#e0303020;color:#e03030;border:1px solid #e0303040">REVISE</span><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
     html += '</div>';
     return html;
@@ -741,7 +741,7 @@ ${empty ? `
     });
     html += '</div><div class="psec"><div class="psec-label">All Sessions (' + total + ')</div>';
     sessions.slice().reverse().forEach((item) => {
-      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + item.date.slice(0, 10) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
     html += '</div>';
     return html;
@@ -755,7 +755,7 @@ ${empty ? `
     } else {
       items.forEach((b) => {
         const c = b.type === 'council' ? '#00D2BE' : '#C0C0C0';
-        html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:' + c + '20;color:' + c + ';border:1px solid ' + c + '40">' + b.type.toUpperCase() + '</span><span class="prec-date">' + b.date + '</span></div><div class="prec-text">' + escHtml(b.excerpt) + '</div></div>';
+        html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:' + c + '20;color:' + c + ';border:1px solid ' + c + '40">' + b.type.toUpperCase() + '</span><span class="prec-date">' + escHtml(b.date) + '</span></div><div class="prec-text">' + escHtml(b.excerpt) + '</div></div>';
       });
     }
     html += '</div><div class="psec"><div class="psec-label">Resolution</div>';
@@ -775,7 +775,7 @@ ${empty ? `
     html += '<div class="pstat"><span class="pstat-k">Other</span><span class="pstat-v" style="color:#888">' + (sessions.length - clean - revisions) + '</span></div>';
     html += '</div><div class="psec"><div class="psec-label">All Rulings</div>';
     sessions.slice().reverse().forEach((item) => {
-      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + item.date.slice(0, 10) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
     html += '</div>';
     return html;

@@ -79,4 +79,25 @@ jobs:
             | sudo tar -xz -C /usr/local/bin gitleaks
 
       - name: Scan for secrets
-        run: gitleaks detect --config .gitleaks.toml --redact --no-banner --exit-code 1
+        id: gitleaks-scan
+        run: |
+          GITLEAKS_EXIT_CODE=0
+          gitleaks detect --config .gitleaks.toml --redact --no-banner --report-format json --report-path gitleaks-report.json --exit-code 1 || GITLEAKS_EXIT_CODE=$?
+          echo "GITLEAKS_EXIT_CODE=$GITLEAKS_EXIT_CODE" >> "$GITHUB_ENV"
+
+          echo "::group::gitleaks report"
+          cat gitleaks-report.json || true
+          echo "::endgroup::"
+
+      - name: Upload gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+      - name: Fail if gitleaks found leaks
+        run: |
+          if [ "${GITLEAKS_EXIT_CODE:-0}" -ne 0 ]; then
+            echo "gitleaks detected secrets (exit code ${GITLEAKS_EXIT_CODE}). See artifact 'gitleaks-report'."
+            exit "${GITLEAKS_EXIT_CODE}"
+          fi

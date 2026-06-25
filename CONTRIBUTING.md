@@ -21,7 +21,7 @@ npm install -g pnpm@11.5.1
 
 Clone and install (substitute your actual repo URL):
 ```bash
-git clone https://github.com/your-org/toto-wolff toto-wolff
+git clone https://github.com/ray-aqno/Toto-Wolff toto-wolff
 cd toto-wolff
 pnpm install
 ```

@@ -37,7 +37,7 @@ export async function runSearch(): Promise<void> {
     process.exit(1);
   }
 
-  const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
 
   await new Promise<void>((resolve, reject) => {
     execFile(

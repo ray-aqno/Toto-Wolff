@@ -65,7 +65,7 @@ async function countPendingP10s(vaultPath: string): Promise<number> {
  * pending P10 plans. Always exits 0.
  */
 export async function runWhoami(): Promise<void> {
-  const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
   const persona = inferPersona();
   const pendingCount = await countPendingP10s(vaultPath);
 

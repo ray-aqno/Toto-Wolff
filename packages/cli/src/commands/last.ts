@@ -72,7 +72,7 @@ async function collectEntries(dir: string): Promise<FileEntry[]> {
  * the vault is empty or directories do not exist.
  */
 export async function runLast(): Promise<void> {
-  const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
   const councilDir = path.join(vaultPath, COUNCIL_DIR);
   const p10Dir = path.join(vaultPath, P10_DIR);
 

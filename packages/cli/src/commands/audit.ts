@@ -186,7 +186,7 @@ async function findOrphanedRulings(vaultPath: string): Promise<AuditFinding[]> {
  * (audit is informational).
  */
 export async function runAudit(): Promise<void> {
-  const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
 
   process.stdout.write("toto audit\n\n");
 

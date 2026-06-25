@@ -48,7 +48,7 @@ function dailyQuote(): string {
  * Returns null on any read error (vault not configured, path wrong, etc.)
  */
 async function countVaultFiles(subdir: string): Promise<number | null> {
-  const vaultPath = process.env["VAULT_PATH"] ??
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ??
     path.join(os.homedir(), ".toto", "vault");
   const dir = path.join(vaultPath, subdir);
   try {
@@ -64,7 +64,7 @@ async function countVaultFiles(subdir: string): Promise<number | null> {
  * Returns 0 on any read error.
  */
 async function countBlockedPlans(): Promise<number> {
-  const vaultPath = process.env["VAULT_PATH"] ??
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ??
     path.join(os.homedir(), ".toto", "vault");
   const dir = path.join(vaultPath, "P10-Plans");
   try {

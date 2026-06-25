@@ -66,7 +66,7 @@ async function checkMcpEntry(): Promise<CheckResult> {
  * first; falls back to ~/.toto/vault.
  */
 async function checkVaultPath(): Promise<CheckResult> {
-  const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
   const label = `Vault path (${vaultPath})`;
   try {
     const stat = await fs.stat(vaultPath);

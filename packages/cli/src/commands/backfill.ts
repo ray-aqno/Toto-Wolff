@@ -136,7 +136,7 @@ async function writeSignalRecord(
  * have one. Prints a summary on completion.
  */
 export async function runBackfill(): Promise<void> {
-  const vaultPath = process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
+  const vaultPath = process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
   const signalsDir = path.join(vaultPath, "Signals");
 
   process.stdout.write("toto backfill\n\n");

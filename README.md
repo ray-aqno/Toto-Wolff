@@ -128,6 +128,16 @@ Override the port:
 TOTO_MCP_PORT=4000 node packages/mcp-server/dist/index.js
 ```
 
+The server also exposes these read-only HTTP endpoints (loopback only — never accessible from outside your machine):
+
+| Endpoint | What it does |
+|----------|-------------|
+| `GET /dashboard` | Rendered HTML dashboard |
+| `GET /dashboard/events` | SSE stream of live vault stats |
+| `GET /dashboard/record` | Serve a raw vault record file (`?type=council&file=...`) |
+| `GET /vault/signal` | Query the signal store |
+| `GET /vault/reversed` | Reverse-chronological vault records |
+
 ---
 
 ## Signal loop

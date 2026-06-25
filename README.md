@@ -9,11 +9,44 @@ Claude Code sessions are ephemeral. Council rulings disappear when the tab close
 
 ---
 
+## Concepts
+
+If you're new to this project, these are the terms you'll see everywhere.
+
+**P10 — Power of 10 rules**
+NASA JPL's ten rules for safety-critical software: bounded loops, no recursion, assertions on every function, zero warnings. toto-wolff applies them as a pre-execution planning contract. Before any code is written, a P10 plan is generated, analyzed against all ten rules, and sent to Opus for approval. If Opus sets `status: blocked`, execution halts until the block is resolved. Think of it as a mandatory flight check before the runway.
+
+**Council — tiered deliberation**
+A three-tier AI chain for engineering decisions. Claude Haiku runs as fast "scouts" — two parallel agents that stress-test assumptions and find edge cases cheaply. Claude Sonnet runs as "analysts" — structured risk and implementation analysis. Claude Opus acts as the chairman, reading only a compressed brief from the scouts and analysts, then issuing a ruling, remanding for more information, or issuing a conditional decision. The output is a **Congressional Record** — a Markdown file with YAML frontmatter written to your vault after every session. It is permanent, grep-able, and version-controlled.
+
+**Cabinet — release gate**
+Three independent Opus agents, each shaped by a different persona, that review a release together and must unanimously agree to ship. Any one seat can veto. The personas are:
+
+- **Garry Tan** — product and market truth. Asks: is this worth shipping? Does the version number match what was actually built? Would a real user care?
+- **Richard Feynman** — first-principles correctness. Asks: where are we fooling ourselves? What is claimed but unproven? What does reality say if we actually test it?
+- **Andrej Karpathy** — engineering execution. Asks: does it actually work? Is it the simplest thing that does? What breaks at 3am? Is the foundation sound?
+
+These are not aesthetic choices. Each persona enforces a different failure mode: Garry Tan catches scope creep and version dishonesty; Feynman catches correctness theater; Karpathy catches engineering debt dressed up as a release. The Cabinet is only convened at tagged releases — not on every commit.
+
+**The Senate — stacking council and cabinet**
+When a decision is large enough to warrant both deliberation and a release gate, you run them in sequence: `/council` to reach a ruling on the architectural question, then `/cabinet` to ratify the release against that ruling. Internally this is called "the Senate" — the full legislative stack. You'd reach for it when: tagging a major version, reversing a prior council ruling, or shipping something where a single failure mode (product, correctness, or engineering) would be genuinely costly. For routine work, `/council` alone or `/cabinet` alone is enough.
+
+**Signal store — grounding future plans in past decisions**
+Every council ruling and P10 plan is a signal: evidence that your team has already reasoned about a particular pattern (architectural decision records, approved plans). The signal store is a directory of typed Markdown files in `~/.toto/vault/Signals/`. Before generating a new P10 plan, `score_confidence` — a deterministic function, not a model call — checks whether at least two distinct in-date signals exist for the same pattern with enough topic overlap (Jaccard similarity ≥ 50%). **HIGH confidence** means the plan proceeds with a `confidence_tier: HIGH` stamp. **LOW confidence** halts and surfaces exactly what is missing, prompting a `/council` session to generate the missing evidence. `toto backfill` seeds the signal store from your existing ADRs (Architectural Decision Records — Markdown files documenting why a technical decision was made) and P10 plans.
+
+**Vault**
+A local directory of plain Markdown files with YAML frontmatter. No database, no running process required to read it. Every council ruling, P10 plan, Cabinet record, and signal lives here. The vault is the source of truth: grep-able, diffable, and editable in any text editor. Default location: `~/.toto/vault`.
+
+**gstack**
+An optional Claude Code skill runner (separate project) that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically.
+
+---
+
 ## What you get
 
 - A **Congressional Record `.md`** in `~/.toto/vault/Council/Congressional-Records/` after every `/council` session — Haiku scouts, Sonnet analysis, Opus ruling, all recorded
 - A **P10 plan `.md`** in `~/.toto/vault/P10-Plans/` before any code is touched — Opus must set `status: approved` or execution halts
-- A **Cabinet record `.md`** in `~/.toto/vault/Cabinet/` after every release gate — three Opus seats (Garry Tan, Feynman, Karpathy — model personas), any veto blocks the ship
+- A **Cabinet record `.md`** in `~/.toto/vault/Cabinet/` after every release gate — three Opus seats (Garry Tan, Feynman, Karpathy), any veto blocks the ship
 - A **signal store** in `~/.toto/vault/Signals/` that feeds past rulings forward into future plans — `toto backfill` seeds it from existing ADRs and P10 plans
 - A **live dashboard** at `http://127.0.0.1:3099/dashboard` showing session counts, blocked plans, and vault records with SSE-backed live stats
 - A **`toto` CLI** with 9 commands for vault search, audit, doctor, and interactive pit-wall chat via `toto radio`
@@ -36,7 +69,7 @@ gstack is optional. `/council` and `/p10` are repo-native skills and run without
 ## Install
 
 ```bash
-git clone https://github.com/ray-aqno/toto-wolff ~/toto-wolff
+git clone https://github.com/ray-aqno/Toto-Wolff ~/toto-wolff
 cd ~/toto-wolff
 pnpm install
 pnpm -r build
@@ -73,7 +106,7 @@ toto backfill
 
 Open any Claude Code session and run:
 
-> **API cost:** Each full `/council` session makes 6 Anthropic API calls (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling). Estimated $0.10–$0.30 per session at standard rates.
+> **API cost:** Each full `/council` session runs 6 Anthropic API calls (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling). Estimated $0.10–$0.30 per session at standard rates.
 
 ```
 /council this: what is the highest-risk technical decision our team is about to make?
@@ -87,6 +120,18 @@ ls ~/.toto/vault/Council/Congressional-Records/
 ```
 
 That file is the proof. The governance loop is live.
+
+---
+
+## When to use each skill
+
+| Situation | Skill | Why |
+|-----------|-------|-----|
+| Non-obvious architectural decision | `/council` | 6-call chain forces multiple perspectives; Opus rules on the brief, not the noise |
+| About to write code from a plan | `/p10` | Opus must approve a P10-compliant plan before any file is touched |
+| Tagging a release | `/cabinet` | Three independent Opus seats; any veto holds the release |
+| Major version, reversed ruling, or high-stakes ship | `/council` then `/cabinet` (the Senate) | Full deliberation + release gate in sequence |
+| Ongoing session context | `toto backfill` first | Seeds the signal store so confidence scoring has evidence to work with |
 
 ---
 
@@ -131,7 +176,7 @@ Override the port:
 TOTO_MCP_PORT=4000 node packages/mcp-server/dist/index.js
 ```
 
-The server also exposes these read-only HTTP endpoints (loopback only — never accessible from outside your machine):
+The server exposes these read-only HTTP endpoints (loopback only — never accessible from outside your machine):
 
 | Endpoint | What it does |
 |----------|-------------|
@@ -145,7 +190,7 @@ The server also exposes these read-only HTTP endpoints (loopback only — never 
 
 ## Signal loop
 
-`toto backfill` reads your `ADR/` and `P10-Plans/` vault directories and writes typed `Signals/` records with `pattern` and `topic_tags` fields. Before generating a new P10 plan, the strangler-pattern skill calls `score_confidence` — a deterministic function (not a model call) that checks whether ≥ 2 distinct in-date records exist for the same pattern with a topic Jaccard similarity ≥ 50%. **HIGH confidence** proceeds automatically with a `confidence_tier: HIGH` stamp. **LOW confidence** halts, surfaces the disqualifiers, and requests a `/council` session before retrying. Run `toto backfill` once after setup and again after each batch of new rulings. Without it, every session starts cold.
+`toto backfill` reads your `ADR/` and `P10-Plans/` vault directories and writes typed `Signals/` records with `pattern` and `topic_tags` fields. Before generating a new P10 plan, `score_confidence` checks whether ≥ 2 distinct in-date records exist for the same pattern with a topic Jaccard similarity ≥ 50%. **HIGH confidence** proceeds automatically with a `confidence_tier: HIGH` stamp. **LOW confidence** halts, surfaces the disqualifiers, and requests a `/council` session before retrying. Run `toto backfill` once after setup and again after each batch of new rulings. Without it, every session starts cold.
 
 ---
 

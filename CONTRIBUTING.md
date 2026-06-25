@@ -2,6 +2,8 @@
 
 toto-wolff is a TypeScript monorepo that adds persistent AI governance to Claude Code workflows. This document is the complete guide for making changes.
 
+If you are new to the project, read the [Concepts section in README.md](README.md#concepts) first. Terms like P10, council, Cabinet, Congressional Record, and signal store are used throughout this document and are defined there.
+
 ---
 
 ## Getting started
@@ -386,15 +388,33 @@ Run it in a Claude Code session:
 /council this: <your decision question + constraints>
 ```
 
-The session runs a 6-call chain (2 Haiku scouts → 2 Sonnet analysts → 1 Sonnet brief → 1 Opus ruling) and writes a Congressional Record to `~/.toto/vault/Council/Congressional-Records/`. The record is the artifact. Reference it in your P10 plan and PR.
+The session runs a 6-call chain — two Claude Haiku "scout" agents stress-test assumptions in parallel, two Claude Sonnet "analyst" agents do structured risk and implementation analysis, a Sonnet briefer compresses all four outputs, and Claude Opus reads only the brief and issues a ruling. The output is a **Congressional Record** written to `~/.toto/vault/Council/Congressional-Records/`. The record is permanent. Reference it in your P10 plan and PR.
 
 ### What `/p10` is for
 
-`/p10` is the pre-execution safety contract. It produces a staged plan with assertions. Opus must set `status: approved` before any file is touched. A `status: blocked` result means the implementation cannot proceed — escalate back to `/council`.
+`/p10` is the pre-execution safety contract, grounded in [NASA JPL's Power of 10 rules](https://en.wikipedia.org/wiki/The_Power_of_10:_Rules_for_Developing_Safety-Critical_Code) for safety-critical software. It produces a staged plan with explicit assertions, loop bounds, and return-value checks for every stage. Opus must set `status: approved` before any file is touched. A `status: blocked` result means the implementation cannot proceed — escalate back to `/council`.
 
 ```
 /p10 <task description + which package + optional council ruling reference>
 ```
+
+### What `/cabinet` is for
+
+`/cabinet` is the release gate. Three independent Opus agents, each shaped by a distinct persona, review the release evidence and must vote unanimously to ship. Any seat can issue a BLOCK — naming a specific release-critical defect — which holds the release until resolved. Run it at tagged releases, not on every commit.
+
+The three seats:
+- **Garry Tan** — product truth. Catches scope creep, version dishonesty, and ships that don't serve a real user.
+- **Richard Feynman** — first-principles correctness. Catches claims that are asserted but not demonstrated, and correctness theater.
+- **Andrej Karpathy** — engineering execution. Catches debt dressed as a release, missing test coverage, and 3am failure modes.
+
+### The Senate — stacking council and cabinet
+
+For high-stakes decisions — major version tags, reversals of prior council rulings, or anything where a failure in product judgment, correctness, or engineering execution would be genuinely costly — run both in sequence:
+
+1. `/council` to deliberate and reach a ruling on the architectural or product question
+2. `/cabinet` to ratify the release against that ruling
+
+This full stack is called "the Senate" internally. For routine work, either skill alone is sufficient. Use the Senate when the cost of being wrong in any single dimension (product, correctness, engineering) is high enough that you want independent verification across all three.
 
 ### When a council ruling is required
 

@@ -1,6 +1,6 @@
 {
   "name": "@toto-wolff/cli",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "CLI for toto-wolff governance tooling",
   "type": "module",
   "main": "dist/index.js",

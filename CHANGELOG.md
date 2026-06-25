@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] - 2026-06-25
+
+### Added
+- Signal loop type fix: `SignalRecord` extended with optional `pattern` and `topic_tags` fields; `parseFrontmatter` handles inline JSON arrays via `parseArrayValue`; 4 unsafe casts removed from `scoreConfidence.ts`.
+- 4 signal loop integration tests: HIGH on fixture records, exact `query()` membership, LOW on mismatched Jaccard, ENOENT cold-start path.
+- Cold-start UX: `handleScoreConfidence` returns LOW with actionable "run toto backfill" disqualifier when `Signals/` is absent or empty.
+- `seed_signals()` in `./setup` — idempotent backfill on first install if vault history exists.
+- Dashboard empty-state copy: "No sessions yet — run /council to start your first."
+- `/vault/reversed` and `/vault/signal` endpoints documented in README.
+
+### Changed
+- README: single-user scope explicit (line 5, 159), shared team vault deferred to v1.1.0; API cost disclosed ($0.10–$0.30/session, 6 calls itemized).
+- `./setup --role` allowlist trimmed to `engineering` only; error message updated.
+
+### Removed
+- `personas/devops.md`, `personas/data.md`, `personas/r-and-d.md` — stub files removed; additional roles ship in v1.1.0 when content exists.
+
 ## [0.3.0] - 2026-06-24
 
 ### Added

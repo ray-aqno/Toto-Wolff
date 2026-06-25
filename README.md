@@ -35,7 +35,11 @@ When a decision is large enough to warrant both deliberation and a release gate,
 Every council ruling and P10 plan is a signal: evidence that your team has already reasoned about a particular pattern (architectural decision records, approved plans). The signal store is a directory of typed Markdown files in `~/.toto/vault/Signals/`. Before generating a new P10 plan, `score_confidence` — a deterministic function, not a model call — checks whether at least two distinct in-date signals exist for the same pattern with enough topic overlap (Jaccard similarity ≥ 50%). **HIGH confidence** means the plan proceeds with a `confidence_tier: HIGH` stamp. **LOW confidence** halts and surfaces exactly what is missing, prompting a `/council` session to generate the missing evidence. `toto backfill` seeds the signal store from your existing ADRs (Architectural Decision Records — Markdown files documenting why a technical decision was made) and P10 plans.
 
 **Vault**
-A local directory of plain Markdown files with YAML frontmatter. No database, no running process required to read it. Every council ruling, P10 plan, Cabinet record, and signal lives here. The vault is the source of truth: grep-able, diffable, and editable in any text editor. Default location: `~/.toto/vault`.
+A local directory of plain Markdown files with YAML frontmatter. No database, no running process required to read it. Every council ruling, P10 plan, Cabinet record, and signal lives here. The vault is the source of truth: grep-able, diffable, and editable in any text editor.
+
+The format is natively compatible with [Obsidian](https://obsidian.md). If you already use Obsidian, point `TOTO_VAULT_PATH` at your existing vault and every ruling, plan, and Cabinet record will appear in your graph, backlinks, and search automatically alongside your other notes. This is the recommended setup — the governance record becomes part of your second brain rather than an isolated directory.
+
+Default location when `TOTO_VAULT_PATH` is not set: `~/.toto/vault` (a standalone directory, no Obsidian required).
 
 **gstack**
 An optional Claude Code skill runner (separate project) that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically.
@@ -92,6 +96,19 @@ Toto ready.
   CLAUDE.md:    /Users/<you>/.claude/CLAUDE.md -> ~/toto-wolff/CLAUDE.md
 
 Run /council to test.
+```
+
+**Recommended: point the vault at your Obsidian vault.**
+The vault format is plain Markdown + YAML frontmatter — native Obsidian. Every ruling, plan, and Cabinet record will appear in your graph and search automatically:
+
+```bash
+TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
+```
+
+Or set it permanently in your shell profile:
+
+```bash
+export TOTO_VAULT_PATH="/path/to/your/obsidian/vault"
 ```
 
 Seed the signal store so governance sessions start with context from your existing ADRs and P10 plans:
@@ -206,7 +223,7 @@ The vault is the source of truth: a directory of `.md` files with YAML frontmatt
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `TOTO_VAULT_PATH` | `~/.toto/vault` | Vault directory path |
+| `TOTO_VAULT_PATH` | `~/.toto/vault` | Vault directory path — set this to your Obsidian vault for best results |
 | `TOTO_MCP_PORT` | `3099` | MCP server port |
 | `ANTHROPIC_API_KEY` | — | Personal Anthropic API key (Option A) |
 | `ANTHROPIC_AUTH_TOKEN` | — | Enterprise/proxy bearer token (Option B) |
@@ -214,7 +231,7 @@ The vault is the source of truth: a directory of `.md` files with YAML frontmatt
 
 Option A and Option B are mutually exclusive. If both are set, `ANTHROPIC_API_KEY` wins.
 
-Set `TOTO_VAULT_PATH` in `.toto/config.yml` to point at a custom vault location. Shared team vaults (multi-user, git-backed) are a v1.1.0 roadmap item — the vault is single-user local storage in v1.0.0.
+Set `TOTO_VAULT_PATH` to your Obsidian vault path for the recommended setup, or leave it unset to use `~/.toto/vault` as a standalone directory. Shared team vaults (multi-user, git-backed) are a v1.1.0 roadmap item — the vault is single-user local storage in v1.0.0.
 
 ---
 

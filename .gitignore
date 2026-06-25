@@ -19,5 +19,7 @@ dist/
 # Local retro snapshots — machine-specific, never commit
 .context/
 
-# Local plans — machine-specific, never commit
+# Local plans and checklists — machine-specific, never commit
 plans/
+*checklist*
+*-checklist.md

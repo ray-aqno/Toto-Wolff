@@ -1,5 +1,8 @@
 # toto-wolff
 
+<img width="1280" height="699" alt="tyk2eiagrizd1" src="https://github.com/user-attachments/assets/a130343c-26a3-4f88-a366-ac5671557f03" />
+
+
 Persistent AI governance for Claude Code. Every architectural decision gets a deliberation record. Every code change gets a pre-execution safety plan. Within the `/p10` workflow, nothing executes without Opus signing off.
 
 Claude Code sessions are ephemeral. Council rulings disappear when the tab closes. P10 plans are files no one revisits. Your own deliberation history starts from zero on every session. toto-wolff closes that loop: a TypeScript MCP server that routes deliberation through a three-tier model chain, writes every ruling to a local vault, and gates execution behind a deterministic confidence check grounded in what you have already decided. Shared team vault ships in v1.1.0.

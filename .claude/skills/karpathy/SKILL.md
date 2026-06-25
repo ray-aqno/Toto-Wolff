@@ -1,12 +1,12 @@
 ---
-name: karpathy-guidelines
+name: karpathy
 description: Execution-layer quality rules for implementation work. Active after a P10 plan reaches status: approved. Governs how code is written, not what is built.
 version: 1.0.0
 ---
 
 # Karpathy Guidelines
 
-**Trigger:** `/karpathy-guidelines`, or invoked automatically when a P10 plan reaches `status: approved` and implementation begins.
+**Trigger:** `/karpathy`, or invoked automatically when a P10 plan reaches `status: approved` and implementation begins.
 
 These are execution invariants — not a review checklist, not a one-time step. They run continuously during every stage of implementation. P10 gates the structure. Karpathy governs the execution.
 
@@ -93,7 +93,7 @@ Karpathy sits between P10 approval and Cabinet ratification. It is the execution
 
 ## When to invoke explicitly
 
-You rarely need to invoke `/karpathy-guidelines` directly — the rules are active whenever a P10 plan is approved. Invoke it explicitly when:
+You rarely need to invoke `/karpathy` directly — the rules are active whenever a P10 plan is approved. Invoke it explicitly when:
 
 - You want to reset mid-implementation after drifting from the plan scope
 - A code review surfaces violations (complexity, untraceable lines, unverified stages)

@@ -161,7 +161,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `setup` — installer script; creates vault dirs, symlinks `~/.claude/CLAUDE.md` to repo; supports `TOTO_VAULT_PATH` env var; `--help` and `--force` flags; exit codes 2–5 documented.
 - `runbook.md` — full install guide, first-run verification, SPOF notes, bus-factor checklist, and troubleshooting table.
 - `docs/linear-setup.md` — Linear MCP integration permissions checklist and council→issue field mapping.
-- `.claude/skills/strangler-pattern-guide/` — Navistone .NET strangler pattern skill (express-web-api → actions.api migration); includes 4-line controller pattern, 6-phase TDD checklist, PRISM workflow YAML.
+- `.claude/skills/strangler-pattern-guide/` — strangler pattern skill (express-web-api → actions.api migration); includes 4-line controller pattern, 6-phase TDD checklist, PRISM workflow YAML.
 - `.gitignore` — excludes `.gstack/` and `settings.local.json`.
 
 ### Security

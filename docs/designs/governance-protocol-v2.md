@@ -95,7 +95,7 @@ Toto feels like a silent team lead who has read every decision the company has e
 | 4 | Team vault default in toto init | S | ACCEPTED | Shared memory from day 1. |
 | 5 | Linear full bidirectional sync | M | ACCEPTED | Council → Linear issue, p10 → linked ticket. |
 | 6 | Full web dashboard | L | ACCEPTED | Decision velocity, reversal rate, p10 compliance. |
-| 7 | Persona npm registry | M | ACCEPTED | toto persona add @navistone/devops. |
+| 7 | Persona npm registry | M | ACCEPTED | toto persona add <your-org>/devops. |
 
 ## Accepted Scope
 
@@ -150,7 +150,7 @@ Build `packages/dashboard` and persona registry:
 - React dashboard served by MCP server at `localhost:PORT`
 - `toto dashboard` — opens browser
 - Persona packages: `packages/personas/engineering`, `packages/personas/devops`, etc.
-- `toto persona add @navistone/engineering` — install from npm registry
+- `toto persona add <your-org>/engineering` — install from npm registry
 - All 4 dashboard views require intentional empty-state copy (T9 in TODOS)
 
 ## Review Decisions (resolved 2026-06-05)

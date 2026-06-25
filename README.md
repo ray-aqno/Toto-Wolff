@@ -41,6 +41,9 @@ The format is natively compatible with [Obsidian](https://obsidian.md). If you a
 
 Default location when `TOTO_VAULT_PATH` is not set: `~/.toto/vault` (a standalone directory, no Obsidian required).
 
+**Karpathy guidelines — execution contract**
+Four rules, derived from Andrej Karpathy's public writing on software craftsmanship, that govern how each P10 stage is implemented. P10 gates the structure; Karpathy governs the execution. The rules are: (1) think before coding — state assumptions, surface ambiguity, don't charge forward on a wrong interpretation; (2) simplicity first — minimum code that solves the stage, nothing speculative; (3) surgical changes — touch only what the stage authorizes, mention but don't fix things outside scope; (4) goal-driven execution — map each stage to verifiable success criteria and loop until met, not until it "looks right." Available as `/karpathy-guidelines` in any Claude Code session.
+
 **gstack**
 An optional Claude Code skill runner (separate project) that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically.
 
@@ -146,6 +149,7 @@ That file is the proof. The governance loop is live.
 |-----------|-------|-----|
 | Non-obvious architectural decision | `/council` | 6-call chain forces multiple perspectives; Opus rules on the brief, not the noise |
 | About to write code from a plan | `/p10` | Opus must approve a P10-compliant plan before any file is touched |
+| Implementing an approved P10 stage | `/karpathy-guidelines` | Four execution invariants: think first, simplest solution, surgical scope, verify before moving on |
 | Tagging a release | `/cabinet` | Three independent Opus seats; any veto holds the release |
 | Major version, reversed ruling, or high-stakes ship | `/council` then `/cabinet` (the Senate) | Full deliberation + release gate in sequence |
 | Ongoing session context | `toto backfill` first | Seeds the signal store so confidence scoring has evidence to work with |

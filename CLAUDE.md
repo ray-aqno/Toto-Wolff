@@ -195,6 +195,7 @@ Key routing rules:
 - Author a backlog-ready spec / issue → invoke /spec
 - Engineering decision requiring deliberation → invoke /council
 - Pre-execution safety plan → invoke /p10
+- Execution quality / mid-implementation contract → invoke /karpathy-guidelines
 - Record an architecturally significant decision → invoke /adr
 - .NET controller migration (express-web-api → actions.api) → invoke /strangler-pattern-guide
 

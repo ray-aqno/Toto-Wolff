@@ -83,8 +83,7 @@ export function scoreConfidence(
       disqualifiers.push(`record "${r.id}" expired on ${r.valid_until}`);
     }
 
-    const pattern = (r as unknown as Record<string, string>)['pattern'];
-    if (pattern == null || !isKnownPattern(pattern)) {
+    if (r.pattern == null || !isKnownPattern(r.pattern)) {
       disqualifiers.push(`record "${r.id}" has novel or missing pattern`);
     }
   }
@@ -95,8 +94,8 @@ export function scoreConfidence(
       const ra = records[i];
       const rb = records[j];
       if (ra == null || rb == null) continue;
-      const tagsA = ((ra as unknown as Record<string, unknown>)['topic_tags'] as string[] | undefined) ?? [];
-      const tagsB = ((rb as unknown as Record<string, unknown>)['topic_tags'] as string[] | undefined) ?? [];
+      const tagsA = ra.topic_tags ?? [];
+      const tagsB = rb.topic_tags ?? [];
       const sim = jaccardSimilarity(tagsA, tagsB);
       if (sim < JACCARD_MATCH_THRESHOLD) {
         disqualifiers.push(`records "${ra.id}" and "${rb.id}" topic_tags Jaccard=${sim.toFixed(2)} below threshold ${JACCARD_MATCH_THRESHOLD}`);

@@ -2,7 +2,7 @@
 
 Persistent AI governance for Claude Code. Every architectural decision gets a deliberation record. Every code change gets a pre-execution safety plan. Within the `/p10` workflow, nothing executes without Opus signing off.
 
-Claude Code sessions are ephemeral. Council rulings disappear when the tab closes. P10 plans are files no one revisits. Engineers on the same team start from zero on every session — no shared memory of what was decided, why, or what went wrong last time. toto-wolff closes that loop: a TypeScript MCP server that routes deliberation through a three-tier model chain, writes every ruling to a local vault, and gates execution behind a deterministic confidence check grounded in what your team has already decided.
+Claude Code sessions are ephemeral. Council rulings disappear when the tab closes. P10 plans are files no one revisits. Your own deliberation history starts from zero on every session. toto-wolff closes that loop: a TypeScript MCP server that routes deliberation through a three-tier model chain, writes every ruling to a local vault, and gates execution behind a deterministic confidence check grounded in what you have already decided. Shared team vault ships in v1.1.0.
 
 ---
 
@@ -70,6 +70,8 @@ toto backfill
 
 Open any Claude Code session and run:
 
+> **API cost:** Each full `/council` session makes 6 Anthropic API calls (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling). Estimated $0.10–$0.30 per session at standard rates.
+
 ```
 /council this: what is the highest-risk technical decision our team is about to make?
 ```
@@ -136,7 +138,7 @@ TOTO_MCP_PORT=4000 node packages/mcp-server/dist/index.js
 
 ## How it works
 
-Five packages in a pnpm workspace. `packages/core` owns shared types, error classes, and the three services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), and `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate). `packages/mcp-server` exposes 6 MCP tools and 8 HTTP endpoints on `127.0.0.1:3099` — loopback only, no LAN exposure. `packages/cli` is the `toto` binary. `packages/dashboard` generates server-rendered HTML; no React, no build step at runtime. `packages/personas` holds role stubs (engineering, devops, r-and-d, data) for `./setup --role` persona swaps.
+Five packages in a pnpm workspace. `packages/core` owns shared types, error classes, and the three services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), and `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate). `packages/mcp-server` exposes 6 MCP tools and 8 HTTP endpoints on `127.0.0.1:3099` — loopback only, no LAN exposure. `packages/cli` is the `toto` binary. `packages/dashboard` generates server-rendered HTML; no React, no build step at runtime. `packages/personas` holds the engineering persona for `./setup --role engineering` persona swaps. Additional roles (devops, data, r-and-d) ship in v1.1.0.
 
 The vault is the source of truth: a directory of `.md` files with YAML frontmatter, committed to git after every write. Every ruling is grep-able, diffable, and editable in any text editor — no running process required to read it.
 
@@ -154,7 +156,7 @@ The vault is the source of truth: a directory of `.md` files with YAML frontmatt
 
 Option A and Option B are mutually exclusive. If both are set, `ANTHROPIC_API_KEY` wins.
 
-Set `TOTO_VAULT_PATH` in `.toto/config.yml` to share across teams — the file is gitignored by default.
+Set `TOTO_VAULT_PATH` in `.toto/config.yml` to point at a custom vault location. Shared team vaults (multi-user, git-backed) are a v1.1.0 roadmap item — the vault is single-user local storage in v1.0.0.
 
 ---
 

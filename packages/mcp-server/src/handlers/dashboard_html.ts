@@ -662,7 +662,7 @@ ${empty ? `
     html += '<div class="pstat"><span class="pstat-k">Recent sessions</span><span class="pstat-v">' + sessions.length + '</span></div>';
     html += '<div class="pstat"><span class="pstat-k">Clean ruling rate</span><span class="pstat-v" style="color:#00D2BE">' + cleanRate + '%</span></div>';
     html += '</div><div class="psec"><div class="psec-label">Session Log</div>';
-    if (!sessions.length) { html += '<div class="panel-empty">No sessions yet</div>'; }
+    if (!sessions.length) { html += '<div class="panel-empty">No sessions yet — run /council to start your first.</div>'; }
     sessions.slice().reverse().forEach((item) => {
       html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
@@ -678,7 +678,7 @@ ${empty ? `
     html += '<div class="pstat"><span class="pstat-k">Recent plans</span><span class="pstat-v">' + plans.length + '</span></div>';
     html += '<div class="pstat"><span class="pstat-k">Approved (recent)</span><span class="pstat-v" style="color:#00D2BE">' + approved + '</span></div>';
     html += '</div><div class="psec"><div class="psec-label">Plan Log</div>';
-    if (!plans.length) { html += '<div class="panel-empty">No plans yet</div>'; }
+    if (!plans.length) { html += '<div class="panel-empty">No plans yet — run /p10 to start.</div>'; }
     plans.slice().reverse().forEach((item) => {
       html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });

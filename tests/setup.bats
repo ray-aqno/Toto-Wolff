@@ -140,25 +140,25 @@ EOF
   [[ "$output" == *"engineering"* ]]
 }
 
-@test "swap_role: stub persona exits 4 with stub message" {
+@test "swap_role: unknown role devops exits 4 (removed in v1.0.0, ships in v1.1.0)" {
   write_config
   run "${SETUP}" --role devops 2>&1
   [ "$status" -eq 4 ]
-  [[ "$output" == *"stub"* ]]
+  [[ "$output" == *"unknown role"* ]]
 }
 
-@test "swap_role: stub guard fires for r-and-d persona" {
+@test "swap_role: unknown role r-and-d exits 4 (removed in v1.0.0, ships in v1.1.0)" {
   write_config
   run "${SETUP}" --role r-and-d 2>&1
   [ "$status" -eq 4 ]
-  [[ "$output" == *"stub"* ]]
+  [[ "$output" == *"unknown role"* ]]
 }
 
-@test "swap_role: stub guard fires for data persona" {
+@test "swap_role: unknown role data exits 4 (removed in v1.0.0, ships in v1.1.0)" {
   write_config
   run "${SETUP}" --role data 2>&1
   [ "$status" -eq 4 ]
-  [[ "$output" == *"stub"* ]]
+  [[ "$output" == *"unknown role"* ]]
 }
 
 @test "swap_role: dirty CLAUDE.md exits 4" {

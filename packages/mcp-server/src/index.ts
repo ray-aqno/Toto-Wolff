@@ -30,7 +30,7 @@ const TOOLS: Record<string, (body: unknown) => Promise<unknown> | unknown> = {
   council_run:        (body) => handleCouncilRun(body, council),
   p10_plan:           (body) => handleP10Plan(body, p10),
   dashboard_status:   ()     => handleDashboardStatus(VAULT_PATH),
-  score_confidence:   (body) => handleScoreConfidence(body),
+  score_confidence:   (body) => handleScoreConfidence(body, VAULT_PATH),
 };
 
 const MAX_BODY_BYTES = 65_536;

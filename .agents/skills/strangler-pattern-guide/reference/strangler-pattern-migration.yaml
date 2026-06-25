@@ -1,0 +1,172 @@
+# <!-- Powered by PRISM Core -->
+workflow:
+  id: strangler-pattern-migration
+  name: PRISM Strangler Pattern Controller Migration
+  description: >-
+    Complete TDD-driven workflow for migrating controllers from express-web-api
+    to actions.api using the strangler pattern. Follows PRISM methodology:
+    Predictability (structured process), Resilience (TDD), Intentionality (clean code),
+    Sustainability (craftsmanship), and Maintainability (domain-driven design).
+  type: brownfield
+  version: 1.1.0
+  project_types:
+    - api-migration
+    - legacy-modernization
+    - strangler-pattern
+
+  sequence:
+    - step: execute_migration
+      agent: dev
+      action: strangler
+      description: Execute complete strangler pattern migration
+      notes: |
+        Execute strangler pattern migration workflow:
+        Maps to strangler command in skills/dev/SKILL.md
+        Command: *strangler
+        Loads tasks/strangler-pattern.md
+
+        The strangler command handles the complete migration:
+        1. TDD behavior capture and authentication discovery
+        2. Integration test creation (RED state)
+        3. New endpoint implementation (GREEN state)
+        4. Feature flag strangler integration
+        5. Dual-path validation
+        6. Production readiness verification
+
+        The task file (tasks/strangler-pattern.md) contains:
+        - Complete implementation guide
+        - Authentication patterns
+        - Test patterns using ActionsApiFactory
+        - 4-line controller strangling pattern
+        - Feature flag configuration
+        - Validation procedures
+
+    - step: validate_migration
+      agent: dev
+      action: run-tests
+      requires: execute_migration
+      description: Validate all tests pass
+      notes: |
+        Run comprehensive test validation:
+        Maps to run-tests command in skills/dev/SKILL.md
+        Command: *run-tests
+
+        Validates:
+        - All integration tests pass
+        - No regression in existing tests
+        - Legacy and new endpoints produce equivalent results
+        - Performance meets or exceeds baseline
+
+artifacts:
+  created:
+    - location: "{project_root}/tests/Integration.Tests/Endpoints/[Controller]EndpointTests.cs"
+      description: Integration tests following actions.api patterns
+    - location: TestEnvironment/Data/[Controller]TestData.cs
+      description: Test data and captured response fixtures
+    - location: actions.api endpoint files
+      description: New minimal API endpoints with handlers and services
+    - location: express-web-api controller modifications
+      description: Feature flag strangling in legacy controller
+
+  required:
+    - tasks/strangler-pattern.md (implementation guide)
+    - checklists/strangler-migration-checklist.md (validation checklist)
+    - Running legacy endpoint URL
+    - actions.api test infrastructure
+
+validation:
+  success_criteria:
+    - All integration tests pass (run-tests command)
+    - Legacy behavior preserved exactly
+    - No regression in existing tests
+    - Feature flags configured correctly
+    - Dual-path routing working
+    - Production-ready strangled endpoint
+
+notes: |
+  This workflow orchestrates the complete strangler pattern migration process:
+
+  1. **TDD Foundation**: Follows behavior-first methodology
+  2. **Integration Testing**: Leverages existing actions.api test infrastructure
+  3. **Safe Migration**: Gradual traffic switching with rollback capability
+  4. **Quality Assurance**: Comprehensive validation at each step
+
+  Use for each controller being migrated to ensure consistent, safe transformation.
+
+  **Example Story Structure:**
+
+  # [Controller] Strangler Pattern Migration Story
+
+  ## 🎯 Task:
+  **As a** [stakeholder role]
+  **I want to** migrate the [Controller] [endpoint] from express-web-api to actions.api using the strangler pattern
+  **So that** we can modernize our [domain] infrastructure while maintaining zero downtime and preserving existing functionality
+
+  ## ✅ Acceptance Criteria:
+
+  ### Phase 1: Real-World Behavior Capture with Authentication Discovery
+  - [ ] **WHEN** I test the live [Controller] endpoint at `http://localhost:52928/Api/[controller]/[method]`
+  - [ ] **THEN** I discover working authentication using password grant:
+    ```powershell
+    $authBody = @{
+        grant_type = "password"
+        client_id = "<YOUR_CLIENT_ID>"
+        username = "<YOUR_USERNAME>"
+        password = "<YOUR_PASSWORD>"
+    }
+    $token = (Invoke-RestMethod -Uri "http://localhost:52928/api/Auth/token" -Method Post -Body $authBody).access_token
+    ```
+  - [ ] **AND** I capture complete JSON responses with authentication:
+    ```json
+    {
+      "[response structure based on captured data]": "[actual values]"
+    }
+    ```
+  - [ ] **AND** I test error scenarios (401, 403, 404, 500) and save responses
+  - [ ] **AND** I record response times for performance baseline
+
+  ### Phase 2: Test Creation (RED)
+  - [ ] **WHEN** I create integration tests in `{project_root}/tests/Integration.Tests/Endpoints/[Controller]EndpointTests.cs`
+  - [ ] **THEN** tests follow existing patterns using `ActionsApiFactory`, `DatabaseFixture`, `SmtpFixture`
+  - [ ] **AND** tests use `[Collection(nameof(DefaultWebApplicationCollection))]` attribute
+  - [ ] **AND** all tests initially FAIL (RED state) before implementation
+  - [ ] **AND** test assertions match exact captured response formats including authentication flow
+  - [ ] **CRITICAL** I create response equivalence test validating seeded data produces captured structure:
+    ```csharp
+    [Fact]
+    public async Task [Controller]_ShouldReturn_ExactCapturedResponseStructure()
+    {
+        // Arrange: Seed test data to match captured response expectations
+        // Act: Call new actions.api endpoint with seeded data
+        // Assert: JSON structure matches captured response exactly
+        var expectedJson = LoadCapturedResponse();
+        var actualResponse = await CallNewEndpoint();
+        AssertJsonStructureEquivalence(expectedJson, actualResponse);
+    }
+    ```
+
+  ### Phase 3: Implementation (GREEN)
+  - [ ] **WHEN** I implement the new [Controller] endpoint in actions.api
+  - [ ] **THEN** it follows Command/Request → Handler → Service pattern
+  - [ ] **AND** preserves exact response structure from captured behavior
+  - [ ] **AND** integrates with existing auth schemes and database context
+  - [ ] **AND** all tests pass with behavior exactly matching captured responses
+  - [ ] **CRITICAL** Database seeding validation: Verify seeded test data produces exact captured JSON structure
+  - [ ] **ESSENTIAL** Response structure equivalence: New implementation + seeded data = captured behavior
+
+  ### Phase 4: Strangler Integration
+  - [ ] **WHEN** I set up express-web-api controller modification
+  - [ ] **THEN** add feature flag routing in express-web-api controller
+  - [ ] **AND** configure gradual traffic switching via feature flags
+  - [ ] **AND** enable dual-path testing capability with fallback to legacy
+
+  ### Phase 5: Production Validation
+  - [ ] **WHEN** I run the complete Integration.Tests suite
+  - [ ] **THEN** all existing tests continue to pass (no regressions)
+  - [ ] **AND** new [Controller] tests pass consistently
+  - [ ] **AND** response equivalence verified including authentication and exact JSON structure
+  - [ ] **AND** performance matches or exceeds legacy system baseline
+  - [ ] **CRITICAL** Seeded data validation: Test data produces identical response structure to captured behavior
+  - [ ] **ESSENTIAL** End-to-end verification: New endpoint with seeded data = captured legacy response
+
+  **Story template can be customized for any controller migration.**

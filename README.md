@@ -45,7 +45,7 @@ Default location when `TOTO_VAULT_PATH` is not set: `~/.toto/vault` (a standalon
 Four rules, derived from Andrej Karpathy's public writing on software craftsmanship, that govern how each P10 stage is implemented. P10 gates the structure; Karpathy governs the execution. The rules are: (1) think before coding — state assumptions, surface ambiguity, don't charge forward on a wrong interpretation; (2) simplicity first — minimum code that solves the stage, nothing speculative; (3) surgical changes — touch only what the stage authorizes, mention but don't fix things outside scope; (4) goal-driven execution — map each stage to verifiable success criteria and loop until met, not until it "looks right." Available as `/karpathy` in any Claude Code session.
 
 **gstack**
-An optional Claude Code skill runner (separate project) that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically.
+An optional Claude Code skill runner built by Garry Tan that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically.
 
 ---
 

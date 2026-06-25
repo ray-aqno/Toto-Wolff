@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { scoreConfidence } from '../handlers/scoreConfidence.js';
+import { isSignalRecord } from '@toto-wolff/core';
 import type { SignalRecord } from '@toto-wolff/core';
 
 const NOW = '2027-01-01';
@@ -76,5 +77,65 @@ describe('scoreConfidence', () => {
     const r2 = makeRecord('adr-0007');
     const result = scoreConfidence([r1, r2] as unknown as SignalRecord[], NOW);
     expect(result.tier).toBe('HIGH');
+  });
+});
+
+describe('isSignalRecord', () => {
+  it('accepts a record with topic_tags absent — optional field contract', () => {
+    const record = {
+      id: 'test-no-tags',
+      content_hash: 'abc123',
+      valid_until: '2099-01-01',
+      verdict: 'approved' as const,
+      pattern: 'testing',
+      // topic_tags intentionally absent
+    };
+    expect(isSignalRecord(record)).toBe(true);
+  });
+
+  it('accepts a record with pattern absent — both optional fields absent', () => {
+    const record = {
+      id: 'test-bare',
+      content_hash: 'abc123',
+      valid_until: '2099-01-01',
+      verdict: 'approved' as const,
+    };
+    expect(isSignalRecord(record)).toBe(true);
+  });
+
+  it('rejects a record with topic_tags present but non-array', () => {
+    const record = {
+      id: 'test-bad-tags',
+      content_hash: 'abc123',
+      valid_until: '2099-01-01',
+      verdict: 'approved' as const,
+      topic_tags: 'not-an-array',
+    };
+    expect(isSignalRecord(record)).toBe(false);
+  });
+
+  it('rejects a record with topic_tags containing a non-string element', () => {
+    const record = {
+      id: 'test-bad-tag-element',
+      content_hash: 'abc123',
+      valid_until: '2099-01-01',
+      verdict: 'approved' as const,
+      topic_tags: ['valid', 42],
+    };
+    expect(isSignalRecord(record)).toBe(false);
+  });
+
+  it('rejects a record with empty id', () => {
+    const record = {
+      id: '',
+      content_hash: 'abc123',
+      valid_until: '2099-01-01',
+      verdict: 'approved' as const,
+    };
+    expect(isSignalRecord(record)).toBe(false);
+  });
+
+  it('rejects null', () => {
+    expect(isSignalRecord(null)).toBe(false);
   });
 });

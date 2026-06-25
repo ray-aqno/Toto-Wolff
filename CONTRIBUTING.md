@@ -354,7 +354,7 @@ HTTP error responses must never include stack traces, vault file paths, or inter
 
 **5. Gitleaks rule for manifest tokens.**
 
-`.gitleaks.toml` includes a `manifest-auth-token` rule matching the `mnfst_` prefix. This rule must stay in `.gitleaks.toml`. The placeholder allowlist entry for the demo token (`REDACTED_MANIFEST_TOKEN`) must not be removed — removing it would cause CI to fail on the existing demo snippet in CLAUDE.md. If you add a new token format, add a matching gitleaks rule in the same PR.
+`.gitleaks.toml` includes a `manifest-auth-token` rule matching the `mnfst_` prefix. This rule must stay in `.gitleaks.toml`. Documentation must use non-secret placeholders such as `<your-manifest-token>` instead of token-shaped examples. If you add a new token format, add a matching gitleaks rule in the same PR.
 
 ---
 

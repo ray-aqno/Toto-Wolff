@@ -13,7 +13,6 @@ const originalWrite = process.stdout.write.bind(process.stdout);
 
 beforeEach(() => {
   capturedStdout = '';
-  // @ts-expect-error — narrow overload for test capture
   process.stdout.write = (chunk: string) => { capturedStdout += chunk; return true; };
 });
 

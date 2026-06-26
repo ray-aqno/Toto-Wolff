@@ -113,7 +113,9 @@ An optional Claude Code skill runner built by Garry Tan that provides the `/coun
 |-----------|-------|-----|
 | Non-obvious architectural decision | `/council` | 6-call chain forces multiple perspectives; Opus rules on the brief, not the noise |
 | About to write code from a plan | `/p10` | Opus must approve a P10-compliant plan before any file is touched |
+| P10 plan approved — adversarial stress test | `/safety-car` | Single Sonnet agent with one job: find failure modes in the approved plan before any file is touched |
 | Implementing an approved P10 stage | `/karpathy` | Four execution invariants: think first, simplest solution, surgical scope, verify before moving on |
+| Agent crosses a boundary during execution | `/drs` (auto-fires) | Deterministic PreToolUse hook — frozen paths, auth surfaces, destructive shell patterns; no model reasoning |
 | Tagging a release | `/cabinet` | Three independent Opus seats; any veto holds the release |
 | Major version, reversed ruling, or high-stakes ship | `/council` then `/cabinet` (the Senate) | Full deliberation + release gate in sequence |
 | Ongoing session context | `toto backfill` first | Seeds the signal store so confidence scoring has evidence to work with |

@@ -54,17 +54,9 @@ Superseded by `packages/cli` (Phase 2). Closed per full TODOS eval.
 
 ---
 
-### T4: Public release
+### ~~T4: Public release~~ — DONE 2026-06-25
 
-**What:** Make the repo public at ray-aqno/Toto-Wolff (or a renamed generic version). Pre-release gate: confirm all Navistone-specific content lives in `.toto/config.yml` (gitignored) rather than tracked files. Scrub docs/linear-setup.md of internal workspace IDs. Consider renaming from "Toto Wolff" to a generic name for external adoption.
-
-**Why:** Community moat. Other engineering teams are solving the same AI governance fragmentation problem. Being first to define the council+p10+karpathy protocol as an open standard creates traction that's hard to replicate.
-
-**Natural trigger:** After E2 ships and the gitignore audit confirms no Navistone-specific content in tracked files.
-
-**Effort:** human ~1 week (scrubbing + renaming decisions) / CC ~30 min
-
-**Depends on:** E2 shipped and gitignore audit passed.
+Shipped as v1.0.0 at github.com/ray-aqno/Toto-Wolff. Branch protection live (standard-practices ruleset). 74 tests passing. SECURITY.md, CODE_OF_CONDUCT.md, CODEOWNERS, issue templates all in place. Council ruling + Cabinet record written to vault.
 
 ---
 
@@ -103,6 +95,42 @@ Superseded by `packages/cli` (Phase 2). Closed per full TODOS eval.
 **Action:** Answer this before the E5 p10 implementation session. Candidate answer: whichever role has the most acute pain with the current fragmented setup (per original design doc — the "highest-pain role" question was deferred from June 2).
 
 **Depends on:** Conversation with team leads before E5 p10 starts.
+
+---
+
+---
+
+## v1.0.1 (added 2026-06-26)
+
+Skills and upgrade path — no runtime changes to MCP server, CLI core, or vault format.
+
+### `/safety-car` skill (shipped 2026-06-26)
+
+Single adversarial Sonnet subagent between P10 approval and execution. Verdicts: CLEAR or DEPLOYED. Vault path: `{VAULT_PATH}/Safety-Car/`. Stack position: after `/p10` approval, before karpathy execution.
+
+---
+
+### `/drs` PreToolUse hook (shipped 2026-06-26)
+
+Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, auth surfaces, cross-tenant writes, destructive shell patterns. Hook script: `.claude/skills/drs/bin/drs-check.sh`. Override via `DRS_OVERRIDE_REASON` env var. Events logged to `{VAULT_PATH}/DRS/`.
+
+---
+
+### `toto upgrade` command (shipped 2026-06-26)
+
+`scripts/upgrade.sh` + `packages/cli/src/commands/upgrade.ts`. Pulls `origin/main`, rebuilds, re-runs setup non-destructively. Vault and credentials untouched.
+
+---
+
+## v1.1.0 Roadmap
+
+### Dynamic P10 plans (Serena-assisted)
+
+**What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
+
+**Why:** Static grep misses structural violations (function exceeds 60 lines, pointer dereference chains). Serena-assisted scouting catches P10 violations before the draft stage rather than at Opus arbitration. Plan quality improves materially.
+
+**Depends on:** Serena MCP server live (already registered in `.serena/project.yml`).
 
 ---
 

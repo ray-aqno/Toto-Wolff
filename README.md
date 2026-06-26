@@ -3,9 +3,43 @@
 <img width="1280" height="699" alt="tyk2eiagrizd1" src="https://github.com/user-attachments/assets/a130343c-26a3-4f88-a366-ac5671557f03" />
 
 
-Persistent AI governance for Claude Code. Every architectural decision gets a deliberation record. Every code change gets a pre-execution safety plan. Within the `/p10` workflow, nothing executes without Opus signing off.
+Persistent AI governance for Claude Code. Every architectural decision is deliberated by a chain of AI models and written to a local file. Every code change is planned against a safety checklist before execution starts. Nothing disappears when the session closes.
 
-Claude Code sessions are ephemeral. Council rulings disappear when the tab closes. P10 plans are files no one revisits. Your own deliberation history starts from zero on every session. toto-wolff closes that loop: a TypeScript MCP server that routes deliberation through a three-tier model chain, writes every ruling to a local vault, and gates execution behind a deterministic confidence check grounded in what you have already decided. Shared team vault ships in v1.1.0.
+Claude Code sessions are stateless by default — decisions made in one session are gone in the next. toto-wolff fixes that: an MCP server that runs multi-model deliberation workflows, writes every ruling to plain Markdown files in a local vault, and lets future sessions pick up where the last one left off.
+
+---
+
+## Quickstart
+
+```bash
+git clone https://github.com/ray-aqno/Toto-Wolff ~/toto-wolff
+cd ~/toto-wolff
+pnpm install && pnpm -r build
+./setup
+```
+
+Open any Claude Code session and run your first deliberation:
+
+```
+/council this: what is the highest-risk technical decision our team is about to make?
+```
+
+After it completes, check your vault:
+
+```bash
+ls ~/.toto/vault/Council/Congressional-Records/
+# YYYY-MM-DD-*.md  ← your first ruling on file
+```
+
+That file is permanent. It survives the session, survives restarts, and is grep-able from the terminal. The governance loop is live.
+
+**Want to point the vault at an existing Obsidian vault?** Every ruling, plan, and release record is plain Markdown — it will appear in your graph and search automatically:
+
+```bash
+TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
+```
+
+**New to the terminology?** See [Concepts](#concepts) below for plain-English definitions of everything you'll encounter.
 
 ---
 
@@ -69,77 +103,7 @@ An optional Claude Code skill runner built by Garry Tan that provides the `/coun
   - `ANTHROPIC_API_KEY` — personal Anthropic API key
   - `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` — enterprise proxy (e.g. Manifest)
 
-gstack is optional. `/council` and `/p10` are repo-native skills and run without it.
-
----
-
-## Install
-
-```bash
-git clone https://github.com/ray-aqno/Toto-Wolff ~/toto-wolff
-cd ~/toto-wolff
-pnpm install
-pnpm -r build
-./setup
-```
-
-Vault elsewhere:
-
-```bash
-TOTO_VAULT_PATH=/your/vault/path ./setup
-```
-
-Expected output:
-
-```
-Toto ready.
-  vault:        ~/.toto/vault
-  council logs: ~/.toto/vault/Council/Congressional-Records
-  p10 plans:    ~/.toto/vault/P10-Plans
-  CLAUDE.md:    /Users/<you>/.claude/CLAUDE.md -> ~/toto-wolff/CLAUDE.md
-
-Run /council to test.
-```
-
-**Recommended: point the vault at your Obsidian vault.**
-The vault format is plain Markdown + YAML frontmatter — native Obsidian. Every ruling, plan, and Cabinet record will appear in your graph and search automatically:
-
-```bash
-TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
-```
-
-Or set it permanently in your shell profile:
-
-```bash
-export TOTO_VAULT_PATH="/path/to/your/obsidian/vault"
-```
-
-Seed the signal store so governance sessions start with context from your existing ADRs and P10 plans:
-
-```bash
-toto backfill
-```
-
----
-
-## First run
-
-Open any Claude Code session and run:
-
 > **API cost:** Each full `/council` session runs 6 Anthropic API calls (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling). Estimated $0.10–$0.30 per session at standard rates.
-
-```
-/council this: what is the highest-risk technical decision our team is about to make?
-```
-
-When it completes, check your vault:
-
-```bash
-ls ~/.toto/vault/Council/Congressional-Records/
-# YYYY-MM-DD-*.md  ← your first Congressional Record
-```
-
-That file is the proof. The governance loop is live.
 
 ---
 

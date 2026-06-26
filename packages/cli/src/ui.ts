@@ -121,6 +121,7 @@ export async function printLandingUI(): Promise<void> {
     ["audit",     "Stale plans · orphaned rulings · blocked items"],
     ["dashboard", "Paddock interface — live in browser"],
     ["radio",     "Pit wall chat with Toto  (requires API key)"],
+    ["upgrade",   "Pull latest release and rebuild in-place"],
   ];
 
   const cmdLines = cmds
@@ -158,7 +159,7 @@ export function plainUsage(): string {
 
 Usage: toto <command>
 
-Commands: init  doctor  whoami  search  last  audit  dashboard  radio
+Commands: init  doctor  whoami  search  last  audit  dashboard  radio  upgrade
 
 Run 'toto' with no arguments for the full command reference.
 `;

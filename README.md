@@ -39,6 +39,8 @@ That file is permanent. It survives the session, survives restarts, and is grep-
 TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
 ```
 
+**Already installed and want to update?** Run `toto upgrade` — it pulls the latest release, rebuilds all packages, and re-runs setup non-destructively. Vault, credentials, and config are untouched.
+
 **New to the terminology?** See [Concepts](#concepts) below for plain-English definitions of everything you'll encounter.
 
 ---
@@ -78,6 +80,12 @@ Default location when `TOTO_VAULT_PATH` is not set: `~/.toto/vault` (a standalon
 **Karpathy guidelines — execution contract**
 Four rules, derived from Andrej Karpathy's public writing on software craftsmanship, that govern how each P10 stage is implemented. P10 gates the structure; Karpathy governs the execution. The rules are: (1) think before coding — state assumptions, surface ambiguity, don't charge forward on a wrong interpretation; (2) simplicity first — minimum code that solves the stage, nothing speculative; (3) surgical changes — touch only what the stage authorizes, mention but don't fix things outside scope; (4) goal-driven execution — map each stage to verifiable success criteria and loop until met, not until it "looks right." Available as `/karpathy` in any Claude Code session.
 
+**Safety Car — adversarial stress test**
+Fires between P10 approval and execution. A single Sonnet agent with one job: find failure modes in the approved plan before any file is touched. It does not re-evaluate architecture — that is `/council`'s job. It asks: how does this plan fail in production, how could it be abused, what blast radius does a partial failure carry, and what assumptions could be wrong? Verdict is CLEAR (proceed) or DEPLOYED (halt — one or more HIGH or CRITICAL risks with no accepted mitigation). Available as `/safety-car` in any Claude Code session.
+
+**DRS — Drag Reduction System**
+A deterministic PreToolUse hook, not a slash command. Wired via `.claude/settings.json`, it evaluates every Write, Edit, NotebookEdit, and Bash call against 5 boundary rules before the call executes: (1) write target matches a frozen path in `.toto/freeze.json`; (2) write target is outside declared project scope; (3) write target filename matches an auth/permission surface pattern; (4) write target is in another tenant's namespace; (5) Bash command contains `rm -rf`, `DROP TABLE`, or `DELETE FROM` without a WHERE clause. No model reasoning — deterministic rule evaluation only. Override requires an explicit reason in `DRS_OVERRIDE_REASON`. Every block and every override is logged to the vault.
+
 **gstack**
 An optional Claude Code skill runner built by Garry Tan that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically.
 
@@ -87,10 +95,12 @@ An optional Claude Code skill runner built by Garry Tan that provides the `/coun
 
 - A **Congressional Record `.md`** in `~/.toto/vault/Council/Congressional-Records/` after every `/council` session — Haiku scouts, Sonnet analysis, Opus ruling, all recorded
 - A **P10 plan `.md`** in `~/.toto/vault/P10-Plans/` before any code is touched — Opus must set `status: approved` or execution halts
+- A **Safety Car record `.md`** in `~/.toto/vault/Safety-Car/` after every `/safety-car` run — adversarial risk table, CLEAR/DEPLOYED verdict
 - A **Cabinet record `.md`** in `~/.toto/vault/Cabinet/` after every release gate — three Opus seats (Garry Tan, Feynman, Karpathy), any veto blocks the ship
+- A **DRS event log** in `~/.toto/vault/DRS/` whenever the boundary hook fires — every block and every override is recorded with the rule, target, and reason
 - A **signal store** in `~/.toto/vault/Signals/` that feeds past rulings forward into future plans — `toto backfill` seeds it from existing ADRs and P10 plans
 - A **live dashboard** at `http://127.0.0.1:3099/dashboard` showing session counts, blocked plans, and vault records with SSE-backed live stats
-- A **`toto` CLI** with 9 commands for vault search, audit, doctor, and interactive pit-wall chat via `toto radio`
+- A **`toto` CLI** with 10 commands for vault search, audit, doctor, interactive pit-wall chat via `toto radio`, and in-place upgrades via `toto upgrade`
 
 ---
 
@@ -135,6 +145,7 @@ An optional Claude Code skill runner built by Garry Tan that provides the `/coun
 | `toto dashboard` | Open `http://127.0.0.1:3099/dashboard` in browser | `toto dashboard` |
 | `toto radio` | Interactive pit-wall chat; streams via the Anthropic API | `toto radio` |
 | `toto backfill` | Ingest ADR/ and P10-Plans/ into Signals/ — idempotent, safe to re-run | `toto backfill` |
+| `toto upgrade` | Pull latest release from GitHub, rebuild, re-run setup — vault and credentials untouched | `toto upgrade` |
 
 ---
 
@@ -183,7 +194,9 @@ The server exposes these read-only HTTP endpoints (loopback only — never acces
 
 ## How it works
 
-Five packages in a pnpm workspace. `packages/core` owns shared types, error classes, and the three services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), and `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate). `packages/mcp-server` exposes 6 MCP tools and 8 HTTP endpoints on `127.0.0.1:3099` — loopback only, no LAN exposure. `packages/cli` is the `toto` binary. `packages/dashboard` generates server-rendered HTML; no React, no build step at runtime. `packages/personas` holds the engineering persona for `./setup --role engineering` persona swaps. Additional roles (devops, data, r-and-d) ship in v1.1.0.
+Five packages in a pnpm workspace. `packages/core` owns shared types, error classes, and the three services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), and `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate). `packages/mcp-server` exposes 6 MCP tools and 8 HTTP endpoints on `127.0.0.1:3099` — loopback only, no LAN exposure. `packages/cli` is the `toto` binary (10 commands including `toto upgrade` for in-place updates). `packages/dashboard` generates server-rendered HTML; no React, no build step at runtime. `packages/personas` holds the engineering persona for `./setup --role engineering` persona swaps.
+
+The skill stack in `.claude/skills/` governs the full engineering workflow: `/council` for deliberation, `/p10` for pre-execution planning, `/safety-car` for adversarial stress testing of approved plans (CLEAR/DEPLOYED verdicts, single Sonnet agent), `/karpathy` for execution-time quality rules, and `/drs` as a deterministic PreToolUse hook that fires automatically on every Write/Edit/Bash call to enforce frozen paths, auth surfaces, and destructive shell pattern rules. `/cabinet` closes the loop at tagged releases.
 
 The vault is the source of truth: a directory of `.md` files with YAML frontmatter, committed to git after every write. Every ruling is grep-able, diffable, and editable in any text editor — no running process required to read it.
 

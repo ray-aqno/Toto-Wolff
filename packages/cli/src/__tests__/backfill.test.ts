@@ -13,7 +13,7 @@ const originalWrite = process.stdout.write.bind(process.stdout);
 
 beforeEach(() => {
   capturedStdout = '';
-  process.stdout.write = (chunk: string) => { capturedStdout += chunk; return true; };
+  (process.stdout as NodeJS.WriteStream).write = (chunk: string) => { capturedStdout += chunk; return true; };
 });
 
 afterEach(() => {

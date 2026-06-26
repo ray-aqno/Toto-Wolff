@@ -100,39 +100,37 @@ Shipped as v1.0.0 at github.com/ray-aqno/Toto-Wolff. Branch protection live (sta
 
 ---
 
-## v1.1.0 Roadmap (added 2026-06-26)
+## v1.0.1 (added 2026-06-26)
 
-### V1: Upgrade mechanism
+Skills and upgrade path — no runtime changes to MCP server, CLI core, or vault format.
 
-**What:** `toto upgrade` CLI command (or `scripts/upgrade.sh`) that pulls the latest release from GitHub, runs `pnpm install && pnpm -r build`, re-runs `./setup` non-destructively (preserves vault, credentials, and config), and prints a diff of what changed. Must be safe to run in-place on a live installation.
-
-**Why:** On a public release schedule, installations go stale. Users have no current upgrade path — they must re-clone manually. `toto upgrade` gives installations a self-service update path without touching vault data or credentials.
-
-**Effort:** CC ~1 hour. Requires idempotent `./setup` (already true) and a versioned release tag on GitHub (live as of v1.0.0).
-
----
-
-### V2: Dynamic P10 plans (Serena-assisted)
-
-**What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
-
-**Why:** Static grep misses structural violations (function exceeds 60 lines, pointer dereference chains). Serena-assisted scouting catches P10 violations before the draft stage rather than at Opus arbitration. Plan quality improves materially. This is the "dynamic P10s" roadmap item.
-
-**Effort:** CC ~2 hours. Prompt updates to P10 skill + Serena integration in scout stage.
-
-**Depends on:** Serena MCP server live (already registered in `.serena/project.yml`).
-
----
-
-### V3: `/safety-car` skill (shipped 2026-06-26)
+### `/safety-car` skill (shipped 2026-06-26)
 
 Single adversarial Sonnet subagent between P10 approval and execution. Verdicts: CLEAR or DEPLOYED. Vault path: `{VAULT_PATH}/Safety-Car/`. Stack position: after `/p10` approval, before karpathy execution.
 
 ---
 
-### V4: `/drs` PreToolUse hook (shipped 2026-06-26)
+### `/drs` PreToolUse hook (shipped 2026-06-26)
 
 Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, auth surfaces, cross-tenant writes, destructive shell patterns. Hook script: `.claude/skills/drs/bin/drs-check.sh`. Override via `DRS_OVERRIDE_REASON` env var. Events logged to `{VAULT_PATH}/DRS/`.
+
+---
+
+### `toto upgrade` command (shipped 2026-06-26)
+
+`scripts/upgrade.sh` + `packages/cli/src/commands/upgrade.ts`. Pulls `origin/main`, rebuilds, re-runs setup non-destructively. Vault and credentials untouched.
+
+---
+
+## v1.1.0 Roadmap
+
+### Dynamic P10 plans (Serena-assisted)
+
+**What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
+
+**Why:** Static grep misses structural violations (function exceeds 60 lines, pointer dereference chains). Serena-assisted scouting catches P10 violations before the draft stage rather than at Opus arbitration. Plan quality improves materially.
+
+**Depends on:** Serena MCP server live (already registered in `.serena/project.yml`).
 
 ---
 

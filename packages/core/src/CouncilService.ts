@@ -28,7 +28,15 @@ const CHAIRMAN_MODEL = 'claude-opus-4-8';
 const FASTPATH_MODEL = 'claude-sonnet-4-6';
 
 // T10: no-tradeoff-language heuristic — presence of any term below routes to full chain.
+// Word-boundary matched, not substring — "should the team" must not slip past "should we".
 const TRADEOFF_KEYWORDS = ['vs', 'versus', 'should we', 'tradeoff', 'trade-off', 'risk'];
+const TRADEOFF_PATTERN = new RegExp(
+  `\\b(${TRADEOFF_KEYWORDS.map((kw) => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`,
+  'i',
+);
+// Deliberative phrasing that carries no tradeoff keyword but is not a factual lookup.
+const DELIBERATIVE_MARKERS = /\b(which approach|what'?s the best|which pattern should|how should we|how do we|which (way|option|path) (should|do))\b/i;
+const FASTPATH_MAX_WORDS = 20;
 const FASTPATH_PERSONA = 'You are answering a quick factual lookup against a governance vault search result. Summarize what the match says in 2-3 sentences. No preamble, no deliberation, no hedging.';
 
 const SCOUT_1_PERSONA = 'You are a pragmatic senior engineer on an F1 engineering council. Identify concrete technical risks, implementation obstacles, and resource constraints. Be specific — name files, services, real numbers. No hedging.';
@@ -133,8 +141,11 @@ export class CouncilService {
    * no tradeoff/deliberation language. Deliberative questions always take the full chain.
    */
   private _isFactualQuestion(question: string): boolean {
-    const lower = question.toLowerCase();
-    return !TRADEOFF_KEYWORDS.some((kw) => lower.includes(kw));
+    if (TRADEOFF_PATTERN.test(question)) return false;
+    if (DELIBERATIVE_MARKERS.test(question)) return false;
+    const wordCount = question.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount > FASTPATH_MAX_WORDS) return false;
+    return true;
   }
 
   /**

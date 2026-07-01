@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] - 2026-07-01
+
+Closes the two conditions the Cabinet attached to v1.1.0 (`2026-07-01-v1.1.0-tag-justification`) that were still open when that tag was cut and distributed. Both were previously "shipped" in name only — the code paths existed but were unreachable/unguarded from any real invocation.
+
+### Fixed
+- **T10 fast-path routing (Karpathy's condition).** `CouncilService._isFactualQuestion()` used bare `.includes()` substring matching, so a genuinely deliberative question with none of the 5 trigger keywords as a whole word (e.g. "which approach should the team take for the migration") silently routed to the single-call fast-path and got written to the vault as `Status: approved` with zero deliberation. Replaced with word-boundary regex matching, an explicit deliberative-marker guard (`which approach`, `how should we`, etc.), and a 20-word length cap. `packages/core/src/CouncilService.test.ts` now asserts this exact case is rejected.
+- **T5 reversal detection, end-to-end (Feynman's condition).** `handleCouncilRun()` never loaded real priors — `SignalIndex` existed but was only ever wired into the dashboard's read-only signal feed, and the `council_run` MCP tool schema didn't even expose `currentTags`/`priors` as inputs, so no real client could reach `detectReversal`'s conflict branch. The handler now constructs a real `SignalIndex(vaultPath)`, loads it, and forwards live priors (plus tags derived from the question via new `extractQuestionTags()`) into `CouncilService.run()` when the caller doesn't supply them explicitly. The `council_run` tool schema now advertises `currentTags`/`priors` as real inputs. `packages/mcp-server/src/__tests__/council_run.test.ts` proves `reversalDetected === true` fires through the real handler against a real on-disk vault fixture — not just a hand-built test double.
+- Removed the phantom `SignalIndex.MAX_RECORDS` references in `reversalDetector.ts` / `constants.ts` comments — that symbol was never exported; the comments now describe the actual (independent) bound each module enforces.
+
 ## [1.0.2] - 2026-07-01
 
 ### Added

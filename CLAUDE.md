@@ -370,7 +370,13 @@ If you add or remove a pattern, update **both** this section and the JSON file,
 then run `pnpm check-patterns` locally before committing.
 
 ```sensitive-patterns
-auth
+authToken
+auth_token
+authHeader
+isAuthenticated
+requireAuth
+Authorization:
+authenticate\(
 service\.boundar
 data\.migrat
 permission

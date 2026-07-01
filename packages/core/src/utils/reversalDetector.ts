@@ -21,7 +21,8 @@ export interface ReversalResult {
  * Caller also owns currentTags — pass the topic_tags from the SignalRecord
  * the handler constructs for the current session. Do not derive tags from summary text.
  *
- * P10 Rule 2: priors bounded by SignalIndex.MAX_RECORDS = 500 (SIGNAL_MAX_PRIORS).
+ * P10 Rule 2: priors bounded by SIGNAL_MAX_PRIORS (this module's own constant,
+ * independent of whatever cap the mcp-server's SignalIndex.load() applies).
  * P10 Rule 7: no async, no I/O. Async boundary is entirely in the caller.
  */
 export function detectReversal(
@@ -32,9 +33,9 @@ export function detectReversal(
   assert(typeof currentVerdict === 'string' && currentVerdict.length > 0, 'currentVerdict must be non-empty string');
   assert(Array.isArray(currentTags), 'currentTags must be a string[]');
   assert(Array.isArray(priors), 'priors must be an array');
-  // P10-R2: bounded by SignalIndex MAX_RECORDS = 500. If SignalIndex's own cap
-  // has an off-by-one bug, degrade gracefully via truncation instead of crashing
-  // the whole council run.
+  // P10-R2: bounded by SIGNAL_MAX_PRIORS regardless of the caller's own cap,
+  // so this function degrades gracefully via truncation instead of crashing
+  // the whole council run if a caller ever passes an oversized array.
   const boundedPriors = priors.length > SIGNAL_MAX_PRIORS ? priors.slice(0, SIGNAL_MAX_PRIORS) : priors;
 
   for (let i = 0; i < boundedPriors.length; i++) { // P10 Rule 2: bounded by boundedPriors.length ≤ SIGNAL_MAX_PRIORS

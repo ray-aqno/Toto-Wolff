@@ -4,6 +4,15 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+## Completed (v1.1.1, 2026-07-01)
+
+Cabinet ruled `2026-07-01-v1.1.0-tag-justification` APPROVED WITH CONDITIONS. The v1.1.0 tag was cut and distributed to the internal team before 2 of the 3 conditions were actually verified in code — a session limit hit mid-fix. Caught post-distribution.
+
+- **T10 fast-path routing fixed (Karpathy's condition)** — `_isFactualQuestion` now uses word-boundary regex + a deliberative-marker guard + a word-count cap, replacing the old substring heuristic. Test proves "which approach should the team take for the migration" no longer silently auto-approves.
+- **T5 reversal detection wired end-to-end (Feynman's condition)** — `handleCouncilRun` now loads real `SignalIndex` priors from the vault and forwards them into `CouncilService.run()`; the `council_run` MCP tool schema now exposes `currentTags`/`priors`. End-to-end test proves `reversalDetected === true` fires against a real on-disk vault fixture, not a hand-built test double.
+
+---
+
 ## Completed (post-v1.0.2 strangler-fig fixes, 2026-07-01)
 
 Council ruling `2026-07-01-strangler-fig-seam-bugs` (lean mode, ~86K tokens vs. standard full chain). Both bugs found by a preemptive `/investigate` pass on the strangler-fig seam.

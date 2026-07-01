@@ -25,6 +25,11 @@ const SCOUT_MODEL = 'claude-haiku-4-5-20251001';
 const ANALYST_MODEL = 'claude-sonnet-4-6';
 const BRIEF_MODEL = 'claude-sonnet-4-6';
 const CHAIRMAN_MODEL = 'claude-opus-4-8';
+const FASTPATH_MODEL = 'claude-sonnet-4-6';
+
+// T10: no-tradeoff-language heuristic — presence of any term below routes to full chain.
+const TRADEOFF_KEYWORDS = ['vs', 'should we', 'tradeoff', 'trade-off', 'risk'];
+const FASTPATH_PERSONA = 'You are answering a quick factual lookup against a governance vault search result. Summarize what the match says in 2-3 sentences. No preamble, no deliberation, no hedging.';
 
 const SCOUT_1_PERSONA = 'You are a pragmatic senior engineer on an F1 engineering council. Identify concrete technical risks, implementation obstacles, and resource constraints. Be specific — name files, services, real numbers. No hedging.';
 const SCOUT_2_PERSONA = 'You are a systems architect on an F1 engineering council. Identify structural concerns, long-term maintainability risks, and irreversible architectural decisions. Name the breaking points precisely.';
@@ -45,12 +50,19 @@ export class CouncilService {
   }
 
   /**
-   * Run a full council session on a governance question.
-   * Flow: parallel scouts → compression → parallel analysts → brief → chairman ruling → vault write.
+   * Run a council session on a governance question.
+   * T10 fast-path: factual questions (no tradeoff language) with a direct vault_search hit
+   * skip straight to a single Sonnet summary call instead of the full 6-call chain.
+   * Full chain flow: parallel scouts → compression → parallel analysts → brief → chairman ruling → vault write.
    */
   async run(question: string, currentTags: string[] = [], priors: SignalRecord[] = []): Promise<CouncilResult> {
     assert(typeof question === 'string' && question.length > 0, 'question must be non-empty');
     assert(question.length <= 4000, 'question must not exceed 4000 chars');
+
+    if (this._isFactualQuestion(question)) {
+      const fastResult = await this._tryFastPath(question);
+      if (fastResult !== null) return fastResult;
+    }
 
     // Scouts: clean slate — question only, no accumulated context (primacy bias mitigation)
     const [rawScout1, rawScout2] = await Promise.all([
@@ -113,6 +125,43 @@ export class CouncilService {
       recordPath,
       reversalDetected: reversal !== null,
       ...(reversal !== null ? { priorId: reversal.priorId } : {}),
+    };
+  }
+
+  /**
+   * T10 heuristic: a question is "factual" (fast-path eligible) when it contains
+   * no tradeoff/deliberation language. Deliberative questions always take the full chain.
+   */
+  private _isFactualQuestion(question: string): boolean {
+    const lower = question.toLowerCase();
+    return !TRADEOFF_KEYWORDS.some((kw) => lower.includes(kw));
+  }
+
+  /**
+   * T10 fast-path: vault_search + single Sonnet call for direct factual lookups.
+   * Returns null (caller falls back to full chain) if vault_search finds nothing.
+   */
+  private async _tryFastPath(question: string): Promise<CouncilResult | null> {
+    const hits = await this.vault.search(question);
+    if (hits.length === 0) return null;
+
+    const topHits = hits.slice(0, 5); // P10 Rule 2: bounded
+    const matchContext = topHits.map((h) => `${h.file}:${h.line}: ${h.text}`).join('\n');
+    const summary = await withLLMTimeout(
+      (opts) => this._callModel(FASTPATH_MODEL, FASTPATH_PERSONA, `Vault matches:\n${matchContext}\n\nQuestion: ${question}`, opts),
+      'fastpath-summary',
+    );
+    assert(summary.length > 0, 'fastpath summary must not be empty');
+
+    const recordPath = `Council/Congressional-Records/${Date.now()}-council-fastpath.md`;
+    await this.vault.write(recordPath, formatRecord(question, summary, { status: 'approved', summary }));
+    await this.vault.drainQueue();
+
+    return {
+      status: 'approved',
+      ruling: summary,
+      brief: summary,
+      recordPath,
     };
   }
 

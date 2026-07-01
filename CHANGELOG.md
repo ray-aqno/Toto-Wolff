@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-07-01
+
+### Added
+- Decision reversal auto-detection: `detectReversal()` in `packages/core/src/utils/reversalDetector.ts` scans prior `SignalRecord`s for a topic-matched, conflicting verdict; wired into `CouncilService.run()` via optional `currentTags`/`priors` params (backward-compatible defaults).
+- Shared `jaccardSimilarity`/`JACCARD_MATCH_THRESHOLD` extracted to `packages/core/src/utils/jaccard.ts`; `scoreConfidence.ts` now imports from core instead of duplicating the implementation.
+- Local governance pre-commit hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`): greps staged diffs against `.toto/sensitive-patterns.json` and blocks the commit with a `/council` prompt on a match. Host-agnostic — no GitHub Actions dependency, replaces the blocked auto-trigger design from the 2026-06-29 council ruling.
+- `scripts/check-patterns.ts` (`pnpm check-patterns`): lint gate keeping `.toto/sensitive-patterns.json` and the CLAUDE.md `##sensitive-patterns` fence in sync; rejects overbroad patterns (bare `.*`, `.+`, empty string) that would match every diff. Runs locally and in a new read-only `check-patterns` CI job (`contents: read`, no `pull_request_target`).
+- `toto doctor` now checks whether the governance pre-commit hook is installed.
+- `tests/pre-commit.bats` (8 tests) and `tests/toto-report.bats` (1 live test, 2 pre-green pending E4).
+
+### Fixed
+- `CouncilService.run()` no longer throws if `detectReversal` fails on a bad input — the council record is already written to vault by that point, so a detection failure now degrades gracefully instead of surfacing as a false "the whole run failed."
+
 ## [1.0.0] - 2026-06-25
 
 ### Added

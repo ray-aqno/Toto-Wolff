@@ -4,6 +4,11 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+## Completed (v1.0.2)
+
+- **T2: Local governance pre-commit hook** — original GitHub Actions design BLOCKED by council (2026-06-29-t2-github-actions-seam-test: fails silently for 90%+ of fork PRs, adds a write-credentialed dependency). Redesigned as a host-agnostic local hook: `scripts/hooks/pre-commit` + `scripts/install-hooks.sh`, single-source pattern list in `.toto/sensitive-patterns.json`, `scripts/check-patterns.ts` lint gate keeping CLAUDE.md in sync, read-only advisory CI job. `toto doctor` surfaces install state. 8/8 bats tests passing. Shipped 2026-07-01.
+- **T5: Decision reversal auto-detection** — `detectReversal()` in `packages/core/src/utils/reversalDetector.ts`, wired into `CouncilService.run()` via optional `currentTags`/`priors` params. Shared `jaccardSimilarity` extracted to core. Shipped 2026-07-01.
+
 ## Completed (v0.0.4.0)
 
 - **Phase 1 demo path** — `scripts/demo.sh` drives the full council→p10 cycle end-to-end. MCP server returns HTTP 200 `{status:'blocked'}` for arbiter-blocked p10 plans (governance working, not an error). Shipped 2026-06-11.
@@ -24,9 +29,9 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ### T7: bats test suite for `toto-report`
 
-**What:** `tests/toto-report.bats` — no analytics dir → graceful exit, malformed frontmatter → unknown fields, happy path output. Deferred from T1 (toto-report not yet implemented).
+**What:** `tests/toto-report.bats` — no analytics dir → graceful exit, malformed frontmatter → unknown fields, happy path output. Scaffold shipped 2026-07-01: test 1 (no analytics dir) is live and green; tests 2 and 3 are `skip`-gated with `TODO(E4)` pending report.ts.
 
-**Effort:** CC ~30 min once toto-report is built.
+**Effort:** CC ~10 min to un-skip once toto-report ships.
 
 **Depends on:** E4 (metrics dashboard, toto-report implementation).
 
@@ -34,17 +39,9 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ## P3 — Right Feature, Deferred
 
-### T2: Council auto-trigger (GitHub integration)
+### ~~T2: Council auto-trigger (GitHub integration)~~ — REDESIGNED & SHIPPED 2026-07-01
 
-**What:** GitHub Actions workflow or webhook that detects PRs touching sensitive patterns (auth, service boundaries, data migrations) and posts a comment: "This PR touches authentication — run /council before merging?" Engineer clicks a link that opens a pre-filled /council prompt.
-
-**Why:** Without this, council adoption depends on individual discipline. With it, council becomes a structural quality gate. The PR comment with the ruling is also the artifact that makes Toto visible to reviewers and leadership who aren't running Claude Code themselves.
-
-**Effort:** human ~2 weeks / CC ~2 hours
-
-**Seam filter note:** This adds a GitHub webhook dependency (new seam). Revisit only after shared vault (E1) is live and GitHub org permissions are confirmed (see docs/linear-setup.md).
-
-**Depends on:** E1 (shared vault live), GitHub org permissions resolved.
+Original GitHub Actions design BLOCKED by council. See "Completed (v1.0.2)" above.
 
 ---
 
@@ -60,15 +57,9 @@ Shipped as v1.0.0 at github.com/ray-aqno/Toto-Wolff. Branch protection live (sta
 
 ---
 
-### T5: Decision reversal auto-detection
+### ~~T5: Decision reversal auto-detection~~ — DONE 2026-07-01
 
-**What:** Instead of requiring engineers to manually add `reversal: true` frontmatter, detect reversals by matching council rulings against subsequent council sessions on the same topic (semantic similarity or topic tag match). Surface as a metric in `./toto-report`.
-
-**Why:** Manual tagging works but degrades with team size. Auto-detection turns reversal rate into a reliable metric without requiring discipline.
-
-**Effort:** human ~1 week / CC ~2 hours (requires embedding/similarity or topic tagging)
-
-**Depends on:** E1 (shared vault with sufficient volume), E4 (metrics dashboard baseline established).
+See "Completed (v1.0.2)" above.
 
 ---
 
@@ -136,13 +127,21 @@ Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, 
 
 ---
 
-### Dynamic P10 plans (Serena-assisted)
+### ~~Dynamic P10 plans (Serena-assisted)~~ — DONE 2026-07-01
 
-**What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
+Used for the T2/T5/T7 P10 cycle. Serena scouts (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) confirmed exact function line counts and existing symbol shapes before drafting — caught the CouncilService.run() 60-line budget precisely instead of estimating from grep.
 
-**Why:** Static grep misses structural violations (function exceeds 60 lines, pointer dereference chains). Serena-assisted scouting catches P10 violations before the draft stage rather than at Opus arbitration. Plan quality improves materially.
+---
 
-**Depends on:** Serena MCP server live (already registered in `.serena/project.yml`).
+### Safety-car follow-ups from T2/T5/T7 ship (2026-07-01)
+
+**What:** Adversarial post-execution review found 7 open LOW/MEDIUM items not blocking ship, logged in `Safety-Car/2026-07-01-t2-t5-t7-ship.md`: (1) `jaccardSimilarity` has no unicode normalization/trim, (2) `CouncilResult.priorId` conditional-absence footgun needs doc comment, (3) pre-commit hook blocks on removed-line matches not just added lines, (4) `doctor.ts checkHookInstalled` is spoofable via a comment-string sentinel, (5) missing `jq` gives an unfriendly raw error in the hook, (6) no CI job exercises the pre-commit hook itself against a fixture diff, (7) `detectReversal`'s hard assertion on `SIGNAL_MAX_PRIORS` crashes the council run rather than truncating if `SignalIndex`'s cap has an off-by-one.
+
+**Why:** None are severe enough to block v1.0.2, but they're real and cheap to fix in a follow-up pass.
+
+**Effort:** CC ~30 min for all seven.
+
+**Depends on:** Nothing — can be picked up any time.
 
 ---
 

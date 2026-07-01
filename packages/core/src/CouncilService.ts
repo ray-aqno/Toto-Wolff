@@ -3,14 +3,16 @@ import assert from 'node:assert';
 import { withLLMTimeout } from './utils/timeout.js';
 import { createAnthropicClient } from './utils/anthropic.js';
 import type { VaultService } from './VaultService.js';
-import type { CouncilRuling, CouncilStatus } from './types.js';
+import type { CouncilRuling, CouncilStatus, SignalRecord } from './types.js';
+import { detectReversal } from './utils/reversalDetector.js';
 
-// CouncilResult shape per requirement — differs from the legacy types.ts definition
 export interface CouncilResult {
   status: CouncilStatus;
   ruling: string;
   brief: string;
   recordPath: string;
+  reversalDetected?: boolean;
+  priorId?: string;
 }
 
 const SCOUT_MODEL = 'claude-haiku-4-5-20251001';
@@ -40,7 +42,7 @@ export class CouncilService {
    * Run a full council session on a governance question.
    * Flow: parallel scouts → compression → parallel analysts → brief → chairman ruling → vault write.
    */
-  async run(question: string): Promise<CouncilResult> {
+  async run(question: string, currentTags: string[] = [], priors: SignalRecord[] = []): Promise<CouncilResult> {
     assert(typeof question === 'string' && question.length > 0, 'question must be non-empty');
     assert(question.length <= 4000, 'question must not exceed 4000 chars');
 
@@ -89,7 +91,23 @@ export class CouncilService {
     await this.vault.write(recordPath, formatRecord(question, brief, ruling));
     await this.vault.drainQueue();
 
-    return { status: ruling.status, ruling: ruling.summary, brief, recordPath };
+    // Ruling is already written to vault above — a bad detectReversal input must
+    // degrade, not throw, or a successful council write would look like a failure.
+    let reversal = null;
+    try {
+      reversal = detectReversal(ruling.status, currentTags, priors);
+    } catch {
+      reversal = null;
+    }
+
+    return {
+      status: ruling.status,
+      ruling: ruling.summary,
+      brief,
+      recordPath,
+      reversalDetected: reversal !== null,
+      ...(reversal !== null ? { priorId: reversal.priorId } : {}),
+    };
   }
 
   /**

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# .git/hooks/pre-commit — toto-wolff governance gate
+# Source: scripts/hooks/pre-commit. Install via scripts/install-hooks.sh.
+# P10-R2 LOOP BOUND: one grep pass per pattern in .toto/sensitive-patterns.json (max 20)
+set -euo pipefail
+
+readonly REPO_ROOT="$(git rev-parse --show-toplevel)"
+readonly PATTERNS_JSON="${REPO_ROOT}/.toto/sensitive-patterns.json"
+readonly HOOK_TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${HOOK_TMPDIR}"' EXIT
+
+# R5 guard 1: git context
+git rev-parse --git-dir >/dev/null 2>&1 || {
+  echo "pre-commit: not a git repository" >&2
+  exit 1
+}
+
+# R5 guard 2: patterns file
+test -f "${PATTERNS_JSON}" || {
+  echo "pre-commit: .toto/sensitive-patterns.json not found — run toto init or scripts/install-hooks.sh" >&2
+  exit 1
+}
+
+# Extract patterns to temp file for grep -f
+# P10-R2 LOOP BOUND: jq outputs one line per pattern; max 20 lines
+readonly PATTERNS_FILE="${HOOK_TMPDIR}/patterns.txt"
+jq -r '.patterns[]' "${PATTERNS_JSON}" > "${PATTERNS_FILE}"
+
+# Grep staged diff. grep exits 0 on match, 1 on no-match, 2 on error.
+# || true: grep's exit 1 (no match) must not abort set -e pipeline.
+MATCH_OUTPUT="$(git diff --cached | grep -E -f "${PATTERNS_FILE}" || true)"
+
+if [ -n "${MATCH_OUTPUT}" ]; then
+  echo "" >&2
+  echo "pre-commit: GOVERNANCE GATE — sensitive pattern detected in staged diff" >&2
+  echo "" >&2
+  echo "Matching lines:" >&2
+  echo "${MATCH_OUTPUT}" | head -20 >&2
+  echo "" >&2
+  echo "This change touches a governance-sensitive surface." >&2
+  echo "Required action: run /council before committing." >&2
+  echo "  /council [describe your change + why it is safe]" >&2
+  echo "" >&2
+  echo "To bypass (use only after council ruling): git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0

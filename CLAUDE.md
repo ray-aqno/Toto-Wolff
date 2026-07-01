@@ -361,3 +361,27 @@ curl "http://127.0.0.1:3099/dashboard/record?type=p10&file=2026-06-22-plan.md"
 ```
 
 @RTK.md
+
+## sensitive-patterns
+
+The patterns below are the CLAUDE.md declaration of `.toto/sensitive-patterns.json`.
+`scripts/check-patterns.ts` enforces that these two lists stay in sync.
+If you add or remove a pattern, update **both** this section and the JSON file,
+then run `pnpm check-patterns` locally before committing.
+
+```sensitive-patterns
+auth
+service\.boundar
+data\.migrat
+permission
+role
+tenant
+policy
+rbac
+acl
+iam
+secret
+credential
+api\.key
+token
+```

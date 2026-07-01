@@ -4,3 +4,7 @@ export { CouncilService } from './CouncilService.js';
 export type { CouncilResult } from './CouncilService.js';
 export { P10Service } from './P10Service.js';
 export * from './types.js';
+export { jaccardSimilarity, JACCARD_MATCH_THRESHOLD } from './utils/jaccard.js';
+export { REVERSAL_JACCARD_THRESHOLD, SIGNAL_MAX_PRIORS, TAG_SEPARATOR } from './utils/constants.js';
+export { detectReversal } from './utils/reversalDetector.js';
+export type { ReversalResult } from './utils/reversalDetector.js';

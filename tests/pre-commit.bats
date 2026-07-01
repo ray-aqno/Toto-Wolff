@@ -109,3 +109,27 @@ teardown() {
   run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
   [ "$status" -eq 1 ]
 }
+
+# Regression: council ruling 2026-07-01-v1.1.1-cabinet-conditions-closed. The real
+# .toto/sensitive-patterns.json bare "auth" entry false-positived on test fixture
+# prose (topic_tags containing "auth", "auth coupling" fixture text, a question
+# string mentioning "auth"). Uses the actual repo pattern list, not a fixture.
+@test "pre-commit exits 0 on test-fixture prose mentioning auth using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  cat > "${TEST_DIR}/fixture.test.ts" <<'EOF'
+topic_tags: ["migration", "auth"],
+// Prior ruling: migration approach blocked due to auth coupling.
+const question = 'Which approach should the migration take for auth?';
+EOF
+  git -C "${TEST_DIR}" add fixture.test.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-commit exits 1 on real auth-token code using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "const authToken = process.env.SECRET_AUTH_TOKEN;" > "${TEST_DIR}/client.ts"
+  git -C "${TEST_DIR}" add client.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 1 ]
+}

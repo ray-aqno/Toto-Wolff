@@ -35,7 +35,7 @@ const p10 = new P10Service(vault);
 const TOOLS: Record<string, (body: unknown) => Promise<unknown> | unknown> = {
   vault_write:        (body) => handleVaultWrite(body, vault),
   vault_search:       (body) => handleVaultSearch(body, vault),
-  council_run:        (body) => handleCouncilRun(body, council),
+  council_run:        (body) => handleCouncilRun(body, council, VAULT_PATH),
   p10_plan:           (body) => handleP10Plan(body, p10),
   dashboard_status:   ()     => handleDashboardStatus(VAULT_PATH),
   score_confidence:   (body) => handleScoreConfidence(body, VAULT_PATH),
@@ -144,7 +144,7 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     { name: 'vault_write',       description: 'Write a record to the toto vault',                inputSchema: { type: 'object' as const, properties: { content: { type: 'string' }, filename: { type: 'string' } }, required: ['content', 'filename'] } },
     { name: 'vault_search',      description: 'Search vault records by query string',             inputSchema: { type: 'object' as const, properties: { query: { type: 'string' } }, required: ['query'] } },
-    { name: 'council_run',       description: 'Run a council deliberation session',               inputSchema: { type: 'object' as const, properties: { question: { type: 'string' } }, required: ['question'] } },
+    { name: 'council_run',       description: 'Run a council deliberation session',               inputSchema: { type: 'object' as const, properties: { question: { type: 'string' }, currentTags: { type: 'array' as const, items: { type: 'string' as const } }, priors: { type: 'array' as const, items: { type: 'object' as const } } }, required: ['question'] } },
     { name: 'p10_plan',          description: 'Generate a P10 pre-execution plan',                inputSchema: { type: 'object' as const, properties: { task: { type: 'string' } }, required: ['task'] } },
     { name: 'dashboard_status',  description: 'Get current vault stats for the dashboard',       inputSchema: { type: 'object' as const, properties: {} } },
     { name: 'score_confidence',  description: 'Score confidence of a council ruling',             inputSchema: { type: 'object' as const, properties: { ruling: { type: 'string' } }, required: ['ruling'] } },

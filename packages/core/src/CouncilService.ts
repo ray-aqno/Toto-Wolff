@@ -28,7 +28,7 @@ const CHAIRMAN_MODEL = 'claude-opus-4-8';
 const FASTPATH_MODEL = 'claude-sonnet-4-6';
 
 // T10: no-tradeoff-language heuristic — presence of any term below routes to full chain.
-const TRADEOFF_KEYWORDS = ['vs', 'should we', 'tradeoff', 'trade-off', 'risk'];
+const TRADEOFF_KEYWORDS = ['vs', 'versus', 'should we', 'tradeoff', 'trade-off', 'risk'];
 const FASTPATH_PERSONA = 'You are answering a quick factual lookup against a governance vault search result. Summarize what the match says in 2-3 sentences. No preamble, no deliberation, no hedging.';
 
 const SCOUT_1_PERSONA = 'You are a pragmatic senior engineer on an F1 engineering council. Identify concrete technical risks, implementation obstacles, and resource constraints. Be specific — name files, services, real numbers. No hedging.';

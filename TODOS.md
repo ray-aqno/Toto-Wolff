@@ -115,15 +115,9 @@ Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, 
 
 ## v1.1.0 Roadmap
 
-### T-RADIO-TONE: toto radio persona grounding
+### ~~T-RADIO-TONE: toto radio persona grounding~~ — DONE 2026-07-01
 
-**What:** The local LLM backing `toto radio` is roleplaying as an actual F1 character rather than behaving as a grounded engineering assistant. The system prompt needs explicit persona constraints: no F1 lore, no race commentary, no character voice. Tone should be direct builder-to-builder — same register as the CLAUDE.md Toto Wolff persona (data-driven, no hedging, name files and numbers), not a character impression.
-
-**Why:** Radio is a frontline interaction surface. F1 flavor and easter eggs are intentional — the issue is the LLM fully inhabits the character (race commentary, lore, team-principal voice) instead of using it as seasoning. Engineering substance must lead; F1 is accent, not identity. Secondary failure: the model argues back and refuses to accept user input, which is actively hostile for a radio interface. Fix both: ground in helpfulness first, personality second.
-
-**Effort:** CC ~10 min. System prompt change in the radio command only.
-
-**Depends on:** Nothing.
+`SYSTEM_PROMPT` in `packages/cli/src/commands/radio.ts` rewritten: model is now "an engineering practice lead," direct/data-driven/builder-to-builder tone, must name files/lines/commands/numbers. F1 terms permitted only as occasional seasoning, never a sustained character voice. Added explicit no-argue clause — accept redirection, never stonewall the user.
 
 ---
 
@@ -133,15 +127,9 @@ Used for the T2/T5/T7 P10 cycle. Serena scouts (`get_symbols_overview`, `find_sy
 
 ---
 
-### Safety-car follow-ups from T2/T5/T7 ship (2026-07-01)
+### ~~Safety-car follow-ups from T2/T5/T7 ship~~ — DONE 2026-07-01
 
-**What:** Adversarial post-execution review found 7 open LOW/MEDIUM items not blocking ship, logged in `Safety-Car/2026-07-01-t2-t5-t7-ship.md`: (1) `jaccardSimilarity` has no unicode normalization/trim, (2) `CouncilResult.priorId` conditional-absence footgun needs doc comment, (3) pre-commit hook blocks on removed-line matches not just added lines, (4) `doctor.ts checkHookInstalled` is spoofable via a comment-string sentinel, (5) missing `jq` gives an unfriendly raw error in the hook, (6) no CI job exercises the pre-commit hook itself against a fixture diff, (7) `detectReversal`'s hard assertion on `SIGNAL_MAX_PRIORS` crashes the council run rather than truncating if `SignalIndex`'s cap has an off-by-one.
-
-**Why:** None are severe enough to block v1.0.2, but they're real and cheap to fix in a follow-up pass.
-
-**Effort:** CC ~30 min for all seven.
-
-**Depends on:** Nothing — can be picked up any time.
+6 of 7 fixed: (1) `jaccardSimilarity` now trims + NFC-normalizes tags, (2) `CouncilResult.priorId` invariant documented on the interface, (3) skipped — accepted as correct behavior, not a bug, (4) `doctor.ts checkHookInstalled` now also verifies the hook content references `.toto/sensitive-patterns.json`, not just the sentinel comment, (5) pre-commit hook has an explicit `jq`-missing guard with a friendly message, (6) new `pre-commit-hook-test` CI job runs `bats tests/pre-commit.bats`, (7) `detectReversal` now truncates to `SIGNAL_MAX_PRIORS` instead of asserting/crashing.
 
 ---
 

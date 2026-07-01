@@ -124,6 +124,18 @@ Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, 
 
 ## v1.1.0 Roadmap
 
+### T-RADIO-TONE: toto radio persona grounding
+
+**What:** The local LLM backing `toto radio` is roleplaying as an actual F1 character rather than behaving as a grounded engineering assistant. The system prompt needs explicit persona constraints: no F1 lore, no race commentary, no character voice. Tone should be direct builder-to-builder — same register as the CLAUDE.md Toto Wolff persona (data-driven, no hedging, name files and numbers), not a character impression.
+
+**Why:** Radio is a frontline interaction surface. F1 flavor and easter eggs are intentional — the issue is the LLM fully inhabits the character (race commentary, lore, team-principal voice) instead of using it as seasoning. Engineering substance must lead; F1 is accent, not identity. Secondary failure: the model argues back and refuses to accept user input, which is actively hostile for a radio interface. Fix both: ground in helpfulness first, personality second.
+
+**Effort:** CC ~10 min. System prompt change in the radio command only.
+
+**Depends on:** Nothing.
+
+---
+
 ### Dynamic P10 plans (Serena-assisted)
 
 **What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
@@ -193,3 +205,28 @@ Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 **Effort:** human ~30min / CC ~5min
 
 **Depends on:** Phase 4 (dashboard) design underway.
+
+## v1.2.0 Roadmap
+
+### T-AUTO: Automated vault cross-connection synthesis
+**Feature:** `toto synthesize` — periodic background job that scans vault records across Council, P10-Plans, ADR, Cabinet, and Signals directories and surfaces non-obvious connections.
+
+**What it does:**
+- Detects repeated architectural patterns across projects (same tradeoff resolved differently)
+- Flags council rulings that were never referenced in a subsequent P10 or commit
+- Identifies ADRs orphaned from any follow-up work
+- Surfaces builder instinct patterns (what consistently recurs, what is consistently avoided)
+- Writes a `Synthesis/YYYY-MM-DD-connections.md` record to the vault
+
+**Trigger options:**
+- Manual: `toto synthesize`
+- Scheduled: cron via `toto schedule synthesize --interval weekly`
+- Post-backfill hook: run automatically after `toto backfill` when new signals are written
+
+**Implementation sketch:**
+- Haiku scouts fan out across each vault subdirectory in parallel (bounded: max 20 files each)
+- Sonnet analyst receives all scout summaries, identifies cross-cutting patterns
+- Output written as a typed vault record with `pattern_refs` linking source files
+- No Opus call needed — this is synthesis, not a gate
+
+**Why:** Discovered manually during 2026-06-26 session that Feynman's v1.0.0 block (signal loop inert on fresh install) was the strongest proof point for the LinkedIn launch post — but it took a full vault grep to surface it. This should be automatic.

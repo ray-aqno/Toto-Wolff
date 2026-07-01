@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Canonical sensitive-pattern list for toto-wolff governance. Any change here must be reflected in the CLAUDE.md ##sensitive-patterns section. Run pnpm check-patterns to verify sync.",
+  "patterns": [
+    "auth",
+    "service\\.boundar",
+    "data\\.migrat",
+    "permission",
+    "role",
+    "tenant",
+    "policy",
+    "rbac",
+    "acl",
+    "iam",
+    "secret",
+    "credential",
+    "api\\.key",
+    "token"
+  ]
+}

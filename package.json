@@ -15,7 +15,8 @@
     "build": "pnpm -r build",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint packages --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-patterns": "tsx --tsconfig scripts/tsconfig.json scripts/check-patterns.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

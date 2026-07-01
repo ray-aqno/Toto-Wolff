@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 
 const SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+const CLAUDE_JSON_PATH = path.join(os.homedir(), ".claude.json");
 const MCP_KEY = "toto-wolff";
 const DEFAULT_VAULT_PATH = path.join(os.homedir(), ".toto", "vault");
 
@@ -24,13 +25,38 @@ export function checkEnv(env: Record<string, string | undefined> = process.env):
   return typeof token === "string" && token.length > 0;
 }
 
+/**
+ * Read ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY from ~/.claude.json
+ * mcpServers["toto-wolff"].env — used as fallback for enterprise/proxy setups
+ * where the token is not exported to the shell environment.
+ */
+async function readTokenFromClaudeJson(): Promise<string | undefined> {
+  try {
+    const raw = await fs.readFile(CLAUDE_JSON_PATH, "utf8");
+    const json = JSON.parse(raw) as Record<string, unknown>;
+    const servers = json.mcpServers as Record<string, unknown> | undefined;
+    const entry = servers?.[MCP_KEY] as Record<string, unknown> | undefined;
+    const env = entry?.env as Record<string, string> | undefined;
+    return env?.["ANTHROPIC_AUTH_TOKEN"] ?? env?.["ANTHROPIC_API_KEY"];
+  } catch {
+    return undefined;
+  }
+}
+
 /** Check that at least one Anthropic auth env var is set and non-empty. */
-function checkAuthToken(): CheckResult {
-  const passed = checkEnv(process.env as Record<string, string | undefined>);
+async function checkAuthToken(): Promise<CheckResult> {
+  const label = "ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY";
+  if (checkEnv(process.env as Record<string, string | undefined>)) {
+    return { label, passed: true, detail: "set (env)" };
+  }
+  const fromJson = await readTokenFromClaudeJson();
+  if (typeof fromJson === "string" && fromJson.length > 0) {
+    return { label, passed: true, detail: `set (~/.claude.json mcpServers.${MCP_KEY}.env)` };
+  }
   return {
-    label: "ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY",
-    passed,
-    detail: passed ? "set" : "not set — export ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY",
+    label,
+    passed: false,
+    detail: `not set — export ANTHROPIC_AUTH_TOKEN or add it to ~/.claude.json mcpServers.${MCP_KEY}.env`,
   };
 }
 
@@ -82,6 +108,33 @@ async function checkVaultPath(): Promise<CheckResult> {
       passed: false,
       detail: `${vaultPath} does not exist — set VAULT_PATH or create the directory`,
     };
+  }
+}
+
+/**
+ * Check that the toto-wolff pre-commit hook is installed in the current repo's
+ * .git/hooks/pre-commit. Looks for the toto-wolff sentinel comment in the first
+ * 5 lines of the hook file.
+ */
+async function checkHookInstalled(): Promise<CheckResult> {
+  const label = "pre-commit hook (governance gate)";
+  const hookPath = path.join(process.cwd(), ".git", "hooks", "pre-commit");
+  try {
+    const raw = await fs.readFile(hookPath, "utf8");
+    const firstLines = raw.split("\n").slice(0, 5).join("\n");
+    const passed = firstLines.includes("toto-wolff governance gate");
+    return {
+      label,
+      passed,
+      detail: passed ? "installed" : "not the toto hook — run scripts/install-hooks.sh",
+    };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    const detail =
+      code === "ENOENT"
+        ? "not installed — run scripts/install-hooks.sh"
+        : `could not read hook — ${String(err)}`;
+    return { label, passed: false, detail };
   }
 }
 
@@ -155,14 +208,15 @@ function printCheck(result: CheckResult, info = false): void {
 export async function runDoctor(): Promise<void> {
   process.stdout.write("toto doctor\n\n");
 
-  const authResult = checkAuthToken();
-  const [mcpResult, vaultResult, ollamaResult] = await Promise.all([
+  const [authResult, mcpResult, vaultResult, hookResult, ollamaResult] = await Promise.all([
+    checkAuthToken(),
     checkMcpEntry(),
     checkVaultPath(),
+    checkHookInstalled(),
     checkOllama(),
   ]);
 
-  const required: CheckResult[] = [authResult, mcpResult, vaultResult];
+  const required: CheckResult[] = [authResult, mcpResult, vaultResult, hookResult];
   for (const r of required) {
     printCheck(r);
   }

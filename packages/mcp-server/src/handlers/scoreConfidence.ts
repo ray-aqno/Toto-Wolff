@@ -1,13 +1,9 @@
 import assert from 'node:assert';
-import { SIGNAL_PATTERNS } from '@toto-wolff/core';
+import { SIGNAL_PATTERNS, jaccardSimilarity, JACCARD_MATCH_THRESHOLD } from '@toto-wolff/core';
 import type { SignalRecord } from '@toto-wolff/core';
 
-/**
- * Hard constants — changing either requires a council record.
- * Council ruling: 2026-06-23-toto-wolff-v1-confidence-scoring-contract
- */
+/** Hard constant — changing requires a council record. */
 const N_DISTINCT = 2;
-const JACCARD_MATCH_THRESHOLD = 0.5; // set from corpus; topic_tags cardinality 2-5; stricter side
 
 /**
  * Normalizes a pattern string for drift-tolerant comparison.
@@ -16,23 +12,6 @@ const JACCARD_MATCH_THRESHOLD = 0.5; // set from corpus; topic_tags cardinality 
 function canonicalizePattern(p: string): string {
   assert(typeof p === 'string', 'pattern must be a string');
   return p.toLowerCase().replace(/_/g, '-');
-}
-
-/**
- * Computes Jaccard similarity between two tag arrays.
- * Jaccard = |intersection| / |union|. Returns 0 if both arrays are empty.
- */
-function jaccardSimilarity(a: string[], b: string[]): number {
-  assert(Array.isArray(a) && Array.isArray(b), 'tag arrays must be arrays');
-  if (a.length === 0 && b.length === 0) return 0;
-  const setA = new Set(a.map((t) => t.toLowerCase()));
-  const setB = new Set(b.map((t) => t.toLowerCase()));
-  let intersection = 0;
-  for (const tag of setA) { // P10 Rule 2: bounded by setA.size (small tag list)
-    if (setB.has(tag)) intersection++;
-  }
-  const union = setA.size + setB.size - intersection;
-  return union === 0 ? 0 : intersection / union;
 }
 
 /**

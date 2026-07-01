@@ -91,7 +91,14 @@ export class CouncilService {
     await this.vault.write(recordPath, formatRecord(question, brief, ruling));
     await this.vault.drainQueue();
 
-    const reversal = detectReversal(ruling.status, currentTags, priors);
+    // Ruling is already written to vault above — a bad detectReversal input must
+    // degrade, not throw, or a successful council write would look like a failure.
+    let reversal = null;
+    try {
+      reversal = detectReversal(ruling.status, currentTags, priors);
+    } catch {
+      reversal = null;
+    }
 
     return {
       status: ruling.status,

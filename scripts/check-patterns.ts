@@ -60,7 +60,22 @@ function readClaudeMdPatterns(claudePath: string): string[] {
     console.error('check-patterns: CLAUDE.md missing ```sensitive-patterns``` fenced block');
     process.exit(1);
   }
-  return lines.slice(fenceStart + 1, fenceEnd).filter((l) => l.trim().length > 0);
+  return lines
+    .slice(fenceStart + 1, fenceEnd)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+}
+
+/**
+ * Rejects patterns broad enough to match arbitrary diff content (e.g. ".*", "").
+ * Defense-in-depth: the pre-commit hook trusts this list without re-validating.
+ * P10-R2 LOOP BOUND: no internal loop; called once per pattern, ≤ 20 total.
+ */
+function isDangerousPattern(pattern: string): boolean {
+  if (pattern.trim().length === 0) return true;
+  if (/^\.\*+$/.test(pattern)) return true;
+  if (/^\.\+$/.test(pattern)) return true;
+  return false;
 }
 
 /**
@@ -77,6 +92,14 @@ function diffPatterns(jsonPatterns: string[], mdPatterns: string[]): { missing: 
 
 function main(): void {
   const jsonPatterns = readJsonPatterns(PATTERNS_JSON);
+
+  const dangerous = jsonPatterns.filter(isDangerousPattern); // P10-R2: bounded by jsonPatterns.length ≤ 20
+  if (dangerous.length > 0) {
+    console.error(`check-patterns: .toto/sensitive-patterns.json contains overbroad pattern(s): ${dangerous.join(', ')}`);
+    console.error('Fix: patterns must not match arbitrary content (no bare ".*", ".+", or empty strings).');
+    process.exit(1);
+  }
+
   const mdPatterns = readClaudeMdPatterns(CLAUDE_MD);
   const { missing, extra } = diffPatterns(jsonPatterns, mdPatterns);
 

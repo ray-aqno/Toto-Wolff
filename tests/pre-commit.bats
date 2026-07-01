@@ -90,3 +90,22 @@ teardown() {
   [[ "$output" == *"not a git repository"* ]]
   rm -rf "${TARGET}"
 }
+
+# Regression: council ruling 2026-07-01-strangler-fig-seam-bugs. The real
+# .toto/sensitive-patterns.json bare "role" entry false-positived on persona
+# swap prose. Uses the actual repo pattern list, not the minimal test fixture.
+@test "pre-commit exits 0 on persona-swap prose using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "Switch to any role (devops, data, r-and-d) with setup --role <name>" > "${TEST_DIR}/README.md"
+  git -C "${TEST_DIR}" add README.md
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-commit exits 1 on real RBAC code using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "if (hasRole(user, 'admin')) { grantAccess(); }" > "${TEST_DIR}/auth.ts"
+  git -C "${TEST_DIR}" add auth.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 1 ]
+}

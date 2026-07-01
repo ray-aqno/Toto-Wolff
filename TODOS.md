@@ -4,6 +4,13 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+## Completed (post-v1.0.2 strangler-fig fixes, 2026-07-01)
+
+Council ruling `2026-07-01-strangler-fig-seam-bugs` (lean mode, ~86K tokens vs. standard full chain). Both bugs found by a preemptive `/investigate` pass on the strangler-fig seam.
+
+- **CRITICAL — `install-symlink.sh` clobbered target CLAUDE.md** — replaced bare `ln -sf` with a marker-delimited splice (`<!-- TOTO:ROLE:START/END -->`). Preserves all pre-existing content, idempotent on repeat install, handles upgrade from a prior buggy symlink install. 5 new tests in `tests/install-symlink.bats`.
+- **HIGH — pre-commit hook false-positived on persona-swap prose** — `.toto/sensitive-patterns.json`'s bare `role` pattern matched any English sentence containing the word "role" (e.g. `--role engineering`), blocking every persona swap. Replaced with 6 compound-identifier patterns (`hasRole`, `role_based`, etc.) that only match code-shaped RBAC usage. 2 new regression tests in `tests/pre-commit.bats` using the real repo pattern list (existing 8 tests used an isolated fixture and wouldn't have caught this).
+
 ## Completed (v1.0.2)
 
 - **T2: Local governance pre-commit hook** — original GitHub Actions design BLOCKED by council (2026-06-29-t2-github-actions-seam-test: fails silently for 90%+ of fork PRs, adds a write-credentialed dependency). Redesigned as a host-agnostic local hook: `scripts/hooks/pre-commit` + `scripts/install-hooks.sh`, single-source pattern list in `.toto/sensitive-patterns.json`, `scripts/check-patterns.ts` lint gate keeping CLAUDE.md in sync, read-only advisory CI job. `toto doctor` surfaces install state. 8/8 bats tests passing. Shipped 2026-07-01.

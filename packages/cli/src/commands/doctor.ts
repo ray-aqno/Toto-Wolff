@@ -114,7 +114,9 @@ async function checkVaultPath(): Promise<CheckResult> {
 /**
  * Check that the toto-wolff pre-commit hook is installed in the current repo's
  * .git/hooks/pre-commit. Looks for the toto-wolff sentinel comment in the first
- * 5 lines of the hook file.
+ * 5 lines of the hook file, and — to guard against a hook that merely contains
+ * the sentinel string without doing the real governance check — also verifies
+ * the full file content references .toto/sensitive-patterns.json.
  */
 async function checkHookInstalled(): Promise<CheckResult> {
   const label = "pre-commit hook (governance gate)";
@@ -122,7 +124,9 @@ async function checkHookInstalled(): Promise<CheckResult> {
   try {
     const raw = await fs.readFile(hookPath, "utf8");
     const firstLines = raw.split("\n").slice(0, 5).join("\n");
-    const passed = firstLines.includes("toto-wolff governance gate");
+    const hasSentinel = firstLines.includes("toto-wolff governance gate");
+    const hasPatternsRef = raw.includes(".toto/sensitive-patterns.json");
+    const passed = hasSentinel && hasPatternsRef;
     return {
       label,
       passed,

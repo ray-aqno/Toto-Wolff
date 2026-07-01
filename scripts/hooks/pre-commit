@@ -15,6 +15,12 @@ git rev-parse --git-dir >/dev/null 2>&1 || {
   exit 1
 }
 
+# R5 guard 1b: jq must be present before any `set -euo pipefail` command uses it
+command -v jq >/dev/null 2>&1 || {
+  echo "pre-commit: jq is required — install via 'brew install jq' or your package manager" >&2
+  exit 1
+}
+
 # R5 guard 2: patterns file
 test -f "${PATTERNS_JSON}" || {
   echo "pre-commit: .toto/sensitive-patterns.json not found — run toto init or scripts/install-hooks.sh" >&2

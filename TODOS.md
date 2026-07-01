@@ -121,9 +121,15 @@ Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, 
 
 ---
 
-### ~~Dynamic P10 plans (Serena-assisted)~~ — DONE 2026-07-01
+### Dynamic P10 plans (Serena-assisted)
 
-Used for the T2/T5/T7 P10 cycle. Serena scouts (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) confirmed exact function line counts and existing symbol shapes before drafting — caught the CouncilService.run() 60-line budget precisely instead of estimating from grep.
+**What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
+
+**Why:** Static grep misses structural violations (function exceeds 60 lines, pointer dereference chains). Serena-assisted scouting catches P10 violations before the draft stage rather than at Opus arbitration. Plan quality improves materially.
+
+**Status:** Used ad hoc for the T2/T5/T7 P10 cycle (2026-07-01) — confirmed the approach works (caught CouncilService.run()'s exact 60-line budget instead of estimating from grep). Not yet integrated: the `/p10` skill file itself doesn't default to Serena scouting. See U5 below for the actual integration task.
+
+**Depends on:** Serena MCP server live (already registered in `.serena/project.yml`).
 
 ---
 

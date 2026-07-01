@@ -70,7 +70,7 @@ See "Completed (v1.0.2)" above.
 
 ---
 
-### T10: Fast-path for trivial council questions
+### ~~T10: Fast-path for trivial council questions~~ — DONE 2026-07-01
 
 **What:** `council_run` option that skips the 6-call chain (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling) for simple vault lookups. Fast-path: `vault_search` + single Sonnet call for questions that are factual ("which pattern did we use for X?") rather than deliberative.
 
@@ -81,6 +81,8 @@ See "Completed (v1.0.2)" above.
 **Effort:** human ~0.5 days / CC ~10 min
 
 **Depends on:** Phase 1 (`council_run` baseline) must ship first; fast-path is a post-baseline optimization.
+
+**Shipped:** `CouncilService.run()` in `packages/core/src/CouncilService.ts` now checks `_isFactualQuestion()` (keyword check against `vs`, `should we`, `tradeoff`, `trade-off`, `risk`) before the scout chain. If factual and `vault.search()` returns hits, `_tryFastPath()` runs a single Sonnet call (`claude-sonnet-4-6`) over the top 5 matches and returns an early `CouncilResult` with `status: 'approved'`, writing a `*-council-fastpath.md` vault record. Falls through to the unchanged full chain otherwise. `pnpm -C packages/core build`, `pnpm typecheck`, and `pnpm -C packages/mcp-server build` all pass; no existing CouncilService test file to regress.
 
 ---
 
@@ -128,15 +130,9 @@ Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, 
 
 ---
 
-### Dynamic P10 plans (Serena-assisted)
+### ~~Dynamic P10 plans (Serena-assisted)~~ — DONE 2026-07-01
 
-**What:** P10 scouting phase uses Serena MCP tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) for AST-level codebase analysis rather than grep. Plans become context-aware — they know the actual function sizes, call graph, and type surfaces before drafting stages.
-
-**Why:** Static grep misses structural violations (function exceeds 60 lines, pointer dereference chains). Serena-assisted scouting catches P10 violations before the draft stage rather than at Opus arbitration. Plan quality improves materially.
-
-**Status:** Used ad hoc for the T2/T5/T7 P10 cycle (2026-07-01) — confirmed the approach works (caught CouncilService.run()'s exact 60-line budget instead of estimating from grep). Not yet integrated: the `/p10` skill file itself doesn't default to Serena scouting. See U5 below for the actual integration task.
-
-**Depends on:** Serena MCP server live (already registered in `.serena/project.yml`).
+Used ad hoc for the T2/T5/T7 P10 cycle first (confirmed the approach works — caught CouncilService.run()'s exact 60-line budget instead of estimating from grep), then made the default behavior: `~/.claude/skills/p10/SKILL.md` Step 1 — Codebase Scout now instructs scouts to prefer Serena tools (`get_symbols_overview`, `find_symbol`, `find_referencing_symbols`) over grep, falling back only when Serena MCP is unregistered. See U5 below for the integration commit.
 
 ---
 
@@ -162,9 +158,9 @@ Deterministic boundary enforcer. Five rules: frozen paths, out-of-scope writes, 
 
 ---
 
-### U5: Serena in P10 scouting
+### ~~U5: Serena in P10 scouting~~ — DONE 2026-07-01
 
-**What:** P10Service scout prompts updated (shipped 2026-06-08) to instruct structured code analysis. When running inside Claude Code, p10 skill scouts should prefer `mcp__serena__get_symbols_overview` and `mcp__serena__find_symbol` over grep for codebase analysis. Document this in `.claude/skills/p10/P10.md` (or the equivalent skill file).
+**What:** P10Service scout prompts updated (shipped 2026-06-08) to instruct structured code analysis. When running inside Claude Code, p10 skill scouts should prefer `mcp__serena__get_symbols_overview` and `mcp__serena__find_symbol` over grep for codebase analysis. Documented in `~/.claude/skills/p10/SKILL.md`, Step 1 — Codebase Scout section: scouts now default to Serena's `get_symbols_overview`, `find_symbol`, and `find_referencing_symbols`, falling back to grep only if Serena MCP isn't registered.
 
 **Why:** AST-level scouting catches structural violations that grep misses. The P10 plan quality improves materially with symbol-aware analysis.
 

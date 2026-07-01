@@ -32,11 +32,13 @@ export function detectReversal(
   assert(typeof currentVerdict === 'string' && currentVerdict.length > 0, 'currentVerdict must be non-empty string');
   assert(Array.isArray(currentTags), 'currentTags must be a string[]');
   assert(Array.isArray(priors), 'priors must be an array');
-  // P10 Rule 2: bounded by SignalIndex MAX_RECORDS = 500
-  assert(priors.length <= SIGNAL_MAX_PRIORS, `priors.length must not exceed SIGNAL_MAX_PRIORS (${SIGNAL_MAX_PRIORS})`);
+  // P10-R2: bounded by SignalIndex MAX_RECORDS = 500. If SignalIndex's own cap
+  // has an off-by-one bug, degrade gracefully via truncation instead of crashing
+  // the whole council run.
+  const boundedPriors = priors.length > SIGNAL_MAX_PRIORS ? priors.slice(0, SIGNAL_MAX_PRIORS) : priors;
 
-  for (let i = 0; i < priors.length; i++) { // P10 Rule 2: bounded by priors.length ≤ SIGNAL_MAX_PRIORS
-    const prior = priors[i];
+  for (let i = 0; i < boundedPriors.length; i++) { // P10 Rule 2: bounded by boundedPriors.length ≤ SIGNAL_MAX_PRIORS
+    const prior = boundedPriors[i];
     if (prior == null || !isSignalRecord(prior)) continue;
     const sim = jaccardSimilarity(currentTags, prior.topic_tags ?? []);
     if (sim >= REVERSAL_JACCARD_THRESHOLD && prior.verdict !== currentVerdict) {

@@ -8,8 +8,8 @@ import assert from 'node:assert';
 export function jaccardSimilarity(a: string[], b: string[]): number {
   assert(Array.isArray(a) && Array.isArray(b), 'tag arrays must be arrays');
   if (a.length === 0 && b.length === 0) return 0;
-  const setA = new Set(a.map((t) => t.toLowerCase()));
-  const setB = new Set(b.map((t) => t.toLowerCase()));
+  const setA = new Set(a.map((t) => t.trim().normalize('NFC').toLowerCase()));
+  const setB = new Set(b.map((t) => t.trim().normalize('NFC').toLowerCase()));
   let intersection = 0;
   for (const tag of setA) { // P10 Rule 2: bounded by setA.size (small tag list)
     if (setB.has(tag)) intersection++;

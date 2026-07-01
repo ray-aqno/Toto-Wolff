@@ -11,6 +11,12 @@ export interface CouncilResult {
   ruling: string;
   brief: string;
   recordPath: string;
+  /**
+   * Invariant: `priorId` is only ever set when `reversalDetected === true`.
+   * Callers must check `reversalDetected` first — do not branch on the
+   * truthiness of `priorId` alone, since its absence does not by itself
+   * mean no reversal was detected (both fields are optional).
+   */
   reversalDetected?: boolean;
   priorId?: string;
 }

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-07-02
+
+### Added
+- `toto synthesize` — new CLI command (`packages/cli/src/commands/synthesize.ts`) that scans 5 vault directories (Council/Congressional-Records, P10-Plans, ADR, Cabinet, Signals), runs a parallel Haiku scout per directory, and synthesizes cross-cutting patterns with a single Sonnet call: repeated architectural patterns resolved differently across projects, council rulings never referenced in a later P10/commit, orphaned ADRs, and recurring builder-instinct patterns. Writes a typed `Synthesis/YYYY-MM-DD-connections.md` vault record with a new `pattern_refs` field. No Opus call in the runtime path (synthesis, not a gate); manual CLI trigger only this stage (cron/post-backfill-hook triggers are documented follow-up work, not yet built).
+- `withLLMTimeout` added to `packages/core/src/index.ts`'s barrel export — previously only reachable within `packages/core` itself; needed cross-package for `synthesize.ts` to reuse the existing LLM-timeout wrapper instead of reimplementing it.
+- Full P10 plan at `P10-Plans/2026-07-02-toto-wolff-t-auto-vault-synthesis.md` — approved after 1 revision cycle. The Opus arbiter caught a real defect in the first draft: an assertion requiring non-empty `pattern_refs` that directly contradicted the design's own degraded-empty-refs path, which would have crashed on exactly the failure mode it was built to tolerate. Also required `Promise.all` → `Promise.allSettled` on the 5-way scout fan-out so one scout's failure doesn't abort the other four.
+
 ## [1.1.1] - 2026-07-01
 
 Closes the two conditions the Cabinet attached to v1.1.0 (`2026-07-01-v1.1.0-tag-justification`) that were still open when that tag was cut and distributed. Both were previously "shipped" in name only — the code paths existed but were unreachable/unguarded from any real invocation.

@@ -15,6 +15,7 @@ import { runDashboard } from "./commands/dashboard.js";
 import { runRadio } from "./commands/radio.js";
 import { runBackfill } from "./commands/backfill.js";
 import { runUpgrade } from "./commands/upgrade.js";
+import { runSynthesize } from "./commands/synthesize.js";
 import { printLandingUI, plainUsage } from "./ui.js";
 
 /** Print an "unknown command" error to stderr and exit 1. */
@@ -86,6 +87,11 @@ async function main(): Promise<void> {
 
   if (cmd === "upgrade") {
     await runUpgrade();
+    return;
+  }
+
+  if (cmd === "synthesize") {
+    await runSynthesize();
     return;
   }
 

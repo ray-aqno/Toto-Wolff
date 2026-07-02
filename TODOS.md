@@ -95,13 +95,15 @@ See "Completed (v1.0.2)" above.
 
 ---
 
-### T6: Resolve Q2 — first persona to ship with real content
+### ~~T6: Resolve Q2 — first persona to ship with real content~~ — DECIDED 2026-07-02
 
-**What:** Decide which of the 4 roles (Engineering, R&D, DevOps, Data) gets the most authoring investment in the E5 persona library. The other 3 can ship as stubs initially.
+**Decision: Engineering.** Chosen after a repo demo — engineering showed the most enthusiasm of the 4 candidate roles. This resolves the "highest-pain role" question deferred since June 2.
 
-**Why:** E5 builds all 4 persona files but the first strangler fig migration target gets the most refined persona. This determines which team is first off the old setup.
+**What:** Engineering gets the most authoring investment in the E5 persona library. R&D, DevOps, and Data ship as stubs initially.
 
-**Action:** Answer this before the E5 p10 implementation session. Candidate answer: whichever role has the most acute pain with the current fragmented setup (per original design doc — the "highest-pain role" question was deferred from June 2).
+**Why:** E5 builds all 4 persona files but the first strangler fig migration target gets the most refined persona. Engineering is now that target.
+
+**Next:** Kick off the E5 p10 implementation session for the Engineering persona content.
 
 **Depends on:** Conversation with team leads before E5 p10 starts.
 
@@ -213,8 +215,13 @@ Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 
 ## v1.2.0 Roadmap
 
-### T-AUTO: Automated vault cross-connection synthesis
-**Feature:** `toto synthesize` — periodic background job that scans vault records across Council, P10-Plans, ADR, Cabinet, and Signals directories and surfaces non-obvious connections.
+### ~~T-AUTO: Automated vault cross-connection synthesis~~ — SHIPPED 2026-07-02
+
+**P10 plan:** `P10-Plans/2026-07-02-toto-wolff-t-auto-vault-synthesis.md` — status: approved (1 revision cycle). Arbiter caught and required a fix for an unsatisfiable assertion (Rule 5 required non-empty `pattern_refs` while Rule 7's design called for a degraded empty-refs path) and a `Promise.all` → `Promise.allSettled` fix (a single failed scout would otherwise abort all 5, defeating the designed degradation behavior). Both fixed in the approved plan and in the shipped code.
+
+**Shipped:** `packages/cli/src/commands/synthesize.ts` — `toto synthesize` CLI command (manual trigger only this stage) that scans vault records across Council, P10-Plans, ADR, Cabinet, and Signals directories and surfaces non-obvious connections. Wired into `packages/cli/src/index.ts` dispatch and `ui.ts` command listing. Required adding `withLLMTimeout` to `packages/core/src/index.ts`'s barrel export (it existed in core but wasn't reachable cross-package — not called out explicitly in the P10 plan, added as a necessary Stage 1 prerequisite). 10 new tests in `packages/cli/src/__tests__/synthesize.test.ts` covering the ENOENT scan path, REF-parsing including the degraded empty-refs path, and the write-with-empty-refs path. 99/99 total tests pass, `tsc --strict` clean, `pnpm check-patterns` in sync (26 patterns). Manually verified the credential-missing exit path (clean exit 1, no stack trace) since a live LLM call wasn't run as part of this pass.
+
+**What it does:**
 
 **What it does:**
 - Detects repeated architectural patterns across projects (same tradeoff resolved differently)
@@ -228,10 +235,11 @@ Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 - Scheduled: cron via `toto schedule synthesize --interval weekly`
 - Post-backfill hook: run automatically after `toto backfill` when new signals are written
 
-**Implementation sketch:**
-- Haiku scouts fan out across each vault subdirectory in parallel (bounded: max 20 files each)
-- Sonnet analyst receives all scout summaries, identifies cross-cutting patterns
-- Output written as a typed vault record with `pattern_refs` linking source files
+**Implementation sketch (superseded by the P10 plan above — see it for the authoritative staged plan):**
+- Haiku scouts fan out across each vault subdirectory in parallel (bounded: max 20 files each), fan-out uses `Promise.allSettled` not `Promise.all`
+- Sonnet analyst receives all scout summaries, identifies cross-cutting patterns; empty `pattern_refs` from a parse failure is a legal degraded outcome, not an error
+- Output written as a typed vault record with `pattern_refs` linking source files, plus a `synthesis_status: complete | degraded` field
 - No Opus call needed — this is synthesis, not a gate
+- CLI-side only (`packages/cli/src/commands/synthesize.ts`), following the `radio.ts` precedent for calling `createAnthropicClient` directly from a CLI command — no new MCP-server handler
 
 **Why:** Discovered manually during 2026-06-26 session that Feynman's v1.0.0 block (signal loop inert on fresh install) was the strongest proof point for the LinkedIn launch post — but it took a full vault grep to surface it. This should be automatic.

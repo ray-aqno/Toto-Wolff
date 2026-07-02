@@ -122,6 +122,7 @@ export async function printLandingUI(): Promise<void> {
     ["dashboard", "Paddock interface — live in browser"],
     ["radio",     "Pit wall chat with Toto  (requires API key)"],
     ["upgrade",   "Pull latest release and rebuild in-place"],
+    ["synthesize","Cross-connection patterns across the vault  (requires API key)"],
   ];
 
   const cmdLines = cmds
@@ -159,7 +160,7 @@ export function plainUsage(): string {
 
 Usage: toto <command>
 
-Commands: init  doctor  whoami  search  last  audit  dashboard  radio  upgrade
+Commands: init  doctor  whoami  search  last  audit  dashboard  radio  upgrade  synthesize
 
 Run 'toto' with no arguments for the full command reference.
 `;

@@ -133,3 +133,23 @@ EOF
   run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
   [ "$status" -eq 1 ]
 }
+
+# Regression: third recurrence of the bare-English-word pattern bug (role → auth →
+# credential), caught during T-AUTO (toto synthesize) implementation 2026-07-02.
+# A user-facing "no API credentials found" error message and vault prose mentioning
+# "credential-handling" both false-positived on the bare "credential" pattern.
+@test "pre-commit exits 0 on credential-missing error message using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo 'process.stderr.write("synthesize: no API credentials found");' > "${TEST_DIR}/fixture.ts"
+  git -C "${TEST_DIR}" add fixture.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-commit exits 1 on real credential-store code using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "await credentialStore.storeCredential(userId, token);" > "${TEST_DIR}/auth-client.ts"
+  git -C "${TEST_DIR}" add auth-client.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 1 ]
+}

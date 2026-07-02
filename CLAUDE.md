@@ -393,7 +393,11 @@ rbac
 acl
 iam
 secret
-credential
+credentialStore
+storeCredential
+credential_file
+credential_store
+X-Credential
 api\.key
 token
 ```

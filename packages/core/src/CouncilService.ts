@@ -5,6 +5,8 @@ import { createAnthropicClient } from './utils/anthropic.js';
 import type { VaultService } from './VaultService.js';
 import type { CouncilRuling, CouncilStatus, SignalRecord } from './types.js';
 import { detectReversal } from './utils/reversalDetector.js';
+import { checkSessionBudget, trackUsage, COUNCIL_MAX_CALLS, COUNCIL_STATIC_CEILING } from './utils/TokenBudget.js';
+import type { UsageRecord, BudgetFlag } from './utils/TokenBudget.js';
 
 export interface CouncilResult {
   status: CouncilStatus;
@@ -19,6 +21,8 @@ export interface CouncilResult {
    */
   reversalDetected?: boolean;
   priorId?: string;
+  /** Set only when checkSessionBudget() detects a structural fan-out violation. */
+  budgetFlag?: BudgetFlag;
 }
 
 const SCOUT_MODEL = 'claude-haiku-4-5-20251001';
@@ -67,32 +71,45 @@ export class CouncilService {
     assert(typeof question === 'string' && question.length > 0, 'question must be non-empty');
     assert(question.length <= 4000, 'question must not exceed 4000 chars');
 
+    // Session-scoped accumulator, passed by reference — never module-level.
+    const usageRecords: UsageRecord[] = [];
+
     if (this._isFactualQuestion(question)) {
-      const fastResult = await this._tryFastPath(question);
-      if (fastResult !== null) return fastResult;
+      const fastResult = await this._tryFastPath(question, usageRecords);
+      if (fastResult !== null) return this._applyBudgetVerdict(fastResult, usageRecords);
     }
 
+    const result = await this._runFullChain(question, currentTags, priors, usageRecords);
+    return this._applyBudgetVerdict(result, usageRecords);
+  }
+
+  /**
+   * Scouts → compression → analysts → brief writer. Isolated from
+   * _runFullChain purely to stay under the repo's max-lines-per-function
+   * lint cap — no behavior change, same sequential chain.
+   */
+  private async _deliberate(question: string, usageRecords: UsageRecord[]): Promise<string> {
     // Scouts: clean slate — question only, no accumulated context (primacy bias mitigation)
     const [rawScout1, rawScout2] = await Promise.all([
-      withLLMTimeout((opts) => this._callModel(SCOUT_MODEL, SCOUT_1_PERSONA, question, opts), 'scout-1'),
-      withLLMTimeout((opts) => this._callModel(SCOUT_MODEL, SCOUT_2_PERSONA, question, opts), 'scout-2'),
+      withLLMTimeout((opts) => this._callModel(SCOUT_MODEL, SCOUT_1_PERSONA, question, opts, usageRecords, 'scout-1'), 'scout-1'),
+      withLLMTimeout((opts) => this._callModel(SCOUT_MODEL, SCOUT_2_PERSONA, question, opts, usageRecords, 'scout-2'), 'scout-2'),
     ]);
 
     // Compress each scout output independently before passing to analysts (context rot mitigation)
     const [scout1, scout2] = await Promise.all([
-      this._compress(rawScout1),
-      this._compress(rawScout2),
+      this._compress(rawScout1, usageRecords, 'compress-1'),
+      this._compress(rawScout2, usageRecords, 'compress-2'),
     ]);
 
     // Analysts: compressed scout findings at TOP, original question at BOTTOM
     const scoutContext = `Scout findings:\n${scout1}\n\n${scout2}`;
     const [analyst1, analyst2] = await Promise.all([
       withLLMTimeout(
-        (opts) => this._callModel(ANALYST_MODEL, ANALYST_1_PERSONA, `${scoutContext}\n\nQuestion: ${question}`, opts),
+        (opts) => this._callModel(ANALYST_MODEL, ANALYST_1_PERSONA, `${scoutContext}\n\nQuestion: ${question}`, opts, usageRecords, 'analyst-1'),
         'analyst-1',
       ),
       withLLMTimeout(
-        (opts) => this._callModel(ANALYST_MODEL, ANALYST_2_PERSONA, `${scoutContext}\n\nQuestion: ${question}`, opts),
+        (opts) => this._callModel(ANALYST_MODEL, ANALYST_2_PERSONA, `${scoutContext}\n\nQuestion: ${question}`, opts, usageRecords, 'analyst-2'),
         'analyst-2',
       ),
     ]);
@@ -100,14 +117,25 @@ export class CouncilService {
     // Brief writer: analyst outputs at TOP, original question at BOTTOM
     const analystContext = `Analyst findings:\n${analyst1}\n\n${analyst2}`;
     const brief = await withLLMTimeout(
-      (opts) => this._callModel(BRIEF_MODEL, BRIEF_WRITER_PERSONA, `${analystContext}\n\nQuestion: ${question}`, opts),
+      (opts) => this._callModel(BRIEF_MODEL, BRIEF_WRITER_PERSONA, `${analystContext}\n\nQuestion: ${question}`, opts, usageRecords, 'brief-writer'),
       'brief-writer',
     );
     assert(brief.length > 0, 'brief must not be empty');
+    return brief;
+  }
+
+  /** Chairman ruling → vault write → reversal check. Second half of the full chain. */
+  private async _runFullChain(
+    question: string,
+    currentTags: string[],
+    priors: SignalRecord[],
+    usageRecords: UsageRecord[],
+  ): Promise<CouncilResult> {
+    const brief = await this._deliberate(question, usageRecords);
 
     // Chairman: brief at TOP, original question at BOTTOM
     const rawRuling = await withLLMTimeout(
-      (opts) => this._callModel(CHAIRMAN_MODEL, CHAIRMAN_PERSONA, `${brief}\n\nQuestion: ${question}`, opts),
+      (opts) => this._callModel(CHAIRMAN_MODEL, CHAIRMAN_PERSONA, `${brief}\n\nQuestion: ${question}`, opts, usageRecords, 'chairman'),
       'chairman',
     );
     const ruling = parseRuling(rawRuling);
@@ -137,6 +165,26 @@ export class CouncilService {
   }
 
   /**
+   * Checks the session's aggregate usage against the verified call-graph
+   * ceiling and applies the tiered enforcement action. seat_overrun warns
+   * and lets the result through unchanged — legitimate deep deliberation.
+   * fanout_overrun logs an error and flags the result for the vault record.
+   */
+  private _applyBudgetVerdict(result: CouncilResult, usageRecords: UsageRecord[]): CouncilResult {
+    const verdict = checkSessionBudget(usageRecords, COUNCIL_STATIC_CEILING, COUNCIL_MAX_CALLS);
+    switch (verdict.kind) {
+      case 'ok':
+        return result;
+      case 'seat_overrun':
+        console.warn(`[council] seat_overrun: ${verdict.totalTokens} tokens (recordPath=${result.recordPath})`);
+        return result;
+      case 'fanout_overrun':
+        console.error(`[council] fanout_overrun: ${verdict.totalTokens} tokens exceeds ceiling ${verdict.ceiling} (recordPath=${result.recordPath})`);
+        return { ...result, budgetFlag: 'fanout_overrun' };
+    }
+  }
+
+  /**
    * T10 heuristic: a question is "factual" (fast-path eligible) when it contains
    * no tradeoff/deliberation language. Deliberative questions always take the full chain.
    */
@@ -152,14 +200,14 @@ export class CouncilService {
    * T10 fast-path: vault_search + single Sonnet call for direct factual lookups.
    * Returns null (caller falls back to full chain) if vault_search finds nothing.
    */
-  private async _tryFastPath(question: string): Promise<CouncilResult | null> {
+  private async _tryFastPath(question: string, usageRecords: UsageRecord[]): Promise<CouncilResult | null> {
     const hits = await this.vault.search(question);
     if (hits.length === 0) return null;
 
     const topHits = hits.slice(0, 5); // P10 Rule 2: bounded
     const matchContext = topHits.map((h) => `${h.file}:${h.line}: ${h.text}`).join('\n');
     const summary = await withLLMTimeout(
-      (opts) => this._callModel(FASTPATH_MODEL, FASTPATH_PERSONA, `Vault matches:\n${matchContext}\n\nQuestion: ${question}`, opts),
+      (opts) => this._callModel(FASTPATH_MODEL, FASTPATH_PERSONA, `Vault matches:\n${matchContext}\n\nQuestion: ${question}`, opts, usageRecords, 'fastpath-summary'),
       'fastpath-summary',
     );
     assert(summary.length > 0, 'fastpath summary must not be empty');
@@ -180,7 +228,7 @@ export class CouncilService {
    * Compress verbose scout output to 5 terse bullet points.
    * Reduces context rot in downstream analyst calls (Hong et al.).
    */
-  private async _compress(rawText: string): Promise<string> {
+  private async _compress(rawText: string, usageRecords: UsageRecord[], callSite: string): Promise<string> {
     assert(typeof rawText === 'string' && rawText.length > 0, 'rawText must be non-empty');
     return withLLMTimeout(
       (opts) => this._callModel(
@@ -188,6 +236,8 @@ export class CouncilService {
         'Extract the 5 most critical risk points as terse bullet points. One sentence each, concrete, no hedging.',
         rawText,
         opts,
+        usageRecords,
+        callSite,
       ),
       'compress',
     );
@@ -198,6 +248,8 @@ export class CouncilService {
     system: string,
     userMessage: string,
     opts: { signal: AbortSignal },
+    usageRecords: UsageRecord[],
+    callSite: string,
   ): Promise<string> {
     const msg = await this.client.messages.create(
       {
@@ -209,6 +261,7 @@ export class CouncilService {
       },
       { signal: opts.signal },
     );
+    usageRecords.push(trackUsage(msg.usage, callSite));
     const block = msg.content[0];
     return block?.type === 'text' ? block.text : '';
   }

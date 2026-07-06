@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-07-06
+
+### Added
+- **Runtime token-budget enforcement** — `packages/core/src/utils/TokenBudget.ts` tracks per-session token usage for Council and P10 dispatch, instrumented at the single private `_callModel()`/`callModel()` wrapper in each service. Distinguishes legitimate deep deliberation (`seat_overrun` — warn only, session completes) from structural fan-out bugs (`fanout_overrun` — hard-flagged, `budgetFlag` set on the result) using a call-count/aggregate-usage ceiling derived from each service's verified call graph (`COUNCIL_STATIC_CEILING = 9×1024`, `P10_STATIC_CEILING = 9×2048`), not the descriptive SKILL.md budget tables — a 27-session audit showed those are already well-calibrated; the real failure mode was scouts spawning secondary subagents (2 incidents at 30–70x budget). Detection is post-hoc by design (v1 scope): flags a session after tokens are spent, does not abort mid-fan-out. Full plan: `P10-Plans/2026-07-02-toto-wolff-token-budget-enforcement.md` (revision 2, arbiter-approved).
+- **`linear-sync` skill** — `.claude/skills/linear-sync/SKILL.md`, a human-invoked Claude Code skill that syncs an approved P10 plan into a Linear issue via Linear's official hosted MCP connector. No custom Linear client, no new package dependency (per ADR-0009). Explicit team/project targeting (no fuzzy matching), `STORY:`/`SPIKE:` title convention verified against real workspace issues, fixed description template (400-word cap, no-fabrication constraint), dynamic backlog-status resolution by `type` field, and a mandatory confirm-before-write step — this is the first real write capability in the Linear integration. Full plan: `P10-Plans/2026-07-06-toto-wolff-linear-sync-skill.md` (revision 2, arbiter-approved; revision 1 was blocked for stating connector auth as a permanent fact instead of a per-invocation check).
+
+### Changed
+- **ADR-0009: Use Linear's official MCP server instead of a custom Linear integration.** Supersedes TODOS.md T8's original scope (custom `packages/linear-sync` GraphQL client + keytar-stored auth + rate-limit backoff + rotation procedure) — Linear's hosted MCP server (`mcp.linear.app`) already owns auth, rate limiting, and the GraphQL surface. Discovered while investigating T8's auth model.
+- **T8 (Linear integration spec) marked superseded** in TODOS.md, replaced by a smaller task: register the `plugin:engineering:linear` connector and decide which skill/handler calls its tools.
+
+### Deferred
+- `packages/cli/src/keychain.ts`'s stub-to-real-keytar swap: deferred until T8's actual consumer needs it. CI feasibility was verified empirically ahead of time — `keytar`'s prebuilt binary resolves cleanly on `ubuntu-latest` via `prebuild-install`, no toolchain change needed. Full plan: `P10-Plans/2026-07-06-toto-wolff-keytar-swap-deferred.md`.
+- `T-LINEAR-CACHE` — session-scoped caching for `linear-sync`'s team/project resolution walkthrough, to reduce repeat-invocation friction for users who already know their team/project. Parked (P3) pending evidence the friction actually costs time.
+
 ## [1.2.0] - 2026-07-02
 
 ### Added

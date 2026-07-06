@@ -4,15 +4,24 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
-## P2 — Runtime token-budget enforcement (added 2026-07-02, /plan-eng-review token optimization)
+## P3 — Deferred (added 2026-07-06, post-testing feedback)
 
-**What:** `~/.claude/skills/llm-council/SKILL.md` and `~/.claude/skills/p10/SKILL.md` both already document target token budgets per phase (e.g. P10's ~3800-4300 tok/draft, council's ~4200 tok/deliberation) — but nothing checks actual spend against them at runtime. Add real tracking: count tokens per subagent dispatch, sum against the stated target, and flag (or hard-stop) a session that exceeds it.
+### T-LINEAR-CACHE: Session-scoped team/project resolution cache for `linear-sync`
 
-**Why:** An Anthropic usage report showed 96% of this project's own token usage came from subagent-heavy sessions, and 45% came from context windows >150k tokens — a known degradation zone. The `/plan-eng-review` session on 2026-07-02 fixed the doc-level cause (missing explicit `model:`/`subagent_type:` params on scout dispatch, unbounded scout read/report scope — see that review's findings 1-3), but the budget tables themselves remain aspirational, not enforced. If a future session's scouts drift back toward unbounded reads despite the doc fix, nothing catches it until the next usage report.
+**What:** `.claude/skills/linear-sync/SKILL.md` Step 2's team/project resolution (`list_teams`/`list_projects` exact-match check) currently re-runs its full walkthrough on every invocation, even when the same team/project was already confirmed earlier in the same session. Add a session-scoped (not persisted-to-disk) cache: once a team/project pair resolves successfully, skip re-narrating the walkthrough for the rest of that session — but still perform the actual `list_teams`/`list_projects` call, don't remove the underlying safety check, only the repeated narration.
 
-**Context:** This is real new tooling — a token-counting mechanism plus a gate — not a doc tweak, which is why it was explicitly deferred rather than bundled into the 2026-07-02 fix (Step 0 minimal-diff discipline: that fix was 2 files, 0 new services). Needs its own `/p10` plan before implementation: where does the counter live (a wrapper around the Agent tool dispatch? a post-hoc check reading session token usage?), what's the enforcement action (warn vs. hard-stop), and how does it avoid adding overhead to every single subagent call.
+**Why:** Real-world testing (2026-07-06) found Step 2 works well as a training/onboarding aid for someone unfamiliar with a Linear workspace, but creates repeat friction for a user who already knows their team/project and runs the skill multiple times in one session. Explicitly NOT urgent — usability is fine as-is today.
 
-**Depends on:** None — can start anytime. Read the `/plan-eng-review` session's Findings 1-3 (model/agentType/read-scope fixes already landed in both skill files) before scoping this, since the budget tables it would enforce against are the ones already in those files.
+**Depends on:** Nothing structural. Deferred until downstream usage shows this friction is actually costing time, not implemented preemptively.
+
+**Note:** Does not touch any of the 5 binding Arbiter conditions from `P10-Plans/2026-07-06-toto-wolff-linear-sync-skill.md` (Step 0 connector pre-flight, Step 5 confirm-before-write, description template, dynamic status resolution, closed `save_issue` param set) — Step 2's walkthrough narration was not one of them, so this can be scoped as a small revision without full re-arbitration when picked up.
+
+---
+
+## Completed (v1.3.0, 2026-07-06)
+
+- **Runtime token-budget enforcement** — `packages/core/src/utils/TokenBudget.ts` tracks per-session token usage for Council and P10 dispatch. Merged via PR #23 (`feat/token-budget-enforcement`); this note closes the P2 item added 2026-07-02 that PR's merge left undocumented here. Full detail in CHANGELOG.md `[1.3.0]` and `P10-Plans/2026-07-02-toto-wolff-token-budget-enforcement.md`.
+- **`linear-sync` skill** — see ADR-0009 and `P10-Plans/2026-07-06-toto-wolff-linear-sync-skill.md`.
 
 ---
 
@@ -203,15 +212,15 @@ Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 
 ## P2 — v2 Implementation (added 2026-06-05, /plan-ceo-review SCOPE EXPANSION)
 
-### T8: Linear integration spec (pre-Phase-3 gate)
+### ~~T8: Linear integration spec (pre-Phase-3 gate)~~ — SUPERSEDED 2026-07-06
 
-**What:** One-page spec for `packages/linear-sync` covering: auth model (keytar-stored API key, service account vs personal token), error handling for deleted Linear issues (log + skip, don't fail the council write), rate limit strategy (exponential backoff, max 3 retries), and API key rotation procedure.
+**Original scope (superseded):** One-page spec for `packages/linear-sync` covering: auth model (keytar-stored API key, service account vs personal token), error handling for deleted Linear issues (log + skip, don't fail the council write), rate limit strategy (exponential backoff, max 3 retries), and API key rotation procedure.
 
-**Why:** Linear sync was accepted in the v2 CEO plan with no auth or error model specified. The spec doc prevents implementation drift and ensures Phase 3 starts with a verified design, not an open question.
+**Why superseded:** ADR-0009 (vault: `ADR/adr-0009-use-linear-mcp-server-instead-of-custom-integration.md`) — Linear runs an official hosted MCP server (`mcp.linear.app`, built with Anthropic + Cloudflare) that already owns auth, rate limiting, and the GraphQL surface. No custom `packages/linear-sync`, no keytar auth code, no rotation cron needed. Discovered while investigating T8's auth model against the keytar deferral plan (`P10-Plans/2026-07-06-toto-wolff-keytar-swap-deferred.md`).
 
-**Effort:** human ~2h / CC ~10min
+**Replacement task:** Register the `plugin:engineering:linear` MCP connector (present in the environment, currently unauthenticated — needs `claude mcp` or claude.ai connector settings) and decide which toto-wolff skill/handler calls its tools and when.
 
-**Depends on:** Phase 2 (CLI + keytar) complete before Phase 3 starts.
+**Open follow-up (not resolved by ADR-0009):** non-interactive/headless Linear sync (e.g. a CI job posting without a human session) needs the Bearer-token API-key auth mode, not interactive OAuth 2.1 — ownership and storage of that key is undecided.
 
 ---
 

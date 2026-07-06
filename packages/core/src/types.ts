@@ -56,6 +56,8 @@ export interface P10Result {
   status: P10Status | 'error';
   planPath?: string;
   error?: string;
+  /** Set only when checkSessionBudget() detects a structural fan-out violation. */
+  budgetFlag?: 'fanout_overrun';
 }
 
 /**

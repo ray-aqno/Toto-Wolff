@@ -4,6 +4,18 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+## P2 — Runtime token-budget enforcement (added 2026-07-02, /plan-eng-review token optimization)
+
+**What:** `~/.claude/skills/llm-council/SKILL.md` and `~/.claude/skills/p10/SKILL.md` both already document target token budgets per phase (e.g. P10's ~3800-4300 tok/draft, council's ~4200 tok/deliberation) — but nothing checks actual spend against them at runtime. Add real tracking: count tokens per subagent dispatch, sum against the stated target, and flag (or hard-stop) a session that exceeds it.
+
+**Why:** An Anthropic usage report showed 96% of this project's own token usage came from subagent-heavy sessions, and 45% came from context windows >150k tokens — a known degradation zone. The `/plan-eng-review` session on 2026-07-02 fixed the doc-level cause (missing explicit `model:`/`subagent_type:` params on scout dispatch, unbounded scout read/report scope — see that review's findings 1-3), but the budget tables themselves remain aspirational, not enforced. If a future session's scouts drift back toward unbounded reads despite the doc fix, nothing catches it until the next usage report.
+
+**Context:** This is real new tooling — a token-counting mechanism plus a gate — not a doc tweak, which is why it was explicitly deferred rather than bundled into the 2026-07-02 fix (Step 0 minimal-diff discipline: that fix was 2 files, 0 new services). Needs its own `/p10` plan before implementation: where does the counter live (a wrapper around the Agent tool dispatch? a post-hoc check reading session token usage?), what's the enforcement action (warn vs. hard-stop), and how does it avoid adding overhead to every single subagent call.
+
+**Depends on:** None — can start anytime. Read the `/plan-eng-review` session's Findings 1-3 (model/agentType/read-scope fixes already landed in both skill files) before scoping this, since the budget tables it would enforce against are the ones already in those files.
+
+---
+
 ## Completed (v1.1.1, 2026-07-01)
 
 Cabinet ruled `2026-07-01-v1.1.0-tag-justification` APPROVED WITH CONDITIONS. The v1.1.0 tag was cut and distributed to the internal team before 2 of the 3 conditions were actually verified in code — a session limit hit mid-fix. Caught post-distribution.

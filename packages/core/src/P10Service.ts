@@ -5,6 +5,8 @@ import { createAnthropicClient } from './utils/anthropic.js';
 import { P10BlockedError } from './types.js';
 import type { VaultService } from './VaultService.js';
 import type { P10Result, P10Ruling, P10Status } from './types.js';
+import { checkSessionBudget, trackUsage, P10_MAX_CALLS, P10_STATIC_CEILING } from './utils/TokenBudget.js';
+import type { UsageRecord } from './utils/TokenBudget.js';
 
 const VALID_STATUSES = new Set<P10Status>(['approved', 'revision-required', 'blocked']);
 // LOOP BOUND: revision cycle capped at 1 (Opus ruling CB1)
@@ -29,11 +31,14 @@ export class P10Service {
     assert(typeof task === 'string' && task.length > 0, 'task must be non-empty');
     assert(task.length <= 4000, 'task must not exceed 4000 chars');
 
-    const scouts = await this.runScouts(task);
-    const compressed = await this.compressScouts(scouts);
-    const analysis = await this.runAnalyzer(task, compressed);
-    let draft = await this.runDraftWriter(task, analysis);
-    let ruling = await this.runArbiter(task, draft);
+    // Session-scoped accumulator, passed by reference — never module-level.
+    const usageRecords: UsageRecord[] = [];
+
+    const scouts = await this.runScouts(task, usageRecords);
+    const compressed = await this.compressScouts(scouts, usageRecords);
+    const analysis = await this.runAnalyzer(task, compressed, usageRecords);
+    let draft = await this.runDraftWriter(task, analysis, usageRecords);
+    let ruling = await this.runArbiter(task, draft, usageRecords);
 
     let revisionCount = 0;
     while (ruling.status === 'revision-required' && revisionCount < MAX_REVISIONS) {
@@ -45,10 +50,12 @@ export class P10Service {
             P10_REVISE(draft, ruling.requiredChanges ?? ''),
             undefined,
             opts,
+            usageRecords,
+            'draft-revision',
           ),
         'draft-revision',
       );
-      ruling = await this.runArbiter(task, draft);
+      ruling = await this.runArbiter(task, draft, usageRecords);
     }
     // Revision cap reached without terminal status — treat as blocked (CSO: no silent AssertionError)
     if (ruling.status === 'revision-required') {
@@ -59,6 +66,14 @@ export class P10Service {
     if (ruling.status === 'blocked') {
       throw new P10BlockedError(`P10 plan blocked. Plan saved to ${planPath}`);
     }
+
+    const verdict = checkSessionBudget(usageRecords, P10_STATIC_CEILING, P10_MAX_CALLS);
+    if (verdict.kind === 'seat_overrun') {
+      console.warn(`[p10] seat_overrun: ${verdict.totalTokens} tokens (planPath=${planPath})`);
+    } else if (verdict.kind === 'fanout_overrun') {
+      console.error(`[p10] fanout_overrun: ${verdict.totalTokens} tokens exceeds ceiling ${verdict.ceiling} (planPath=${planPath})`);
+      return { status: ruling.status, planPath, budgetFlag: 'fanout_overrun' };
+    }
     return { status: ruling.status, planPath };
   }
 
@@ -66,16 +81,16 @@ export class P10Service {
    * Run the two scouts in parallel. Each scout receives only the task description
    * as its user message (no prior context) — per lost-in-the-middle positioning.
    */
-  private async runScouts(task: string): Promise<string[]> {
+  private async runScouts(task: string, usageRecords: UsageRecord[]): Promise<string[]> {
     return Promise.all([
       withLLMTimeout(
         (opts) =>
-          this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_SKEPTIC(task), undefined, opts),
+          this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_SKEPTIC(task), undefined, opts, usageRecords, 'p10-scout-skeptic'),
         'p10-scout-skeptic',
       ),
       withLLMTimeout(
         (opts) =>
-          this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_MINIMALIST(task), undefined, opts),
+          this.callModel('claude-haiku-4-5-20251001', P10_SCOUT_MINIMALIST(task), undefined, opts, usageRecords, 'p10-scout-minimalist'),
         'p10-scout-minimalist',
       ),
     ]);
@@ -85,7 +100,7 @@ export class P10Service {
    * Compress each scout output to 5 terse bullet points before passing to the
    * analyzer. Prevents context rot and format tax from verbose scout prose.
    */
-  private async compressScouts(scouts: string[]): Promise<string[]> {
+  private async compressScouts(scouts: string[], usageRecords: UsageRecord[]): Promise<string[]> {
     return Promise.all(
       scouts.map((scout, i) =>
         withLLMTimeout(
@@ -95,6 +110,8 @@ export class P10Service {
               scout,
               'Extract the 5 most important findings as terse bullet points. One sentence each.',
               opts,
+              usageRecords,
+              `p10-compress-scout-${i}`,
             ),
           `p10-compress-scout-${i}`,
         ),
@@ -106,10 +123,10 @@ export class P10Service {
    * Run the analyzer with compressed scout summaries at the top and the task at
    * the bottom — critical context first to avoid lost-in-the-middle degradation.
    */
-  private async runAnalyzer(task: string, compressedScouts: string[]): Promise<string> {
+  private async runAnalyzer(task: string, compressedScouts: string[], usageRecords: UsageRecord[]): Promise<string> {
     return withLLMTimeout(
       (opts) =>
-        this.callModel('claude-sonnet-4-6', P10_ANALYZER(task, compressedScouts), undefined, opts),
+        this.callModel('claude-sonnet-4-6', P10_ANALYZER(task, compressedScouts), undefined, opts, usageRecords, 'p10-analyzer'),
       'p10-analyzer',
     );
   }
@@ -118,10 +135,10 @@ export class P10Service {
    * Run the draft writer with analyzer output at the top and the task at the
    * bottom — preserves primacy of analysis context.
    */
-  private async runDraftWriter(task: string, analysis: string): Promise<string> {
+  private async runDraftWriter(task: string, analysis: string, usageRecords: UsageRecord[]): Promise<string> {
     return withLLMTimeout(
       (opts) =>
-        this.callModel('claude-sonnet-4-6', P10_DRAFT_WRITER(task, analysis), undefined, opts),
+        this.callModel('claude-sonnet-4-6', P10_DRAFT_WRITER(task, analysis), undefined, opts, usageRecords, 'p10-draft'),
       'p10-draft',
     );
   }
@@ -130,11 +147,11 @@ export class P10Service {
    * Run the Opus arbiter with the draft plan at the top and the task at the
    * bottom — arbiter sees the artifact first, task last for grounding.
    */
-  private async runArbiter(task: string, draft: string): Promise<P10Ruling> {
+  private async runArbiter(task: string, draft: string, usageRecords: UsageRecord[]): Promise<P10Ruling> {
     assert(draft.length > 0, 'draft must not be empty');
     const raw = await withLLMTimeout(
       (opts) =>
-        this.callModel('claude-opus-4-8', P10_ARBITER(task, draft), undefined, opts),
+        this.callModel('claude-opus-4-8', P10_ARBITER(task, draft), undefined, opts, usageRecords, 'p10-arbiter'),
       'p10-arbiter',
     );
     const ruling = parseP10Ruling(raw);
@@ -160,6 +177,8 @@ export class P10Service {
     userMessage: string,
     system: string | undefined,
     opts: { signal: AbortSignal },
+    usageRecords: UsageRecord[],
+    callSite: string,
   ): Promise<string> {
     const msg = await this.client.messages.create(
       {
@@ -171,6 +190,7 @@ export class P10Service {
       },
       { signal: opts.signal },
     );
+    usageRecords.push(trackUsage(msg.usage, callSite));
     const block = msg.content[0];
     return block?.type === 'text' ? block.text : '';
   }

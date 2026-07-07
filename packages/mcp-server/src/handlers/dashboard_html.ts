@@ -208,6 +208,55 @@ function buildRoleAdoptionCard(): string {
   </div>`;
 }
 
+// T9 remainder (card empty states): the 4 helpers below return card BODY only —
+// each card's header stays inline in renderDashboardHtml because its sector-dot
+// styling is tied to live percentage values, unlike buildRoleAdoptionCard's
+// static full-card return above. Each keys its zero-check off the exact field
+// its non-empty branch renders, per P10-Plans/2026-07-07-toto-wolff-t9-remainder-
+// card-empty-states.md Arbiter Condition 1 — a mismatched predicate would
+// reproduce the "0 approved of 0 recent" bug this task exists to fix.
+
+/** Body of card-velocity. Empty-check keys off `count`, the same field rendered as stat-big. */
+function buildVelocityCard(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="panel-empty">No sessions yet — run /council to start</div>`;
+  }
+  return `<div class="stat-big" data-count="${count}">0</div>
+    <div class="stat-unit">Council Sessions</div>
+    <hr class="sep">
+    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-council')}`;
+}
+
+/** Body of card-p10. Empty-check keys off `count`, the same field rendered as stat-big. */
+function buildP10Card(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="panel-empty">No plans yet — run /p10 to start</div>`;
+  }
+  return `<div class="stat-big" data-count="${count}" style="color:var(--silver)">0</div>
+    <div class="stat-unit">Execution Plans</div>
+    <hr class="sep">
+    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-p10')}`;
+}
+
+/** Body of card-compliance. Empty-check keys off `recentCount`, the same source as `approved`. */
+function buildComplianceCard(recentCount: number, approved: number, compliancePct: number, gaugeColor: string): string {
+  if (recentCount === 0) {
+    return `<div class="panel-empty">No p10 plans yet — run /p10 to start</div>`;
+  }
+  return `${arcGauge(compliancePct, gaugeColor, 'approved / recent', 'gauge-compliance')}
+    <div class="stat-unit">${approved} approved of ${recentCount} recent</div>`;
+}
+
+/** Body of card-reversal. Empty-check keys off `sessionCount`, matching reversalLabel's own upstream computation. */
+function buildReversalCard(sessionCount: number, reversalPct: number, reversalColor: string, reversalLabel: string): string {
+  if (sessionCount === 0) {
+    return `<div class="panel-empty">0 reversals recorded</div>`;
+  }
+  return `<div class="reversal-frac" style="color:${reversalColor}">${reversalLabel}</div>
+    <div class="reversal-pct" style="color:${reversalColor}" data-count="${reversalPct}" data-suffix="%">0%</div>
+    <div class="reversal-diag">${reversalPct === 0 ? 'ALL RULINGS CLEAN' : reversalPct < 15 ? 'HEALTHY SIGNAL' : reversalPct < 30 ? 'WATCH THE TREND' : 'GOVERNANCE PRESSURE'}</div>`;
+}
+
 export function renderDashboardHtml(data: DashboardResult): string {
   const empty = data.councilSessions.count === 0 && data.p10Plans.count === 0;
   const revisions = data.councilSessions.recent.filter((i) => i.status === 'revision-required').length;
@@ -449,10 +498,7 @@ ${empty ? `
       <span class="card-label">Decision Velocity</span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
     </div>
-    <div class="stat-big" data-count="${data.councilSessions.count}">0</div>
-    <div class="stat-unit">Council Sessions</div>
-    <hr class="sep">
-    ${sparkline(data.councilSessions.recent.map((_, i) => i + 1), '#00D2BE', 'spark-council')}
+    ${buildVelocityCard(data.councilSessions.count, data.councilSessions.recent)}
   </div>
 
   <div class="card" id="card-p10" data-panel="p10" style="--delay:.1s">
@@ -460,10 +506,7 @@ ${empty ? `
       <span class="card-label">P10 Plans Filed</span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
     </div>
-    <div class="stat-big" data-count="${data.p10Plans.count}" style="color:var(--silver)">0</div>
-    <div class="stat-unit">Execution Plans</div>
-    <hr class="sep">
-    ${sparkline(data.p10Plans.recent.map((_, i) => i + 1), '#00D2BE', 'spark-p10')}
+    ${buildP10Card(data.p10Plans.count, data.p10Plans.recent)}
   </div>
 
   <div class="card gauge-card" id="card-compliance" data-panel="compliance" style="--delay:.15s">
@@ -471,8 +514,7 @@ ${empty ? `
       <span class="card-label">P10 Compliance</span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${compliancePct < 60 ? 'red' : compliancePct < 80 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
     </div>
-    ${arcGauge(compliancePct, gaugeColor, 'approved / recent', 'gauge-compliance')}
-    <div class="stat-unit">${approved} approved of ${data.p10Plans.recent.length} recent</div>
+    ${buildComplianceCard(data.p10Plans.recent.length, approved, compliancePct, gaugeColor)}
   </div>
 
   <div class="card" id="card-reversal" data-panel="reversal" style="--delay:.2s">
@@ -480,9 +522,7 @@ ${empty ? `
       <span class="card-label">Reversal Rate</span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${reversalPct > 30 ? 'red' : reversalPct > 15 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
     </div>
-    <div class="reversal-frac" style="color:${reversalColor}">${reversalLabel}</div>
-    <div class="reversal-pct" style="color:${reversalColor}" data-count="${reversalPct}" data-suffix="%">0%</div>
-    <div class="reversal-diag">${reversalPct === 0 ? 'ALL RULINGS CLEAN' : reversalPct < 15 ? 'HEALTHY SIGNAL' : reversalPct < 30 ? 'WATCH THE TREND' : 'GOVERNANCE PRESSURE'}</div>
+    ${buildReversalCard(data.councilSessions.count, reversalPct, reversalColor, reversalLabel)}
   </div>
 
   ${buildRoleAdoptionCard()}

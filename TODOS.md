@@ -213,7 +213,7 @@ Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 
 **Why superseded:** ADR-0009 (vault: `ADR/adr-0009-use-linear-mcp-server-instead-of-custom-integration.md`) — Linear runs an official hosted MCP server (`mcp.linear.app`, built with Anthropic + Cloudflare) that already owns auth, rate limiting, and the GraphQL surface. No custom `packages/linear-sync`, no keytar auth code, no rotation cron needed. Discovered while investigating T8's auth model against the keytar deferral plan (`P10-Plans/2026-07-06-toto-wolff-keytar-swap-deferred.md`).
 
-**Replacement task:** Register the `plugin:engineering:linear` MCP connector (present in the environment, currently unauthenticated — needs `claude mcp` or claude.ai connector settings) and decide which toto-wolff skill/handler calls its tools and when.
+**Replacement task — DONE 2026-07-06/07:** `plugin:engineering:linear` connector authorized and verified live (`get_user`, `list_teams`, `save_issue` all tested against the real Navistone workspace). `.claude/skills/linear-sync/SKILL.md` is the skill that calls its tools — see `P10-Plans/2026-07-06-toto-wolff-linear-sync-skill.md`.
 
 **Open follow-up (not resolved by ADR-0009):** non-interactive/headless Linear sync (e.g. a CI job posting without a human session) needs the Bearer-token API-key auth mode, not interactive OAuth 2.1 — ownership and storage of that key is undecided.
 

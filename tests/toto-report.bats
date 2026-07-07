@@ -1,7 +1,5 @@
 #!/usr/bin/env bats
 # Tests for the `toto report` CLI command.
-# Test 1 passes now. Tests 2 and 3 are intentionally pre-green pending E4
-# (report.ts not yet implemented).
 # Run: bats tests/toto-report.bats
 # Requires: bats-core >= 1.0, node, packages/cli built (pnpm -C packages/cli build)
 
@@ -34,12 +32,7 @@ teardown() {
   [[ "$output" == *"no"* ]] || [[ "$output" == *"not found"* ]] || [[ "$output" == *"unknown command"* ]]
 }
 
-# TODO(E4): this test is pre-green until report.ts ships.
-# When E4 lands, remove the skip call and update assertions to match
-# actual output of `toto report` with a malformed-frontmatter fixture.
 @test "report: malformed frontmatter exits non-zero or emits parse error" {
-  skip "TODO(E4): report.ts not yet implemented — pre-green placeholder"
-
   mkdir -p "${TEST_VAULT}/Council/Congressional-Records"
   cat > "${TEST_VAULT}/Council/Congressional-Records/bad-frontmatter.md" <<'EOF'
 ---
@@ -52,12 +45,7 @@ EOF
   [[ "$output" == *"parse"* ]] || [[ "$output" == *"error"* ]] || [[ "$output" == *"invalid"* ]]
 }
 
-# TODO(E4): this test is pre-green until report.ts ships.
-# When E4 lands, remove the skip call and update assertions to match
-# actual output of `toto report` with a valid analytics fixture.
 @test "report: valid analytics dir with good frontmatter exits 0" {
-  skip "TODO(E4): report.ts not yet implemented — pre-green placeholder"
-
   mkdir -p "${TEST_VAULT}/Council/Congressional-Records"
   cat > "${TEST_VAULT}/Council/Congressional-Records/2026-06-29-session.md" <<'EOF'
 ---

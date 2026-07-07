@@ -192,6 +192,22 @@ function sectorBadge(type: 'council' | 'p10'): string {
   return `<span style="display:inline-block;background:${color};color:#0d0d0d;font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:2px;letter-spacing:.05em">${type === 'council' ? 'COUNCIL' : 'P10'}</span>`;
 }
 
+/**
+ * Role Adoption card (T9 empty-state copy). Always renders in its empty
+ * state — no `toto persona` CLI command or persona field on DashboardResult
+ * exists yet, so there is nothing to make this dynamic. Wire real data when
+ * `toto persona add` ships; until then this is intentionally hardcoded.
+ */
+function buildRoleAdoptionCard(): string {
+  return `<div class="card" id="card-roles" data-panel="roles" style="--delay:.22s">
+    <div class="card-header">
+      <span class="card-label">Role Adoption</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="stat-unit">No personas active — run toto persona add</div>
+  </div>`;
+}
+
 export function renderDashboardHtml(data: DashboardResult): string {
   const empty = data.councilSessions.count === 0 && data.p10Plans.count === 0;
   const revisions = data.councilSessions.recent.filter((i) => i.status === 'revision-required').length;
@@ -469,6 +485,8 @@ ${empty ? `
     <div class="reversal-diag">${reversalPct === 0 ? 'ALL RULINGS CLEAN' : reversalPct < 15 ? 'HEALTHY SIGNAL' : reversalPct < 30 ? 'WATCH THE TREND' : 'GOVERNANCE PRESSURE'}</div>
   </div>
 
+  ${buildRoleAdoptionCard()}
+
   <div class="card wide" id="card-history" data-panel="history" style="--delay:.25s">
     <div class="card-header">
       <span class="card-label">Session History</span>
@@ -641,6 +659,7 @@ ${empty ? `
       case 'p10':      return buildP10Panel();
       case 'compliance': return buildCompliancePanel();
       case 'reversal': return buildReversalPanel();
+      case 'roles':    return '<div class="panel-empty">No personas active — run toto persona add</div>';
       case 'history':  return buildHistoryPanel();
       case 'blocked':  return buildBlockedPanel();
       case 'rulings':  return buildRulingsPanel();

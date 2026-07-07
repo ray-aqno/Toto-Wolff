@@ -16,12 +16,42 @@ import { runRadio } from "./commands/radio.js";
 import { runBackfill } from "./commands/backfill.js";
 import { runUpgrade } from "./commands/upgrade.js";
 import { runSynthesize } from "./commands/synthesize.js";
+import { runReport } from "./commands/report.js";
 import { printLandingUI, plainUsage } from "./ui.js";
 
 /** Print an "unknown command" error to stderr and exit 1. */
 function unknownCommand(cmd: string): void {
   process.stderr.write(`toto: unknown command '${cmd}'\n\n${plainUsage()}`);
   process.exit(1);
+}
+
+// Lookup table, not a growing if-chain — a flat if-chain for this many
+// commands cannot stay under the 60-line ESLint cap and would only get worse
+// as commands are added. Same dispatch semantics: one command, one handler.
+const COMMAND_HANDLERS: Record<string, () => Promise<void>> = {
+  init: runInit,
+  doctor: runDoctor,
+  whoami: runWhoami,
+  search: runSearch,
+  last: runLast,
+  audit: runAudit,
+  dashboard: runDashboard,
+  radio: runRadio,
+  backfill: runBackfill,
+  upgrade: runUpgrade,
+  synthesize: runSynthesize,
+  report: runReport,
+};
+
+/**
+ * Look up and run the handler for `cmd`. Returns true if `cmd` matched a
+ * handler (and was awaited to completion), false if nothing matched.
+ */
+async function dispatchCommand(cmd: string): Promise<boolean> {
+  const handler = COMMAND_HANDLERS[cmd];
+  if (handler === undefined) return false;
+  await handler();
+  return true;
 }
 
 /** Route process.argv[2] to the correct handler. */
@@ -40,62 +70,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (cmd === "init") {
-    await runInit();
-    return;
-  }
-
-  if (cmd === "doctor") {
-    await runDoctor();
-    return;
-  }
-
-  if (cmd === "whoami") {
-    await runWhoami();
-    return;
-  }
-
-  if (cmd === "search") {
-    await runSearch();
-    return;
-  }
-
-  if (cmd === "last") {
-    await runLast();
-    return;
-  }
-
-  if (cmd === "audit") {
-    await runAudit();
-    return;
-  }
-
-  if (cmd === "dashboard") {
-    await runDashboard();
-    return;
-  }
-
-  if (cmd === "radio") {
-    await runRadio();
-    return;
-  }
-
-  if (cmd === "backfill") {
-    await runBackfill();
-    return;
-  }
-
-  if (cmd === "upgrade") {
-    await runUpgrade();
-    return;
-  }
-
-  if (cmd === "synthesize") {
-    await runSynthesize();
-    return;
-  }
-
-  unknownCommand(cmd);
+  const handled = await dispatchCommand(cmd);
+  if (!handled) unknownCommand(cmd);
 }
 
 main().catch((err: unknown) => {

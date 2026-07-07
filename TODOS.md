@@ -62,15 +62,10 @@ Council ruling `2026-07-01-strangler-fig-seam-bugs` (lean mode, ~86K tokens vs. 
 
 ---
 
-## P2 — Next Sprint
+## Completed (v1.3.x follow-up, 2026-07-07)
 
-### T7: bats test suite for `toto-report`
-
-**What:** `tests/toto-report.bats` — no analytics dir → graceful exit, malformed frontmatter → unknown fields, happy path output. Scaffold shipped 2026-07-01: test 1 (no analytics dir) is live and green; tests 2 and 3 are `skip`-gated with `TODO(E4)` pending report.ts.
-
-**Effort:** CC ~10 min to un-skip once toto-report ships.
-
-**Depends on:** E4 (metrics dashboard, toto-report implementation).
+- **T7: `toto report` CLI command shipped** — `packages/cli/src/commands/report.ts`, all 3 `tests/toto-report.bats` tests green (PR #25). Verified against 42 real Congressional Records, not just the bats fixtures — caught and fixed a real frontmatter-field mismatch (`chairman_action` vs. fixture-assumed `status`) plus two real-data gaps (`INDEX.md` isn't a record; a legitimate record has a blank line inside its frontmatter block). Full plan: `P10-Plans/2026-07-07-toto-wolff-t7-t9-unblock.md`.
+- **T9: Role Adoption dashboard card shipped** — `buildRoleAdoptionCard()` in `dashboard_html.ts` (PR #26). Permanent hardcoded empty state with a marker comment, since no `toto persona` command exists yet to back it with real data. Empty-state copy for the other 3 cards (velocity/p10/reversal) explicitly deferred as a separate follow-up, not done here.
 
 ---
 
@@ -224,15 +219,13 @@ Implemented `.github/workflows/ci.yml` — Phase 1 eval-gate unblocked.
 
 ---
 
-### T9: Dashboard empty-state copy
+### ~~T9: Dashboard empty-state copy~~ — PARTIALLY SHIPPED 2026-07-07
 
-**What:** Write empty-state copy for all 4 dashboard views before Phase 4 ships: decision velocity ("No sessions yet — run /council to start"), reversal rate ("0 reversals recorded"), p10 compliance ("No p10 plans yet — run /p10 to start"), role adoption ("No personas active — run toto persona add").
+**Original ask:** empty-state copy for all 4 dashboard views: decision velocity, reversal rate, p10 compliance, role adoption.
 
-**Why:** For a new install, all 4 dashboard panels show blank charts. Without intentional copy, users think the dashboard is broken. Empty state is the most common state for the first 30 days of use.
+**Shipped:** role adoption card built from scratch (didn't exist before — see "Completed (v1.3.x follow-up)" above, PR #26). The other 3 views (velocity/p10/reversal) already had *some* empty-state text buried in their detail-panel builders, but it's not surfaced on the card face itself for the mixed-empty case (e.g. council sessions exist but p10 plans don't — `card-p10` just shows a bare `0`).
 
-**Effort:** human ~30min / CC ~5min
-
-**Depends on:** Phase 4 (dashboard) design underway.
+**Remaining:** surface empty-state copy on the card face for velocity/p10/reversal in the mixed-empty case. Explicitly deferred as a separate task (different blast radius than building a new card) — not scoped or estimated yet.
 
 ## v1.2.0 Roadmap
 

@@ -1,6 +1,6 @@
 {
   "name": "toto-wolff",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.5.1",
@@ -16,7 +16,8 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint packages --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "check-patterns": "tsx --tsconfig scripts/tsconfig.json scripts/check-patterns.ts"
+    "check-patterns": "tsx --tsconfig scripts/tsconfig.json scripts/check-patterns.ts",
+    "bump-version": "tsx --tsconfig scripts/tsconfig.json scripts/bump-version.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -153,3 +153,47 @@ EOF
   run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
   [ "$status" -eq 1 ]
 }
+
+# Regression: fourth recurrence of the bare-English-word pattern bug (role → auth →
+# credential → token). Session 2026-07-06 false-positived twice on the bare "token"
+# pattern: once on a token-usage-tracking feature description (TokenBudget.ts and
+# callers), once on TODOS.md prose describing ADR-0009 (Linear auth decision record).
+@test "pre-commit exits 0 on token-budget feature prose using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "packages/core/src/utils/TokenBudget.ts tracks per-session token usage for Council and P10 dispatch." > "${TEST_DIR}/fixture.md"
+  git -C "${TEST_DIR}" add fixture.md
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-commit exits 0 on ADR-0009 linear-auth prose using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "auth model (keytar-stored API key, service account vs personal token), needs the Bearer-token API-key auth mode, not interactive OAuth 2.1" > "${TEST_DIR}/fixture.md"
+  git -C "${TEST_DIR}" add fixture.md
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-commit exits 1 on real token assignment code using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo 'const token = "d34db33f";' > "${TEST_DIR}/client.ts"
+  git -C "${TEST_DIR}" add client.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 1 ]
+}
+
+@test "pre-commit exits 1 on real apiKey code using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo 'const apiKey = "sk-abc123";' > "${TEST_DIR}/client.ts"
+  git -C "${TEST_DIR}" add client.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 1 ]
+}
+
+@test "pre-commit exits 1 on real env-var token reference using real repo patterns" {
+  cp "${REPO_DIR}/.toto/sensitive-patterns.json" "${TEST_DIR}/.toto/sensitive-patterns.json"
+  echo "const t = process.env.LINEAR_API_TOKEN;" > "${TEST_DIR}/client.ts"
+  git -C "${TEST_DIR}" add client.ts
+  run bash -c "cd '${TEST_DIR}' && '${TEST_DIR}/.git/hooks/pre-commit'"
+  [ "$status" -eq 1 ]
+}

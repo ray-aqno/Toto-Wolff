@@ -257,323 +257,9 @@ function buildReversalCard(sessionCount: number, reversalPct: number, reversalCo
     <div class="reversal-diag">${reversalPct === 0 ? 'ALL RULINGS CLEAN' : reversalPct < 15 ? 'HEALTHY SIGNAL' : reversalPct < 30 ? 'WATCH THE TREND' : 'GOVERNANCE PRESSURE'}</div>`;
 }
 
-export function renderDashboardHtml(data: DashboardResult): string {
-  const empty = data.councilSessions.count === 0 && data.p10Plans.count === 0;
-  const revisions = data.councilSessions.recent.filter((i) => i.status === 'revision-required').length;
-  const reversalPct = data.councilSessions.count === 0 ? 0 : Math.round((revisions / data.councilSessions.count) * 100);
-  const reversalLabel = data.councilSessions.count === 0 ? 'N/A' : `${revisions} / ${data.councilSessions.count}`;
-  const approved = data.p10Plans.recent.filter((i) => i.status === 'approved').length;
-  const compliancePct = data.p10Plans.recent.length === 0 ? 0 : Math.round((approved / data.p10Plans.recent.length) * 100);
-  const reversalColor = reversalPct > 30 ? '#e03030' : reversalPct > 15 ? '#e09020' : '#00D2BE';
-  const gaugeColor = compliancePct < 60 ? '#e03030' : compliancePct < 80 ? '#e09020' : '#00D2BE';
-  const wcc = 8;
-
-  const blockedRows = data.blockedItems.length === 0
-    ? `<div class="blocked-empty">ALL CLEAR — no blocked items</div>`
-    : data.blockedItems.map((b) => `<div class="blocked-row" tabindex="0">${sectorBadge(b.type as 'council' | 'p10')} <span class="blocked-date">${esc(b.date)}</span> <span class="blocked-excerpt">${esc(b.excerpt)}</span></div>`).join('');
-
-  const recentDecisions = data.councilSessions.recent.slice(-5).reverse().map((item) => {
-    const sc = item.status === 'revision-required' ? '#e03030' : item.status === 'approved' ? '#00D2BE' : '#888';
-    const sl = item.status === 'revision-required' ? 'REVISE' : item.status === 'approved' ? 'CLEAN' : 'PENDING';
-    return `<div class="decision-row" tabindex="0"><span class="decision-pill" style="background:${sc}20;color:${sc};border:1px solid ${sc}40">${sl}</span><span class="decision-date">${esc(item.date.slice(0, 10))}</span><span class="decision-excerpt">${esc(item.excerpt.slice(0, 72))}${item.excerpt.length > 72 ? '…' : ''}</span></div>`;
-  }).join('');
-
-  // Serialise data for client-side panel rendering (XSS-safe via JSON.stringify)
-  const jsonData = JSON.stringify(data);
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TOTO — Paddock Interface</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
-  :root {
-    --teal: #00D2BE; --silver: #C0C0C0;
-    --bg: #0d0d0d; --surf: #121212; --card: #181818; --border: #242424;
-    --text: #f0f0f0; --dim: #555; --red: #e03030; --amber: #e09020;
-    --mono: 'JetBrains Mono', 'Courier New', monospace;
-    --panel-w: 420px;
-  }
-  html, body { height: 100%; background: var(--bg); color: var(--text) }
-  body { font-family: var(--mono); font-size: 14px; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden }
-
-  /* ── Header ─────────────────────────────────────────────────────────── */
-  .header {
-    background: var(--surf); border-bottom: 2px solid var(--teal);
-    padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between;
-    position: sticky; top: 0; z-index: 20;
-  }
-  .header-left  { display: flex; align-items: center; gap: .75rem }
-  .header-logo  { font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--teal); letter-spacing: .1em }
-  .header-sub   { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .12em; margin-top: 1px }
-  .header-badge { background: var(--teal); color: #0d0d0d; font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 2px 7px; border-radius: 2px; letter-spacing: .1em; animation: badge-blink 3s ease-in-out infinite }
-  @keyframes badge-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
-  .header-ts    { font-family: var(--mono); font-size: .65rem; color: var(--dim); letter-spacing: .04em; text-align: right }
-  @media (max-width: 600px) { .header-ts { display: none } }
-  .header-ts .val { color: var(--silver) }
-  .wcc-badge    { font-family: var(--mono); font-size: .52rem; color: #2a2a2a; letter-spacing: .08em; margin-top: 2px; user-select: none; transition: color .3s; text-align: right }
-  .wcc-badge:hover { color: var(--dim) }
-
-  /* ── Main grid ───────────────────────────────────────────────────────── */
-  .main {
-    flex: 1; padding: 1.25rem 1.5rem;
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
-    gap: 1rem; align-content: start;
-    transition: margin-right .35s cubic-bezier(.4,0,.2,1);
-  }
-  body.panel-open .main { margin-right: var(--panel-w) }
-
-  /* ── Card ────────────────────────────────────────────────────────────── */
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 4px;
-    padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: .5rem;
-    opacity: 0; transform: translateY(10px);
-    transition: opacity .4s ease, transform .4s ease, border-color .2s, box-shadow .2s, background .2s;
-    cursor: pointer;
-  }
-  .card.visible { opacity: 1; transform: translateY(0) }
-  .card:hover   { border-color: #2e2e2e; box-shadow: 0 0 0 1px #00D2BE18, 0 4px 24px #00000060 }
-  .card.active  { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 4px 32px #00D2BE18; background: #1c1f1f }
-
-  /* click ripple */
-  .card { position: relative; overflow: hidden }
-  .ripple {
-    position: absolute; border-radius: 50%; background: #00D2BE22;
-    transform: scale(0); animation: ripple-anim .55s ease-out forwards;
-    pointer-events: none;
-  }
-  @keyframes ripple-anim { to { transform: scale(4); opacity: 0 } }
-
-  .card-header  { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem }
-  .card-label   { font-family: var(--mono); font-size: .62rem; color: var(--dim); letter-spacing: .13em; text-transform: uppercase }
-  .card-chevron { font-size: .6rem; color: var(--dim); transition: color .2s, transform .2s }
-  .card.active .card-chevron { color: var(--teal); transform: rotate(90deg) }
-  .sector-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0 }
-  .sector-dot.amber { background: var(--amber) }
-  .sector-dot.red   { background: var(--red); animation: dot-pulse 1.4s ease-in-out infinite }
-  @keyframes dot-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .stat-big  { font-family: var(--mono); font-size: 2.6rem; font-weight: 700; color: var(--teal); line-height: 1; letter-spacing: -.02em }
-  .stat-unit { font-family: var(--mono); font-size: .65rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; margin-top: .2rem }
-  .gauge-card { align-items: center; text-align: center }
-  .reversal-frac { font-family: var(--mono); font-size: 1.7rem; font-weight: 700 }
-  .reversal-pct  { font-family: var(--mono); font-size: .85rem; margin-top: .15rem }
-  .reversal-diag { font-family: var(--mono); font-size: .62rem; color: var(--dim); margin-top: .4rem; letter-spacing: .06em }
-  .wide { grid-column: span 2 }
-  @media (max-width: 700px) { .wide { grid-column: span 1 } }
-  .chart-title { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; margin-bottom: .6rem }
-  .blocked-empty { font-family: var(--mono); font-size: .7rem; color: var(--teal); letter-spacing: .08em; padding: .4rem 0 }
-  .blocked-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--border) }
-  .blocked-row:last-child { border-bottom: none }
-  .blocked-date   { font-family: var(--mono); font-size: .68rem; color: var(--dim) }
-  .blocked-excerpt { color: var(--silver); font-size: .8rem }
-  .decision-row { display: grid; grid-template-columns: 4.5rem 6rem 1fr; align-items: baseline; gap: .5rem; padding: .35rem 0; border-bottom: 1px solid var(--border) }
-  .decision-row:last-child { border-bottom: none }
-  .decision-pill { font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 2px 5px; border-radius: 2px; letter-spacing: .06em; text-align: center }
-  .decision-date { font-family: var(--mono); font-size: .68rem; color: var(--dim) }
-  .decision-excerpt { color: var(--silver); font-size: .78rem }
-  .sep { border: none; border-top: 1px solid var(--border); margin: .2rem 0 }
-
-  /* ── Detail panel ────────────────────────────────────────────────────── */
-  .panel {
-    position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel-w);
-    background: var(--surf); border-left: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    transform: translateX(100%);
-    transition: transform .35s cubic-bezier(.4,0,.2,1);
-    z-index: 30; overflow: hidden;
-  }
-  .panel.open { transform: translateX(0) }
-
-  /* thin teal top edge on panel */
-  .panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--teal) }
-
-  .panel-header {
-    padding: 1rem 1.25rem .75rem;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem;
-    flex-shrink: 0;
-  }
-  .panel-title { font-family: var(--mono); font-size: .75rem; color: var(--teal); letter-spacing: .12em; text-transform: uppercase; font-weight: 700 }
-  .panel-sub   { font-family: var(--mono); font-size: .6rem; color: var(--dim); margin-top: 3px; letter-spacing: .06em }
-  .panel-close {
-    background: none; border: 1px solid var(--border); color: var(--dim);
-    font-family: var(--mono); font-size: .65rem; padding: 0 10px; border-radius: 2px;
-    cursor: pointer; flex-shrink: 0; transition: border-color .15s, color .15s;
-    letter-spacing: .08em; min-height: 44px; display: flex; align-items: center;
-  }
-  .panel-close:hover { border-color: var(--teal); color: var(--teal) }
-  .panel-close:focus { outline: 2px solid var(--teal); outline-offset: 2px }
-
-  .panel-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; scrollbar-width: thin; scrollbar-color: #333 transparent }
-  .panel-body::-webkit-scrollbar { width: 4px }
-  .panel-body::-webkit-scrollbar-thumb { background: #333 }
-
-  /* panel sections */
-  .psec { margin-bottom: 1.25rem }
-  .psec-label { font-family: var(--mono); font-size: .58rem; color: var(--dim); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .5rem; padding-bottom: .3rem; border-bottom: 1px solid var(--border) }
-
-  /* stat row inside panel */
-  .pstat { display: flex; justify-content: space-between; align-items: baseline; padding: .3rem 0; border-bottom: 1px solid #1c1c1c }
-  .pstat:last-child { border-bottom: none }
-  .pstat-k { font-family: var(--mono); font-size: .68rem; color: var(--dim) }
-  .pstat-v { font-family: var(--mono); font-size: .78rem; color: var(--text); font-weight: 700 }
-
-  /* record rows inside panel */
-  .prec {
-    padding: .5rem 0; border-bottom: 1px solid #1c1c1c;
-    opacity: 0; transform: translateX(12px);
-    transition: opacity .3s ease, transform .3s ease;
-  }
-  .prec.in { opacity: 1; transform: translateX(0) }
-  .prec:last-child { border-bottom: none }
-  .prec-meta { display: flex; align-items: center; gap: .4rem; margin-bottom: .25rem }
-  .prec-date { font-family: var(--mono); font-size: .65rem; color: var(--dim) }
-  .prec-text { font-size: .8rem; color: var(--silver); line-height: 1.4 }
-  .prec-pill { font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 1px 5px; border-radius: 2px; letter-spacing: .06em }
-
-  /* panel empty */
-  .panel-empty { font-family: var(--mono); font-size: .7rem; color: var(--dim); padding: 1rem 0 }
-
-  /* ── Footer ──────────────────────────────────────────────────────────── */
-  .footer { background: var(--surf); border-top: 1px solid var(--border); padding: .5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; transition: margin-right .35s cubic-bezier(.4,0,.2,1) }
-  body.panel-open .footer { margin-right: var(--panel-w) }
-  .footer-label { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .08em }
-  .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-right: .4rem; animation: pulse 2s ease-in-out infinite }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
-
-  /* ── Empty state ─────────────────────────────────────────────────────── */
-  .empty-state { grid-column: 1/-1; text-align: center; padding: 4rem 1rem }
-  .empty-heading { font-family: var(--mono); font-size: .9rem; color: var(--teal); letter-spacing: .14em; margin-bottom: .6rem }
-  .empty-sub     { font-family: var(--mono); font-size: .7rem; color: var(--dim); letter-spacing: .06em }
-
-  /* ── SSE connection status ───────────────────────────────────────────── */
-  #connection-status { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .06em; margin-left: .75rem }
-  #connection-status.live { color: var(--teal) }
-  #connection-status.error { color: var(--red) }
-
-  /* ── Panel spinner ───────────────────────────────────────────────────── */
-  #panel-spinner { display: none; padding: 1rem; text-align: center }
-  #panel-spinner.visible { display: block }
-
-  /* ── Mobile overlay — 768–1024px ─────────────────────────────────────── */
-  @media (min-width: 768px) and (max-width: 1024px) {
-    #panel { position: fixed; right: 0; top: 0; width: 40vw; height: 100vh; z-index: 100; overflow-y: auto; backdrop-filter: blur(4px); background: rgba(13,13,13,.92) }
-  }
-  /* ── Mobile overlay — <768px ─────────────────────────────────────────── */
-  @media (max-width: 767px) {
-    #panel { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100; overflow-y: auto; background: rgba(13,13,13,.97) }
-  }
-</style>
-</head>
-<body>
-
-<header class="header">
-  <div class="header-left">
-    <div>
-      <div class="header-logo">TOTO WOLFF</div>
-      <div class="header-sub">PADDOCK INTERFACE &nbsp;·&nbsp; BRACKLEY HQ</div>
-    </div>
-    <span class="header-badge">LIVE</span>
-    <span id="connection-status" aria-live="polite"></span>
-  </div>
-  <div>
-    <div class="header-ts">GENERATED &nbsp;<span class="val">${esc(data.generatedAt)}</span></div>
-    <div class="wcc-badge" title="Mercedes-AMG F1 Constructor Championships 2014–2021">W${wcc} · ${wcc}×WCC</div>
-  </div>
-</header>
-
-<main class="main" id="main">
-${empty ? `
-  <div class="empty-state">
-    <div class="empty-heading">PIT LANE CLEAR</div>
-    <div class="empty-sub">No sessions recorded — run /council to start</div>
-  </div>
-` : `
-  <div class="card" id="card-velocity" data-panel="velocity" style="--delay:.05s">
-    <div class="card-header">
-      <span class="card-label">Decision Velocity</span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
-    </div>
-    ${buildVelocityCard(data.councilSessions.count, data.councilSessions.recent)}
-  </div>
-
-  <div class="card" id="card-p10" data-panel="p10" style="--delay:.1s">
-    <div class="card-header">
-      <span class="card-label">P10 Plans Filed</span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
-    </div>
-    ${buildP10Card(data.p10Plans.count, data.p10Plans.recent)}
-  </div>
-
-  <div class="card gauge-card" id="card-compliance" data-panel="compliance" style="--delay:.15s">
-    <div class="card-header">
-      <span class="card-label">P10 Compliance</span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${compliancePct < 60 ? 'red' : compliancePct < 80 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
-    </div>
-    ${buildComplianceCard(data.p10Plans.recent.length, approved, compliancePct, gaugeColor)}
-  </div>
-
-  <div class="card" id="card-reversal" data-panel="reversal" style="--delay:.2s">
-    <div class="card-header">
-      <span class="card-label">Reversal Rate</span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${reversalPct > 30 ? 'red' : reversalPct > 15 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
-    </div>
-    ${buildReversalCard(data.councilSessions.count, reversalPct, reversalColor, reversalLabel)}
-  </div>
-
-  ${buildRoleAdoptionCard()}
-
-  <div class="card wide" id="card-history" data-panel="history" style="--delay:.25s">
-    <div class="card-header">
-      <span class="card-label">Session History</span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
-    </div>
-    <div class="chart-title">Council sessions by month</div>
-    ${sessionBarChart(data.councilSessions.recent)}
-  </div>
-
-  <div class="card wide" id="card-blocked" data-panel="blocked" style="--delay:.3s">
-    <div class="card-header">
-      <span class="card-label">Blocked Items &nbsp;<span id="blocked-count" aria-live="polite" style="font-family:var(--mono);font-size:.6rem;color:${data.blockedItems.length > 0 ? 'var(--red)' : 'var(--dim)'}">${data.blockedItems.length > 0 ? data.blockedItems.length + ' FLAG' + (data.blockedItems.length > 1 ? 'S' : '') : 'CLEAR'}</span></span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${data.blockedItems.length > 0 ? 'red' : ''}"></span><span class="card-chevron">▶</span></span>
-    </div>
-    ${blockedRows}
-  </div>
-
-  ${data.councilSessions.recent.length > 0 ? `
-  <div class="card wide" id="card-rulings" data-panel="rulings" style="--delay:.35s">
-    <div class="card-header">
-      <span class="card-label">Recent Rulings</span>
-      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
-    </div>
-    ${recentDecisions}
-  </div>` : ''}
-`}
-</main>
-
-<!-- ── Detail panel ─────────────────────────────────────────────────────── -->
-<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-label="Detail view">
-  <div class="panel-header">
-    <div>
-      <div class="panel-title" id="panel-title">—</div>
-      <div class="panel-sub" id="panel-sub"></div>
-    </div>
-    <button class="panel-close" id="panel-close" aria-label="Close panel">ESC</button>
-  </div>
-  <div id="panel-spinner"><span class="live-dot"></span></div>
-  <div class="panel-body" id="panel-body"></div>
-</aside>
-
-<footer class="footer" id="footer">
-  <div class="footer-label"><span class="live-dot"></span>TOTO-WOLFF GOVERNANCE STACK</div>
-  <div class="footer-label">BRACKLEY · ${esc(data.generatedAt)}</div>
-</footer>
-
-<script>
+/** Returns the client-side `<script>` block: card animation, panel drill-down, click handling. Depends only on `jsonData`. */
+function buildDashboardClientScript(jsonData: string): string {
+  return `<script>
 (function () {
   // ── Data ───────────────────────────────────────────────────────────────
   const D = ${jsonData};
@@ -904,7 +590,387 @@ ${empty ? `
   panelClose.addEventListener('click', closePanel);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
 })();
-</script>
+</script>`;
+}
+
+/** Returns the static `<head>` block: meta tags, fonts, CSS. Takes no dashboard data. */
+function buildDashboardHead(): string {
+  return `<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TOTO — Paddock Interface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+  :root {
+    --teal: #00D2BE; --silver: #C0C0C0;
+    --bg: #0d0d0d; --surf: #121212; --card: #181818; --border: #242424;
+    --text: #f0f0f0; --dim: #555; --red: #e03030; --amber: #e09020;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --panel-w: 420px;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text) }
+  body { font-family: var(--mono); font-size: 14px; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden }
+
+  /* ── Header ─────────────────────────────────────────────────────────── */
+  .header {
+    background: var(--surf); border-bottom: 2px solid var(--teal);
+    padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .header-left  { display: flex; align-items: center; gap: .75rem }
+  .header-logo  { font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--teal); letter-spacing: .1em }
+  .header-sub   { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .12em; margin-top: 1px }
+  .header-badge { background: var(--teal); color: #0d0d0d; font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 2px 7px; border-radius: 2px; letter-spacing: .1em; animation: badge-blink 3s ease-in-out infinite }
+  @keyframes badge-blink { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .header-ts    { font-family: var(--mono); font-size: .65rem; color: var(--dim); letter-spacing: .04em; text-align: right }
+  @media (max-width: 600px) { .header-ts { display: none } }
+  .header-ts .val { color: var(--silver) }
+  .wcc-badge    { font-family: var(--mono); font-size: .52rem; color: #2a2a2a; letter-spacing: .08em; margin-top: 2px; user-select: none; transition: color .3s; text-align: right }
+  .wcc-badge:hover { color: var(--dim) }
+
+  /* ── Main grid ───────────────────────────────────────────────────────── */
+  .main {
+    flex: 1; padding: 1.25rem 1.5rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+    gap: 1rem; align-content: start;
+    transition: margin-right .35s cubic-bezier(.4,0,.2,1);
+  }
+  body.panel-open .main { margin-right: var(--panel-w) }
+
+  /* ── Card ────────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: .5rem;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity .4s ease, transform .4s ease, border-color .2s, box-shadow .2s, background .2s;
+    cursor: pointer;
+  }
+  .card.visible { opacity: 1; transform: translateY(0) }
+  .card:hover   { border-color: #2e2e2e; box-shadow: 0 0 0 1px #00D2BE18, 0 4px 24px #00000060 }
+  .card.active  { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 4px 32px #00D2BE18; background: #1c1f1f }
+
+  /* click ripple */
+  .card { position: relative; overflow: hidden }
+  .ripple {
+    position: absolute; border-radius: 50%; background: #00D2BE22;
+    transform: scale(0); animation: ripple-anim .55s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes ripple-anim { to { transform: scale(4); opacity: 0 } }
+
+  .card-header  { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem }
+  .card-label   { font-family: var(--mono); font-size: .62rem; color: var(--dim); letter-spacing: .13em; text-transform: uppercase }
+  .card-chevron { font-size: .6rem; color: var(--dim); transition: color .2s, transform .2s }
+  .card.active .card-chevron { color: var(--teal); transform: rotate(90deg) }
+  .sector-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0 }
+  .sector-dot.amber { background: var(--amber) }
+  .sector-dot.red   { background: var(--red); animation: dot-pulse 1.4s ease-in-out infinite }
+  @keyframes dot-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .stat-big  { font-family: var(--mono); font-size: 2.6rem; font-weight: 700; color: var(--teal); line-height: 1; letter-spacing: -.02em }
+  .stat-unit { font-family: var(--mono); font-size: .65rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; margin-top: .2rem }
+  .gauge-card { align-items: center; text-align: center }
+  .reversal-frac { font-family: var(--mono); font-size: 1.7rem; font-weight: 700 }
+  .reversal-pct  { font-family: var(--mono); font-size: .85rem; margin-top: .15rem }
+  .reversal-diag { font-family: var(--mono); font-size: .62rem; color: var(--dim); margin-top: .4rem; letter-spacing: .06em }
+  .wide { grid-column: span 2 }
+  @media (max-width: 700px) { .wide { grid-column: span 1 } }
+  .chart-title { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; margin-bottom: .6rem }
+  .blocked-empty { font-family: var(--mono); font-size: .7rem; color: var(--teal); letter-spacing: .08em; padding: .4rem 0 }
+  .blocked-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--border) }
+  .blocked-row:last-child { border-bottom: none }
+  .blocked-date   { font-family: var(--mono); font-size: .68rem; color: var(--dim) }
+  .blocked-excerpt { color: var(--silver); font-size: .8rem }
+  .decision-row { display: grid; grid-template-columns: 4.5rem 6rem 1fr; align-items: baseline; gap: .5rem; padding: .35rem 0; border-bottom: 1px solid var(--border) }
+  .decision-row:last-child { border-bottom: none }
+  .decision-pill { font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 2px 5px; border-radius: 2px; letter-spacing: .06em; text-align: center }
+  .decision-date { font-family: var(--mono); font-size: .68rem; color: var(--dim) }
+  .decision-excerpt { color: var(--silver); font-size: .78rem }
+  .sep { border: none; border-top: 1px solid var(--border); margin: .2rem 0 }
+
+  /* ── Detail panel ────────────────────────────────────────────────────── */
+  .panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel-w);
+    background: var(--surf); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .35s cubic-bezier(.4,0,.2,1);
+    z-index: 30; overflow: hidden;
+  }
+  .panel.open { transform: translateX(0) }
+
+  /* thin teal top edge on panel */
+  .panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--teal) }
+
+  .panel-header {
+    padding: 1rem 1.25rem .75rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem;
+    flex-shrink: 0;
+  }
+  .panel-title { font-family: var(--mono); font-size: .75rem; color: var(--teal); letter-spacing: .12em; text-transform: uppercase; font-weight: 700 }
+  .panel-sub   { font-family: var(--mono); font-size: .6rem; color: var(--dim); margin-top: 3px; letter-spacing: .06em }
+  .panel-close {
+    background: none; border: 1px solid var(--border); color: var(--dim);
+    font-family: var(--mono); font-size: .65rem; padding: 0 10px; border-radius: 2px;
+    cursor: pointer; flex-shrink: 0; transition: border-color .15s, color .15s;
+    letter-spacing: .08em; min-height: 44px; display: flex; align-items: center;
+  }
+  .panel-close:hover { border-color: var(--teal); color: var(--teal) }
+  .panel-close:focus { outline: 2px solid var(--teal); outline-offset: 2px }
+
+  .panel-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; scrollbar-width: thin; scrollbar-color: #333 transparent }
+  .panel-body::-webkit-scrollbar { width: 4px }
+  .panel-body::-webkit-scrollbar-thumb { background: #333 }
+
+  /* panel sections */
+  .psec { margin-bottom: 1.25rem }
+  .psec-label { font-family: var(--mono); font-size: .58rem; color: var(--dim); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .5rem; padding-bottom: .3rem; border-bottom: 1px solid var(--border) }
+
+  /* stat row inside panel */
+  .pstat { display: flex; justify-content: space-between; align-items: baseline; padding: .3rem 0; border-bottom: 1px solid #1c1c1c }
+  .pstat:last-child { border-bottom: none }
+  .pstat-k { font-family: var(--mono); font-size: .68rem; color: var(--dim) }
+  .pstat-v { font-family: var(--mono); font-size: .78rem; color: var(--text); font-weight: 700 }
+
+  /* record rows inside panel */
+  .prec {
+    padding: .5rem 0; border-bottom: 1px solid #1c1c1c;
+    opacity: 0; transform: translateX(12px);
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .prec.in { opacity: 1; transform: translateX(0) }
+  .prec:last-child { border-bottom: none }
+  .prec-meta { display: flex; align-items: center; gap: .4rem; margin-bottom: .25rem }
+  .prec-date { font-family: var(--mono); font-size: .65rem; color: var(--dim) }
+  .prec-text { font-size: .8rem; color: var(--silver); line-height: 1.4 }
+  .prec-pill { font-family: var(--mono); font-size: .58rem; font-weight: 700; padding: 1px 5px; border-radius: 2px; letter-spacing: .06em }
+
+  /* panel empty */
+  .panel-empty { font-family: var(--mono); font-size: .7rem; color: var(--dim); padding: 1rem 0 }
+
+  /* ── Footer ──────────────────────────────────────────────────────────── */
+  .footer { background: var(--surf); border-top: 1px solid var(--border); padding: .5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; transition: margin-right .35s cubic-bezier(.4,0,.2,1) }
+  body.panel-open .footer { margin-right: var(--panel-w) }
+  .footer-label { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .08em }
+  .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-right: .4rem; animation: pulse 2s ease-in-out infinite }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  /* ── Empty state ─────────────────────────────────────────────────────── */
+  .empty-state { grid-column: 1/-1; text-align: center; padding: 4rem 1rem }
+  .empty-heading { font-family: var(--mono); font-size: .9rem; color: var(--teal); letter-spacing: .14em; margin-bottom: .6rem }
+  .empty-sub     { font-family: var(--mono); font-size: .7rem; color: var(--dim); letter-spacing: .06em }
+
+  /* ── SSE connection status ───────────────────────────────────────────── */
+  #connection-status { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .06em; margin-left: .75rem }
+  #connection-status.live { color: var(--teal) }
+  #connection-status.error { color: var(--red) }
+
+  /* ── Panel spinner ───────────────────────────────────────────────────── */
+  #panel-spinner { display: none; padding: 1rem; text-align: center }
+  #panel-spinner.visible { display: block }
+
+  /* ── Mobile overlay — 768–1024px ─────────────────────────────────────── */
+  @media (min-width: 768px) and (max-width: 1024px) {
+    #panel { position: fixed; right: 0; top: 0; width: 40vw; height: 100vh; z-index: 100; overflow-y: auto; backdrop-filter: blur(4px); background: rgba(13,13,13,.92) }
+  }
+  /* ── Mobile overlay — <768px ─────────────────────────────────────────── */
+  @media (max-width: 767px) {
+    #panel { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100; overflow-y: auto; background: rgba(13,13,13,.97) }
+  }
+</style>
+</head>
+`;
+}
+
+/**
+ * Computes the derived stats (reversal/compliance percentages, colors, empty
+ * flag) shared by the header, cards, and client-side panel. Pure — no HTML.
+ */
+function computeDashboardMetrics(data: DashboardResult): {
+  empty: boolean;
+  reversalPct: number;
+  reversalLabel: string;
+  reversalColor: string;
+  approved: number;
+  compliancePct: number;
+  gaugeColor: string;
+} {
+  const empty = data.councilSessions.count === 0 && data.p10Plans.count === 0;
+  const revisions = data.councilSessions.recent.filter((i) => i.status === 'revision-required').length;
+  const reversalPct = data.councilSessions.count === 0 ? 0 : Math.round((revisions / data.councilSessions.count) * 100);
+  const reversalLabel = data.councilSessions.count === 0 ? 'N/A' : `${revisions} / ${data.councilSessions.count}`;
+  const approved = data.p10Plans.recent.filter((i) => i.status === 'approved').length;
+  const compliancePct = data.p10Plans.recent.length === 0 ? 0 : Math.round((approved / data.p10Plans.recent.length) * 100);
+  const reversalColor = reversalPct > 30 ? '#e03030' : reversalPct > 15 ? '#e09020' : '#00D2BE';
+  const gaugeColor = compliancePct < 60 ? '#e03030' : compliancePct < 80 ? '#e09020' : '#00D2BE';
+  assert(reversalPct >= 0 && reversalPct <= 100, 'computeDashboardMetrics: reversalPct out of range');
+  assert(compliancePct >= 0 && compliancePct <= 100, 'computeDashboardMetrics: compliancePct out of range');
+  return { empty, reversalPct, reversalLabel, reversalColor, approved, compliancePct, gaugeColor };
+}
+
+/** Renders the sticky top header: logo, connection status, generated-at timestamp. */
+function buildDashboardHeader(data: DashboardResult): string {
+  const wcc = 8;
+  return `<header class="header">
+  <div class="header-left">
+    <div>
+      <div class="header-logo">TOTO WOLFF</div>
+      <div class="header-sub">PADDOCK INTERFACE &nbsp;·&nbsp; BRACKLEY HQ</div>
+    </div>
+    <span class="header-badge">LIVE</span>
+    <span id="connection-status" aria-live="polite"></span>
+  </div>
+  <div>
+    <div class="header-ts">GENERATED &nbsp;<span class="val">${esc(data.generatedAt)}</span></div>
+    <div class="wcc-badge" title="Mercedes-AMG F1 Constructor Championships 2014–2021">W${wcc} · ${wcc}×WCC</div>
+  </div>
+</header>`;
+}
+
+/** Renders the blocked-items list, or the ALL CLEAR empty state. */
+function buildBlockedSection(blockedItems: DashboardResult['blockedItems']): string {
+  return blockedItems.length === 0
+    ? `<div class="blocked-empty">ALL CLEAR — no blocked items</div>`
+    : blockedItems.map((b) => `<div class="blocked-row" tabindex="0">${sectorBadge(b.type)} <span class="blocked-date">${esc(b.date)}</span> <span class="blocked-excerpt">${esc(b.excerpt)}</span></div>`).join('');
+}
+
+/** Renders the 5 most recent council decisions as pill rows. */
+function buildRecentDecisionsSection(recent: DashboardItem[]): string {
+  return recent.slice(-5).reverse().map((item) => {
+    const sc = item.status === 'revision-required' ? '#e03030' : item.status === 'approved' ? '#00D2BE' : '#888';
+    const sl = item.status === 'revision-required' ? 'REVISE' : item.status === 'approved' ? 'CLEAN' : 'PENDING';
+    return `<div class="decision-row" tabindex="0"><span class="decision-pill" style="background:${sc}20;color:${sc};border:1px solid ${sc}40">${sl}</span><span class="decision-date">${esc(item.date.slice(0, 10))}</span><span class="decision-excerpt">${esc(item.excerpt.slice(0, 72))}${item.excerpt.length > 72 ? '…' : ''}</span></div>`;
+  }).join('');
+}
+
+/** Renders the `<main>` grid: empty state, or all 7 dashboard cards. */
+function buildMainSection(data: DashboardResult, m: ReturnType<typeof computeDashboardMetrics>): string {
+  if (m.empty) {
+    return `<main class="main" id="main">
+  <div class="empty-state">
+    <div class="empty-heading">PIT LANE CLEAR</div>
+    <div class="empty-sub">No sessions recorded — run /council to start</div>
+  </div>
+</main>`;
+  }
+  const blockedRows = buildBlockedSection(data.blockedItems);
+  const recentDecisions = buildRecentDecisionsSection(data.councilSessions.recent);
+  return `<main class="main" id="main">
+  <div class="card" id="card-velocity" data-panel="velocity" style="--delay:.05s">
+    <div class="card-header">
+      <span class="card-label">Decision Velocity</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    ${buildVelocityCard(data.councilSessions.count, data.councilSessions.recent)}
+  </div>
+
+  <div class="card" id="card-p10" data-panel="p10" style="--delay:.1s">
+    <div class="card-header">
+      <span class="card-label">P10 Plans Filed</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    ${buildP10Card(data.p10Plans.count, data.p10Plans.recent)}
+  </div>
+
+  <div class="card gauge-card" id="card-compliance" data-panel="compliance" style="--delay:.15s">
+    <div class="card-header">
+      <span class="card-label">P10 Compliance</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${m.compliancePct < 60 ? 'red' : m.compliancePct < 80 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
+    </div>
+    ${buildComplianceCard(data.p10Plans.recent.length, m.approved, m.compliancePct, m.gaugeColor)}
+  </div>
+
+  <div class="card" id="card-reversal" data-panel="reversal" style="--delay:.2s">
+    <div class="card-header">
+      <span class="card-label">Reversal Rate</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${m.reversalPct > 30 ? 'red' : m.reversalPct > 15 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
+    </div>
+    ${buildReversalCard(data.councilSessions.count, m.reversalPct, m.reversalColor, m.reversalLabel)}
+  </div>
+
+  ${buildRoleAdoptionCard()}
+
+  ${buildWideCardsSection(data, blockedRows, recentDecisions)}
+</main>`;
+}
+
+/** Renders the 3 full-width cards: session history, blocked items, recent rulings. */
+function buildWideCardsSection(data: DashboardResult, blockedRows: string, recentDecisions: string): string {
+  return `<div class="card wide" id="card-history" data-panel="history" style="--delay:.25s">
+    <div class="card-header">
+      <span class="card-label">Session History</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="chart-title">Council sessions by month</div>
+    ${sessionBarChart(data.councilSessions.recent)}
+  </div>
+
+  <div class="card wide" id="card-blocked" data-panel="blocked" style="--delay:.3s">
+    <div class="card-header">
+      <span class="card-label">Blocked Items &nbsp;<span id="blocked-count" aria-live="polite" style="font-family:var(--mono);font-size:.6rem;color:${data.blockedItems.length > 0 ? 'var(--red)' : 'var(--dim)'}">${data.blockedItems.length > 0 ? data.blockedItems.length + ' FLAG' + (data.blockedItems.length > 1 ? 'S' : '') : 'CLEAR'}</span></span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${data.blockedItems.length > 0 ? 'red' : ''}"></span><span class="card-chevron">▶</span></span>
+    </div>
+    ${blockedRows}
+  </div>
+
+  ${data.councilSessions.recent.length > 0 ? `
+  <div class="card wide" id="card-rulings" data-panel="rulings" style="--delay:.35s">
+    <div class="card-header">
+      <span class="card-label">Recent Rulings</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    ${recentDecisions}
+  </div>` : ''}`;
+}
+
+/** Renders the static slide-in detail panel shell. Takes no dashboard data — content is filled client-side. */
+function buildDetailPanelAside(): string {
+  return `<!-- ── Detail panel ─────────────────────────────────────────────────────── -->
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-label="Detail view">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title" id="panel-title">—</div>
+      <div class="panel-sub" id="panel-sub"></div>
+    </div>
+    <button class="panel-close" id="panel-close" aria-label="Close panel">ESC</button>
+  </div>
+  <div id="panel-spinner"><span class="live-dot"></span></div>
+  <div class="panel-body" id="panel-body"></div>
+</aside>`;
+}
+
+/** Renders the sticky bottom footer. */
+function buildDashboardFooter(data: DashboardResult): string {
+  return `<footer class="footer" id="footer">
+  <div class="footer-label"><span class="live-dot"></span>TOTO-WOLFF GOVERNANCE STACK</div>
+  <div class="footer-label">BRACKLEY · ${esc(data.generatedAt)}</div>
+</footer>`;
+}
+
+export function renderDashboardHtml(data: DashboardResult): string {
+  assert(typeof data.generatedAt === 'string', 'renderDashboardHtml: generatedAt must be a string');
+  const metrics = computeDashboardMetrics(data);
+  // Serialise data for client-side panel rendering (XSS-safe via JSON.stringify)
+  const jsonData = JSON.stringify(data);
+  assert(jsonData.length > 0, 'renderDashboardHtml: jsonData must not be empty');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+${buildDashboardHead()}
+
+<body>
+
+${buildDashboardHeader(data)}
+
+${buildMainSection(data, metrics)}
+
+${buildDetailPanelAside()}
+
+${buildDashboardFooter(data)}
+
+${buildDashboardClientScript(jsonData)}
 ${injectSseScript('/dashboard/events')}
 ${injectPanelScript()}
 </body>

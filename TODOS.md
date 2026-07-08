@@ -4,6 +4,20 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+## P2 — Pre-v1.4 (added 2026-07-08, /investigate preemptive pass)
+
+### T-DASHBOARD-LINT: Split `renderDashboardHtml` before v1.4 UI/UX work
+
+**What:** `packages/mcp-server/src/handlers/dashboard_html.ts:260` — `renderDashboardHtml` is 653 lines, 10.9x the 60-line `max-lines-per-function` lint cap. `pnpm lint` currently fails with 63 errors across the repo; this function is the single largest offender. Extract per-card render functions (`renderVelocityCard`, `renderP10Card`, `renderReversalCard`, `renderRoleAdoptionCard`, etc.) out of the monolith.
+
+**Why:** T7/T9 both added UI to this function without hitting a lint failure — lint isn't wired into CI as a gate, so the debt compounded silently. v1.4's UI/UX work will touch this exact file; every new card or empty-state addition on top of a 653-line function makes diffs unreviewable and locks in the debt further. Found during a preemptive `/investigate` pass across build/typecheck/lint/test before starting v1.4.
+
+**Depends on:** Nothing structural — mechanical extraction, no behavior change. Also worth checking whether `.github/workflows/ci.yml` has a lint gate; its absence is the actual root cause of the drift, not the file itself.
+
+**Next:** `/p10` scoping in progress (parallel to filing this).
+
+---
+
 ## P3 — Deferred (added 2026-07-06, post-testing feedback)
 
 ### T-LINEAR-CACHE: Session-scoped team/project resolution cache for `linear-sync`

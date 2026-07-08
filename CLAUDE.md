@@ -380,8 +380,6 @@ authenticate\(
 service\.boundar
 data\.migrat
 permission
-[a-zA-Z_](role|Role)
-(role|Role)[A-Z_]
 has_role
 hasRole
 checkRole

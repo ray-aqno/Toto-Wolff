@@ -398,6 +398,13 @@ storeCredential
 credential_file
 credential_store
 X-Credential
-api\.key
-token
+apiKey
+api_key
+API_KEY
+tokenStore
+storeToken
+token_store
+process\.env\.\w*TOKEN
+Bearer\s+[A-Za-z0-9._-]+
+\btoken\s*[:=]
 ```

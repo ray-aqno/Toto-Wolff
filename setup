@@ -29,8 +29,34 @@ require it.
 EOF
       exit 0
       ;;
+    --print-install-prompt)
+      cat <<'EOF'
+Paste the block below into a fresh Claude Code session, opened at this
+repo's root, to have Claude run the full toto-wolff install for you:
+
+---
+Set up toto-wolff in this repo. Do the following, in order, and report the
+result of each step:
+1. Confirm prerequisites: bash >= 3.2, git, Node.js 24.x, pnpm 11.5.1 (see
+   runbook.md's Prerequisites table for install commands if any are missing).
+2. Run `pnpm install` then `pnpm -r build`.
+3. Wire the toto CLI onto PATH for this shell session:
+   export PATH="$(pwd)/packages/cli/dist:$PATH"
+   (add this line to ~/.zshrc or ~/.bashrc to persist it across sessions).
+4. Run `./setup` (or `TOTO_VAULT_PATH=/custom/path ./setup` for a non-default
+   vault location). Confirm it prints "Toto ready." — if it exits non-zero,
+   the message names the failing line; check runbook.md's Troubleshooting
+   table.
+5. Verify the install using runbook.md's First-Run Verification section:
+   run a /council session, run a /p10 plan, and (optionally) start the MCP
+   server + ./scripts/demo.sh. Report which of these you ran and what each
+   produced.
+---
+EOF
+      exit 0
+      ;;
     --help|-h)
-      echo "Usage: ./setup [--force] [--role <name>] [--print-gstack-install-prompt]"
+      echo "Usage: ./setup [--force] [--role <name>] [--print-gstack-install-prompt] [--print-install-prompt]"
       echo ""
       echo "Without flags: wires ~/.claude/CLAUDE.md -> this repo's CLAUDE.md and creates vault dirs."
       echo ""
@@ -38,10 +64,12 @@ EOF
       echo "  --force                         Override an existing ~/.claude/CLAUDE.md symlink pointing elsewhere"
       echo "  --role <name>                   Swap the # ROLE section to a named persona (requires .toto/config.yml)"
       echo "  --print-gstack-install-prompt    Print a ready-to-paste Claude Code prompt for installing gstack"
+      echo "  --print-install-prompt          Print a ready-to-paste Claude Code prompt for the full toto-wolff install"
       echo ""
       echo "Available personas: engineering (additional roles ship in v1.1.0)"
       echo ""
       echo "Prerequisites: bash >= 3.2, git, python3. Optional: gstack (commodity skills /ship /review /browse) — run ./setup --print-gstack-install-prompt for the install prompt."
+      echo "New to this repo? Run ./setup --print-install-prompt for a prompt you can hand to Claude Code to do the whole install."
       echo "Docs: runbook.md"
       exit 0
       ;;
@@ -135,11 +163,17 @@ seed_signals() {
     echo "  signals: no vault records yet — run 'toto backfill' after your first /council session"
     return 0
   fi
-  # Run backfill; check exit code explicitly
-  toto backfill --quiet
-  local exit_code=$?
-  if [ "${exit_code}" -ne 0 ]; then
-    echo "  WARNING: toto backfill exited ${exit_code} — signals not seeded. Run manually: toto backfill"
+  # toto CLI may not be built/on PATH yet (runbook's "wire the toto CLI" step
+  # runs after ./setup) — guard before attempting the call at all.
+  if ! command -v toto >/dev/null 2>&1; then
+    echo "  signals: toto CLI not built/on PATH yet — run 'pnpm install && pnpm -r build' (see runbook.md), then 'toto backfill'"
+    return 0
+  fi
+  # `if ! cmd; then` (not `cmd; local x=$?`) is the set -e-safe form — a bare
+  # command's non-zero exit under `set -e` aborts before a following `$?` line
+  # is ever reached.
+  if ! toto backfill --quiet; then
+    echo "  WARNING: toto backfill failed — signals not seeded. Run manually: toto backfill"
   else
     local count
     count=$(ls "${signals_dir}"/*.md 2>/dev/null | wc -l | tr -d ' ')

@@ -34,6 +34,10 @@ Do not set both. When both are present, the MCP server and CLI both prefer `ANTH
 
 ## Install
 
+**Prefer Claude Code to do this for you?** After cloning, run `./setup --print-install-prompt` and paste its output into a fresh Claude Code session opened at the repo root — it walks Claude through prerequisites, build, CLI wiring, `./setup`, and verification, in order.
+
+Manual steps:
+
     git clone <repo-url> ~/toto-wolff
     cd ~/toto-wolff
     chmod +x setup

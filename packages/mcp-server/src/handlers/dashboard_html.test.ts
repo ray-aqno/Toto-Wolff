@@ -49,16 +49,30 @@ describe('renderDashboardHtml', () => {
   });
 
   it('renders populated cards and escapes vault-sourced strings in the decision list (XSS guard)', () => {
-    // NOTE: the recentDecisions row goes through esc() and is properly escaped.
-    // The raw jsonData dump embedded in the client <script> block (line 579,
-    // `const D = ${jsonData}`) is a SEPARATE, pre-existing code path that does
-    // NOT escape `<`/`>` — flagged out-of-scope for this refactor (T-DASHBOARD-LINT
-    // is a mechanical lint-debt split, not a security fix). See spawned follow-up task.
+    // The recentDecisions row goes through esc() and is properly escaped. The raw
+    // jsonData dump embedded in the client <script> block is now also safe — see
+    // the dedicated script-injection test below (fix/dashboard-json-script-escape).
     const html = renderDashboardHtml(populatedResult);
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('&quot;quote&quot;');
     expect(html).toContain('id="card-velocity"');
     expect(html).toContain('id="card-p10"');
+  });
+
+  it('does not let a </script> substring in a vault excerpt close the inline script early', () => {
+    const withInjection: DashboardResult = {
+      ...emptyResult,
+      councilSessions: {
+        count: 1,
+        recent: [{ date: '2026-07-08', excerpt: 'malicious excerpt </script><script>alert(1)</script>', status: 'approved' }],
+      },
+    };
+    const html = renderDashboardHtml(withInjection);
+    const scriptStart = html.indexOf('const D = ');
+    const scriptBodyEnd = html.indexOf('</script>', scriptStart);
+    const dataLine = html.slice(scriptStart, scriptBodyEnd);
+    expect(dataLine).not.toContain('</script>');
+    expect(html).not.toContain('<script>alert(1)</script>');
   });
 
   it('renders the mixed-empty-state per-card copy (T9 remainder)', () => {

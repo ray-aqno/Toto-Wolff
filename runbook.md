@@ -13,7 +13,7 @@ A new team member can complete this solo in under 30 minutes.
 | Node.js | 24.x | `nvm install 24 && nvm use 24` |
 | pnpm | 11.5.1 | `npm i -g pnpm@11.5.1` |
 | Claude Code CLI | latest | `npm i -g @anthropic-ai/claude-code` |
-| gstack | latest | `/gstack-upgrade` inside Claude Code (optional — provides `/ship`, `/review`, `/browse`; does not gate this install) |
+| gstack | latest | Optional Claude Code skill (not a CLI binary — nothing to add to PATH). Run `./setup --print-gstack-install-prompt` for a ready-to-paste Claude Code prompt; provides `/ship`, `/review`, `/browse`, does not gate this install |
 
 Verify before continuing:
 

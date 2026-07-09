@@ -952,8 +952,10 @@ function buildDashboardFooter(data: DashboardResult): string {
 export function renderDashboardHtml(data: DashboardResult): string {
   assert(typeof data.generatedAt === 'string', 'renderDashboardHtml: generatedAt must be a string');
   const metrics = computeDashboardMetrics(data);
-  // Serialise data for client-side panel rendering (XSS-safe via JSON.stringify)
-  const jsonData = JSON.stringify(data);
+  // Serialise data for client-side panel rendering. JSON.stringify does not escape
+  // '<', so a vault excerpt containing "</script>" would otherwise break out of the
+  // inline <script> block when the browser's HTML parser scans for the closing tag.
+  const jsonData = JSON.stringify(data).replace(/</g, '\\u003c');
   assert(jsonData.length > 0, 'renderDashboardHtml: jsonData must not be empty');
 
   return `<!DOCTYPE html>

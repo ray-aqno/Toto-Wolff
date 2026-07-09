@@ -81,6 +81,27 @@ check_prereqs() {
   echo "  Install: run ./setup --print-gstack-install-prompt for a ready-to-paste Claude Code prompt, or see https://garryslist.org"
 }
 
+# ── 1b. check_skill_drift ───────────────────────────────────── ≤20 lines ────
+# LOOP BOUND: find is repo-root-bounded, maxdepth 4 (every real SKILL.md in this
+# repo sits at exactly depth 4: <root>/.claude/skills/<name>/SKILL.md). Claude
+# Code only auto-discovers .claude/skills/*/SKILL.md — a SKILL.md anywhere else
+# is invisible to it, silently. -prune (not -not -path) stops the walk at
+# node_modules/.git rather than merely filtering after descending into them.
+check_skill_drift() {
+  local strays
+  # `if strays=$(...); then` (not a bare assignment) is the set -e-safe form —
+  # a bare `strays=$(find ...)` would abort the whole script on find's failure
+  # before its exit code could ever be inspected.
+  if ! strays=$(find "${REPO_DIR}" -maxdepth 4 \( -path '*/node_modules/*' -o -path '*/.git/*' -o -path '*/.claude/worktrees/*' \) -prune -o -iname "SKILL.md" -print 2>/dev/null); then
+    echo "NOTE: skill-drift scan did not complete cleanly — result may be incomplete, not a clean pass."
+    return 0
+  fi
+  strays=$(echo "$strays" | grep -v "/\.claude/skills/" || true)
+  [ -z "$strays" ] && return 0
+  echo "WARNING: SKILL.md found outside .claude/skills/ — Claude Code will not discover it there:"
+  echo "$strays" | sed 's/^/  /'
+}
+
 # ── 2. create_vault_dirs ──────────────────────────────────── ≤15 lines ──────
 create_vault_dirs() {
   # LOOP BOUND: max 4 iterations, array is static
@@ -273,6 +294,7 @@ print_summary() {
 # ── main ──────────────────────────────────────────────────────────────────────
 read_config
 check_prereqs
+check_skill_drift
 
 if [ -n "$ROLE" ]; then
   swap_role "$ROLE"

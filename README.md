@@ -18,6 +18,8 @@ pnpm install && pnpm -r build
 ./setup
 ```
 
+Prefer to hand this to Claude Code instead of running it by hand? Clone the repo, then run `./setup --print-install-prompt` and paste its output into a fresh Claude Code session — it drives the whole install (build, CLI wiring, `./setup`, verification) and reports back at each step.
+
 Open any Claude Code session and run your first deliberation:
 
 ```

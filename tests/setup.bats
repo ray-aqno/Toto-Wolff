@@ -478,6 +478,31 @@ PYEOF
   [[ "$output" != *"real-skill"* ]]
 }
 
+@test "seed_signals: toto absent from PATH with existing vault records does not crash" {
+  TMP_BIN=$(mktemp -d)
+  TMP_VAULT=$(mktemp -d)
+  mkdir -p "${TMP_VAULT}/Council/Congressional-Records" "${TMP_VAULT}/P10-Plans"
+  echo "record" > "${TMP_VAULT}/Council/Congressional-Records/2026-01-01-test.md"
+  run env PATH="${TMP_BIN}:/bin" bash -c "
+    set -euo pipefail
+    VAULT_PATH='${TMP_VAULT}'
+    $(awk '/^seed_signals\(\)/,/^\}$/{print}' "${SETUP}")
+    seed_signals
+  " 2>&1
+  rm -rf "$TMP_BIN" "$TMP_VAULT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"toto CLI not built/on PATH yet"* ]]
+  [[ "$output" != *"command not found"* ]]
+}
+
+@test "arg parsing: --print-install-prompt exits 0 with non-empty output" {
+  run "${SETUP}" --print-install-prompt 2>&1
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  [[ "$output" == *"pnpm install"* ]]
+  [[ "$output" == *"./setup"* ]]
+}
+
 @test "check_skill_drift: all skills under .claude/skills/ stays silent" {
   TMP_REPO=$(mktemp -d)
   mkdir -p "${TMP_REPO}/.claude/skills/real-skill"

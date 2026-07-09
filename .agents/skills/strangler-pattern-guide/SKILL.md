@@ -279,3 +279,52 @@ $response = Invoke-RestMethod -Uri "http://localhost:52928/Api/{controller}/{met
 
 **For Process:**
 - Follow [strangler-pattern-migration.yaml](./reference/strangler-pattern-migration.yaml) workflow orchestration
+
+---
+
+## Signal Loop Protocol
+
+Before generating a migration plan, query `/vault/signal` to load active governance verdicts.
+Three branches — handle all three before writing the plan:
+
+| Endpoint result | Meaning | Plan stamp |
+|---|---|---|
+| ECONNREFUSED (port closed) | Server not running — cold start | `cold-start` |
+| 200 + `[]` (empty array) | Server up, no active signals | `cold-start` |
+| 200 + non-empty array | Active signals loaded | `loop-informed` |
+
+**Cold-start** — proceed with plan generation. Do NOT claim loop influence. Stamp the plan header:
+```
+session_verdicts: []
+loop_informed: false
+```
+
+**Loop-informed** — the plan MUST cite every consumed verdict ID as structured output in the plan header:
+```
+session_verdicts: ["adr-0005-ordercontroller-auth-extraction"]
+loop_informed: true
+```
+
+After plan generation, run `checkProvenance(citedIds, sessionIds)`:
+- `ok: true` — provenance verified; continue to tiered veto
+- `ok: false` — cited IDs not in session response; plan is rejected (do not write to vault)
+
+**Tiered veto (active — runs after provenance passes):**
+
+Call the `score_confidence` MCP tool (POST to the MCP server) with `{ records, now }` where `records` is the full array returned by `/vault/signal` and `now` is today's date in `YYYY-MM-DD` format. This is a deterministic tool call — not prose reasoning.
+
+| Tier | Condition | Action |
+|------|-----------|--------|
+| `HIGH` | ≥2 distinct in-date records, all patterns known, Jaccard≥0.5 | Proceed — write plan to vault automatically |
+| `LOW` | Any clause fails (novel pattern, expired record, count < 2, Jaccard < 0.5) | **HALT** — do not write plan; surface disqualifiers to user and request a ruling via `/council` |
+
+When tier is LOW, output the disqualifiers verbatim:
+```
+TIERED VETO — LOW confidence. Plan write halted.
+Disqualifiers:
+  - <disqualifier 1>
+  - <disqualifier 2>
+Run /council to issue a fresh ruling before retrying.
+```
+
+When tier is HIGH, stamp the plan header with `confidence_tier: HIGH` before vault write.

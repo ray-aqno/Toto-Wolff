@@ -458,6 +458,40 @@ PYEOF
   [[ "$output" == *"--print-gstack-install-prompt"* ]]
 }
 
+# ── check_skill_drift ──────────────────────────────────────────────────────────
+
+@test "check_skill_drift: SKILL.md outside .claude/skills/ triggers WARNING" {
+  TMP_REPO=$(mktemp -d)
+  mkdir -p "${TMP_REPO}/.claude/skills/real-skill"
+  echo "content" > "${TMP_REPO}/.claude/skills/real-skill/SKILL.md"
+  mkdir -p "${TMP_REPO}/.agents/skills/stray-skill"
+  echo "stale content" > "${TMP_REPO}/.agents/skills/stray-skill/SKILL.md"
+  run env bash -c "
+    REPO_DIR='${TMP_REPO}'
+    $(awk '/^check_skill_drift\(\)/,/^\}$/{print}' "${SETUP}")
+    check_skill_drift
+  " 2>&1
+  rm -rf "$TMP_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"WARNING: SKILL.md found outside .claude/skills/"* ]]
+  [[ "$output" == *"stray-skill/SKILL.md"* ]]
+  [[ "$output" != *"real-skill"* ]]
+}
+
+@test "check_skill_drift: all skills under .claude/skills/ stays silent" {
+  TMP_REPO=$(mktemp -d)
+  mkdir -p "${TMP_REPO}/.claude/skills/real-skill"
+  echo "content" > "${TMP_REPO}/.claude/skills/real-skill/SKILL.md"
+  run env bash -c "
+    REPO_DIR='${TMP_REPO}'
+    $(awk '/^check_skill_drift\(\)/,/^\}$/{print}' "${SETUP}")
+    check_skill_drift
+  " 2>&1
+  rm -rf "$TMP_REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 # ── symlink_claude_md ─────────────────────────────────────────────────────────
 
 @test "symlink_claude_md: source CLAUDE.md missing exits 4" {

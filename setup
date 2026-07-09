@@ -14,18 +14,34 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --force)    FORCE="--force"; shift ;;
     --role)     [[ "${2:-}" != --* ]] || { echo "ERROR: --role requires a name, not a flag"; exit 2; }; ROLE="${2:-}"; [ -n "$ROLE" ] || { echo "ERROR: --role requires a name"; exit 2; }; shift 2 ;;
+    --print-gstack-install-prompt)
+      cat <<'EOF'
+Paste the block below into Claude Code to install or upgrade gstack — an
+optional Claude Code skill package (not a CLI tool, nothing to add to PATH):
+
+---
+Run /gstack-upgrade. If that command isn't recognized, install gstack first:
+see https://garryslist.org for the current install instructions, then run
+/gstack-upgrade again. gstack adds the /ship, /review, and /browse skills,
+plus an optional /freeze integration — /council and /p10 in this repo do not
+require it.
+---
+EOF
+      exit 0
+      ;;
     --help|-h)
-      echo "Usage: ./setup [--force] [--role <name>]"
+      echo "Usage: ./setup [--force] [--role <name>] [--print-gstack-install-prompt]"
       echo ""
       echo "Without flags: wires ~/.claude/CLAUDE.md -> this repo's CLAUDE.md and creates vault dirs."
       echo ""
       echo "Options:"
-      echo "  --force         Override an existing ~/.claude/CLAUDE.md symlink pointing elsewhere"
-      echo "  --role <name>   Swap the # ROLE section to a named persona (requires .toto/config.yml)"
+      echo "  --force                         Override an existing ~/.claude/CLAUDE.md symlink pointing elsewhere"
+      echo "  --role <name>                   Swap the # ROLE section to a named persona (requires .toto/config.yml)"
+      echo "  --print-gstack-install-prompt    Print a ready-to-paste Claude Code prompt for installing gstack"
       echo ""
       echo "Available personas: engineering (additional roles ship in v1.1.0)"
       echo ""
-      echo "Prerequisites: bash >= 3.2, git, python3. Optional: gstack (commodity skills /ship /review /browse) — run /gstack-upgrade in Claude Code."
+      echo "Prerequisites: bash >= 3.2, git, python3. Optional: gstack (commodity skills /ship /review /browse) — run ./setup --print-gstack-install-prompt for the install prompt."
       echo "Docs: runbook.md"
       exit 0
       ;;
@@ -60,11 +76,9 @@ check_prereqs() {
     [ -n "$ROLE" ] && { echo "ERROR: python3 not found on PATH — required for --role"; exit 2; }
     echo "WARNING: python3 not found on PATH — ./setup --role will not work until installed"
   fi
-  if ! command -v gstack >/dev/null 2>&1; then
-    echo "NOTE: gstack not found on PATH — /council and /p10 do not need it (they run on Claude Code + the vault)."
-    echo "  gstack adds commodity skills (/ship, /review, /browse) and an optional /freeze integration."
-    echo "  Install: open Claude Code and run /gstack-upgrade, or see https://garryslist.org"
-  fi
+  echo "NOTE: gstack is an optional Claude Code skill (not a PATH binary) — /council and /p10 do not need it (they run on Claude Code + the vault)."
+  echo "  gstack adds commodity skills (/ship, /review, /browse) and an optional /freeze integration."
+  echo "  Install: run ./setup --print-gstack-install-prompt for a ready-to-paste Claude Code prompt, or see https://garryslist.org"
 }
 
 # ── 2. create_vault_dirs ──────────────────────────────────── ≤15 lines ──────

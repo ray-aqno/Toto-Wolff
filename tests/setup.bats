@@ -112,7 +112,7 @@ EOF
 
 @test "check_prereqs: missing python3 without --role emits WARNING not exit" {
   TMP_BIN=$(mktemp -d)
-  # git present; python3 and gstack absent from TMP_BIN and /bin
+  # git present; python3 absent from TMP_BIN and /bin
   printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/git" && chmod +x "${TMP_BIN}/git"
   run env PATH="${TMP_BIN}:/bin" bash -c "
     $(awk '/^check_prereqs\(\)/,/^\}$/{print}' "${SETUP}")
@@ -440,9 +440,11 @@ PYEOF
 
 # ── check_prereqs: prereq guards ──────────────────────────────────────────────
 
-@test "check_prereqs: gstack missing emits WARNING (not exit)" {
+@test "check_prereqs: gstack note always prints (not exit, not PATH-conditional)" {
+  # gstack is a Claude Code skill, not a PATH binary — the note is unconditional,
+  # there is no absent/present branch to test (see setup:63, P10-Plans/2026-07-09-
+  # toto-wolff-gstack-setup-path-gate-fix.md).
   TMP_BIN=$(mktemp -d)
-  # git and python3 present; gstack absent from TMP_BIN and /bin
   printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/git" && chmod +x "${TMP_BIN}/git"
   printf '#!/bin/sh\nexit 0\n' > "${TMP_BIN}/python3" && chmod +x "${TMP_BIN}/python3"
   run env PATH="${TMP_BIN}:/bin" bash -c "
@@ -451,7 +453,9 @@ PYEOF
   " 2>&1
   rm -rf "$TMP_BIN"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"WARNING"* ]]
+  [[ "$output" == *"NOTE: gstack is an optional Claude Code skill"* ]]
+  [[ "$output" != *"not found on PATH"* ]]
+  [[ "$output" == *"--print-gstack-install-prompt"* ]]
 }
 
 # ── symlink_claude_md ─────────────────────────────────────────────────────────

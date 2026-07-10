@@ -189,7 +189,15 @@ jobs:
           # in this job) — the launch command's first run installs workspace deps
           # from a cold registry cache before starting the server, so give it real
           # room before checking whether it's alive.
-          TOTO_MCP_PORT=0 "$COMMAND" "${ARGS[@]}" &
+          #
+          # ANTHROPIC_API_KEY is a placeholder, never a real secret: CouncilService/
+          # P10Service construct eagerly at process startup (index.ts top level,
+          # not lazily on first tool call — this is documented, intended behavior,
+          # see CLAUDE.md's "MCP Server" section), so createAnthropicClient() throws
+          # immediately with no credential at all. This test proves the launch
+          # command resolves and the process runs — it never calls a tool, so no
+          # real credential or network access is needed, only a non-empty string.
+          ANTHROPIC_API_KEY=sk-ci-smoke-test-placeholder-not-real TOTO_MCP_PORT=0 "$COMMAND" "${ARGS[@]}" &
           SERVER_PID=$!
           sleep 60
           if ! kill -0 "$SERVER_PID" 2>/dev/null; then

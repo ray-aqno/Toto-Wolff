@@ -21,13 +21,9 @@
   ],
   "mcpServers": {
     "toto-wolff": {
-      "command": "npx",
+      "command": "sh",
       "args": [
-        "--yes",
-        "tsx@4.22.4",
-        "--tsconfig",
-        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/tsconfig.plugin.json",
-        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/src/index.ts"
+        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/plugin-launch.sh"
       ]
     }
   }

@@ -28,7 +28,13 @@ tags = ["key", "anthropic"]
 [[rules]]
 id = "generic-api-key"
 description = "Generic API Key assignment"
-regex = '''(?i)(api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['""]?[a-zA-Z0-9\-_]{20,}['""]?'''
+# The single capture group wraps the VALUE, not the key name — gitleaks reports
+# a rule's lone capture group as the finding's "Secret" and rule-scoped allowlist
+# regexes match against that field. A capture group around the key name instead
+# (e.g. `(api[_-]?key|...)`) makes every finding's "Secret" just the literal
+# string "API_KEY" regardless of the actual leaked value — useless for triage,
+# and it makes value-scoped allowlisting structurally impossible.
+regex = '''(?i)(?:api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['""]?([a-zA-Z0-9\-_]{20,})['""]?'''
 tags = ["key", "generic"]
 [rules.allowlist]
 regexes = [
@@ -36,4 +42,5 @@ regexes = [
   '''secrets\.''',
   '''\$\{\{''',
   '''YOUR_''',
+  '''sk-ci-smoke-test-placeholder-not-real''',
 ]

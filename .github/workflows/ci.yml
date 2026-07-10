@@ -185,15 +185,19 @@ jobs:
             '.mcpServers["toto-wolff"].args[] | gsub("\\$\\{CLAUDE_PLUGIN_ROOT\\}"; $root)' \
             "$CACHE_DIR/.claude-plugin/plugin.json")
 
+          # No node_modules exists yet either (fresh checkout, no pnpm install step
+          # in this job) — the launch command's first run installs workspace deps
+          # from a cold registry cache before starting the server, so give it real
+          # room before checking whether it's alive.
           TOTO_MCP_PORT=0 "$COMMAND" "${ARGS[@]}" &
           SERVER_PID=$!
-          sleep 5
+          sleep 60
           if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            echo "::error::MCP server exited within 5s of running the plugin's own declared launch command ($COMMAND ${ARGS[*]})"
+            echo "::error::MCP server exited within 60s of running the plugin's own declared launch command ($COMMAND ${ARGS[*]})"
             exit 1
           fi
           kill "$SERVER_PID"
-          echo "Plugin launch smoke test passed: server started and stayed alive from a build-free install."
+          echo "Plugin launch smoke test passed: server started and stayed alive from a build-free, dependency-free install."
 
   pre-commit-hook-test:
     runs-on: ubuntu-latest

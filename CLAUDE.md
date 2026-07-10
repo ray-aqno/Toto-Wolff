@@ -285,16 +285,29 @@ When writing or modifying code:
 
 # MCP Server
 
-The toto-wolff MCP server (packages/mcp-server) is registered in ~/.claude.json under mcpServers["toto-wolff"]. Run `pnpm -C packages/mcp-server build` before first use.
+**Primary install path (marketplace plugin):** the toto-wolff MCP server, skills, and vault tooling are packaged as a Claude Code plugin (`.claude-plugin/marketplace.json` + `plugin.json`). Install with:
 
-Start command: `node <repo>/packages/mcp-server/dist/index.js`
+```
+claude plugin marketplace add <owner>/Toto-Wolff
+claude plugin install toto-wolff@toto-wolff
+```
+
+The plugin launches the server directly from TypeScript source (`npx tsx --tsconfig packages/mcp-server/tsconfig.plugin.json packages/mcp-server/src/index.ts`) — no `pnpm install`/build step required before first use.
+
+**Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Run `pnpm -C packages/mcp-server build` before first use with this path.
+
+Start command (manual path): `node <repo>/packages/mcp-server/dist/index.js`
 
 ## Credentials (required)
 
-The server calls the Anthropic API and exits on startup if no credentials are present
-(`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty`).
-Supply them per-user via the `env` block of the `toto-wolff` entry in your own
-`~/.claude.json`. Never commit a real token to this repo:
+The server calls the Anthropic API and exits if no credentials are present
+(`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked shell environment and ~/.claude.json mcpServers.toto-wolff.env)`).
+
+Resolution order (see `packages/core/src/utils/anthropic.ts`):
+1. `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the shell environment Claude Code was launched from — this is the primary path for marketplace installs, since the plugin manifest never embeds a real token.
+2. Falls back to `~/.claude.json`'s `mcpServers.toto-wolff.env` — the manual-wiring path below still works even after a marketplace install, since this is a plain file read, independent of how the server was launched.
+
+Manual wiring (fallback path), never committing a real token to this repo:
 
 ```jsonc
 "toto-wolff": {

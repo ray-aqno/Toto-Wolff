@@ -1,0 +1,15 @@
+{
+  "name": "toto-wolff",
+  "owner": {
+    "name": "Rayyan Aquino"
+  },
+  "description": "Persistent AI governance for Claude Code — council deliberation, P10 pre-execution planning, and a local vault that survives session resets.",
+  "plugins": [
+    {
+      "name": "toto-wolff",
+      "source": "./",
+      "description": "MCP server, skills, and vault tooling for AI-governed engineering: /council deliberation, /p10 pre-execution plans, /cabinet release gates.",
+      "category": "productivity"
+    }
+  ]
+}

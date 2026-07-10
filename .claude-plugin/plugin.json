@@ -1,0 +1,34 @@
+{
+  "name": "toto-wolff",
+  "description": "Persistent AI governance for Claude Code — council deliberation, P10 pre-execution planning, and a local vault that survives session resets.",
+  "version": "1.4.0",
+  "author": {
+    "name": "Rayyan Aquino"
+  },
+  "homepage": "https://github.com/ray-aqno/Toto-Wolff",
+  "repository": "https://github.com/ray-aqno/Toto-Wolff",
+  "license": "MIT",
+  "keywords": ["governance", "p10", "council", "vault", "planning", "mcp"],
+  "skills": [
+    "./.claude/skills/drs",
+    "./.claude/skills/karpathy",
+    "./.claude/skills/linear-sync",
+    "./.claude/skills/safety-car",
+    "./.claude/skills/strangler-pattern-guide",
+    "./.claude/skills/p10",
+    "./.claude/skills/llm-council",
+    "./.claude/skills/the-cabinet"
+  ],
+  "mcpServers": {
+    "toto-wolff": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "tsx@4.22.4",
+        "--tsconfig",
+        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/tsconfig.plugin.json",
+        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/src/index.ts"
+      ]
+    }
+  }
+}

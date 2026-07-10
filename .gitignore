@@ -5,6 +5,10 @@
 .claude/settings.local.json
 .claude/launch.json
 
+# Plugin-scoped skill config (vaultPath overrides for p10/llm-council/the-cabinet) —
+# per-user, written by Step 0's first-run AskUserQuestion flow, never commit
+/settings.local.json
+
 # Local team config — contains machine-specific paths, never commit
 .toto/config.yml
 

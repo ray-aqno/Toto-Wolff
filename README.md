@@ -11,6 +11,17 @@ Claude Code sessions are stateless by default — decisions made in one session 
 
 ## Quickstart
 
+**Fastest path — install as a Claude Code plugin** (no build step, no manual `~/.claude.json` editing):
+
+```
+claude plugin marketplace add ray-aqno/Toto-Wolff
+claude plugin install toto-wolff@toto-wolff
+```
+
+Export `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) in your shell before launching Claude Code — the plugin has no mechanism to prompt for or store a credential itself, so this is the one manual step. See [Credentials](CLAUDE.md#credentials-required) for the fallback if you'd rather wire it into `~/.claude.json` instead.
+
+**Manual path (for contributing to this repo, or if your Claude Code host doesn't support plugin marketplaces yet):**
+
 ```bash
 git clone https://github.com/ray-aqno/Toto-Wolff ~/toto-wolff
 cd ~/toto-wolff

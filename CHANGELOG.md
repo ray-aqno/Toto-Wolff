@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] - 2026-07-10
+
+### Added
+- **Install toto-wolff as a Claude Code plugin** — `claude plugin marketplace add ray-aqno/Toto-Wolff` then `claude plugin install toto-wolff@toto-wolff` replaces manual `~/.claude.json` wiring as the primary install path. The plugin bundles the MCP server plus all 8 skills (`drs`, `karpathy`, `linear-sync`, `safety-car`, `strangler-pattern-guide`, `p10`, `llm-council`, `the-cabinet`) and launches with zero prebuild step (`.claude-plugin/marketplace.json`, `plugin.json`). Manual `~/.claude.json` wiring is kept as a documented fallback, not removed. Full plans: `P10-Plans/2026-07-09-toto-wolff-mcp-plugin-marketplace-registration.md`, `P10-Plans/2026-07-09-toto-wolff-skill-config-packaging.md` (both arbiter-approved, executed).
+- **`p10`, `llm-council`, and `the-cabinet` skills vendored into the repo** — previously only lived globally in `~/.claude/skills/`; now shipped as part of the plugin under `.claude/skills/`. Each gets a shared, byte-identical config-resolution scheme (`config.schema.json`): `TOTO_VAULT_PATH` env var → plugin-scoped `settings.local.json` → global `~/.claude/CLAUDE.md` prose (still honored) → hardcoded default, with a first-run interactive prompt and a fail-loud headless fallback — no dependency on an unconfirmed platform install-time-config feature (verified absent by testing 4 real plugin manifests before committing to this design).
+
+### Changed
+- **MCP server credentials no longer require a separate shell export** — `createAnthropicClient()` (`packages/core/src/utils/anthropic.ts`) now falls back to `~/.claude.json`'s `mcpServers.toto-wolff.env` when `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` aren't in shell env, promoting a pattern that previously only powered the `toto doctor` CLI check. Still throws the same clear assertion error if no credential is found anywhere.
+
+### Fixed
+- **Plugin launch works with no build step** — a fresh marketplace install has no `dist/` (gitignored, no `bin` field), so the MCP server launches from TypeScript source directly (`npx tsx@4.22.4`, pinned) with a scoped `tsconfig.plugin.json` path override for the `@toto-wolff/core` workspace dependency. Verified with a real `claude plugin install` against the copied plugin cache.
+
 ## [1.3.0] - 2026-07-06
 
 ### Added

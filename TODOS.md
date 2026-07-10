@@ -18,11 +18,13 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ### T-PLUGIN-NO-BUILD-GATE: No build/artifact gate between merge and plugin execution
 
-**What:** The plugin launches the MCP server directly from `packages/mcp-server/src/index.ts` / `packages/core/src/**` via `npx tsx` (chosen because `dist/` is gitignored and marketplace installs don't run `pnpm build` — see `T-PLUGIN-LAUNCH-REGRESSION` above). Unlike the manual-wiring fallback path (which still requires `pnpm build` first), there's no build/typecheck/CI gate between "merged to main" and "running with live credential access on every user's machine" for the plugin-install path specifically.
+**What:** The plugin launches the MCP server directly from `packages/mcp-server/src/index.ts` / `packages/core/src/**` via `npx tsx` (chosen because `dist/` is gitignored and marketplace installs don't run `pnpm build`). Unlike the manual-wiring fallback path (which still requires `pnpm build` first), there's no build/typecheck/CI gate between "merged to main" and "running with live credential access on every user's machine" for the plugin-install path specifically.
 
 **Why:** Flagged during `/ship` adversarial review (2026-07-10) as a real but bounded gap — CI already runs typecheck+tests+lint on every push to `main`, so broken/malicious code doesn't reach `main` uncaught; it just isn't a *distinct* build gate standing between merge and plugin execution. Accepted for now — a real fix (committing `dist/`, or a proper release/build pipeline for the plugin distribution path) is separate, larger scope than this PR.
 
-**Depends on:** Related to `T-PLUGIN-LAUNCH-REGRESSION` above; consider addressing both together.
+**Note:** The *specific* silent-regression risk this item originally bundled with (no CI proof the declared launch command actually boots) is now closed — see the `T-PLUGIN-LAUNCH-REGRESSION closed` entry in Completed (v1.4.0). What remains open here is the broader question: should there be a reviewed build artifact between merge and execution at all, not just a test that today's `src/` launches.
+
+**Depends on:** Nothing structural — this is a scope/architecture decision (build pipeline vs. live-source execution), not a bug.
 
 ---
 
@@ -70,18 +72,6 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ## P2 — Pre-v1.4 (added 2026-07-09, /investigate retrospective pass)
 
-### T-PLUGIN-LAUNCH-REGRESSION: No CI guard against the marketplace-install-has-no-dist/ bug class
-
-**What:** `.claude-plugin/plugin.json`'s `mcpServers.toto-wolff` launches the MCP server via `npx tsx --tsconfig packages/mcp-server/tsconfig.plugin.json packages/mcp-server/src/index.ts` instead of `node packages/mcp-server/dist/index.js`, specifically because `dist/` is gitignored ([.gitignore:13](.gitignore)) with no `bin` field, and `claude plugin install` only copies repo files — it never runs `pnpm -r build`. Add a CI job (or extend `validate-plugin-manifest` in `.github/workflows/ci.yml`) that actually installs the plugin into a scratch `$CLAUDE_CONFIG_DIR`/cache location from a clean git checkout (no `node_modules`, no `dist/`) and confirms the declared `mcpServers` command launches successfully — not just that the manifest JSON is well-formed.
-
-**Why:** Found and fixed live during F2 (marketplace registration) execution — reproduced with `dist/` removed, got `ERR_MODULE_NOT_FOUND`, fixed via the `tsx` + scoped `tsconfig.plugin.json` `paths` override, and verified once with a real local `claude plugin marketplace add` + `claude plugin install` + direct launch against the actual copied cache. That was a manual, one-time proof — the `validate-plugin-manifest` CI job added in the same PR only checks manifest *schema* (via `claude plugin validate .`), not that the launch command actually runs. If a future change reverts to `node dist/index.js` (e.g. someone "simplifying" the launch command without knowing why `tsx` was chosen), nothing in CI would catch it until an open-source user's fresh install fails.
-
-**Depends on:** Nothing structural — this is closing a verification gap, not a design change. The fix pattern (`tsx` + `tsconfig.plugin.json` paths override) is already correct and shipped; this item is purely "make the CI regression-proof."
-
-**Ref:** `P10-Plans/2026-07-09-toto-wolff-mcp-plugin-marketplace-registration.md` (F2, executed) — Execution Log section has the full repro/fix trace.
-
----
-
 ### T-DASHBOARD-LINT: Split `renderDashboardHtml` before v1.4 UI/UX work
 
 **What:** `packages/mcp-server/src/handlers/dashboard_html.ts:260` — `renderDashboardHtml` is 653 lines, 10.9x the 60-line `max-lines-per-function` lint cap. `pnpm lint` currently fails with 63 errors across the repo; this function is the single largest offender. Extract per-card render functions (`renderVelocityCard`, `renderP10Card`, `renderReversalCard`, `renderRoleAdoptionCard`, etc.) out of the monolith.
@@ -111,6 +101,7 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 ## Completed (v1.4.0, 2026-07-10)
 
 - **Fixed `pnpm typecheck` silently checking zero files** — root `typecheck` script was `tsc --noEmit` against a `tsconfig.json` with `"files": []`, which type-checks nothing and exits 0 without `-b` (build mode). Discovered live during `/ship`'s verification gate when `pnpm typecheck` passed on a real `exactOptionalPropertyTypes` violation that `pnpm build` caught immediately — meaning CI's `Typecheck` step had been a no-op the whole time, not just for this PR. Fixed to `tsc -b` — `--noEmit` is incompatible with build mode here since referenced `composite: true` projects must emit `.d.ts` for downstream consumers (CI caught this: `tsc -b --noEmit` failed with `TS6310: Referenced project may not disable emit`); build artifacts are gitignored so this is equivalent to what `pnpm build` already produces. Verified locally by reintroducing the same bug class and confirming it's caught.
+- **`T-PLUGIN-LAUNCH-REGRESSION` closed** — added a `plugin-launch-smoke-test` CI job (`.github/workflows/ci.yml`) that installs the plugin fresh via `claude plugin marketplace add`/`claude plugin install`, confirms no `dist/` exists (proving it's a build-free install), reads the launch `command`/`args` directly out of the *installed* `plugin.json` (not a hand-copied duplicate — fails the moment the manifest drifts from what actually works), and confirms the process stays alive for 5s. Closed per a Cabinet-conditioned follow-up on v1.4.0 (Feynman + Karpathy both flagged this gap; Cabinet record: `~/.toto/vault/Cabinet/2026-07-10-toto-wolff-v1.4.0-mcp-plugin-distribution.md`).
 
 ---
 

@@ -108,6 +108,12 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
+## Completed (v1.4.0, 2026-07-10)
+
+- **Fixed `pnpm typecheck` silently checking zero files** — root `typecheck` script was `tsc --noEmit` against a `tsconfig.json` with `"files": []`, which type-checks nothing and exits 0 without `-b` (build mode). Discovered live during `/ship`'s verification gate when `pnpm typecheck` passed on a real `exactOptionalPropertyTypes` violation that `pnpm build` caught immediately — meaning CI's `Typecheck` step had been a no-op the whole time, not just for this PR. Fixed to `tsc -b` — `--noEmit` is incompatible with build mode here since referenced `composite: true` projects must emit `.d.ts` for downstream consumers (CI caught this: `tsc -b --noEmit` failed with `TS6310: Referenced project may not disable emit`); build artifacts are gitignored so this is equivalent to what `pnpm build` already produces. Verified locally by reintroducing the same bug class and confirming it's caught.
+
+---
+
 ## Completed (v1.3.0, 2026-07-06)
 
 - **Runtime token-budget enforcement** — `packages/core/src/utils/TokenBudget.ts` tracks per-session token usage for Council and P10 dispatch. Merged via PR #23 (`feat/token-budget-enforcement`); this note closes the P2 item added 2026-07-02 that PR's merge left undocumented here. Full detail in CHANGELOG.md `[1.3.0]` and `P10-Plans/2026-07-02-toto-wolff-token-budget-enforcement.md`.

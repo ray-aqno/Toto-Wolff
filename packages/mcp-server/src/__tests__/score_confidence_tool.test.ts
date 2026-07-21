@@ -9,6 +9,7 @@ async function seedSignal(
   vaultDir: string,
   id: string,
   topicTags: string[],
+  validUntil = '2027-12-31',
 ): Promise<void> {
   const signalsDir = join(vaultDir, 'Signals');
   await mkdir(signalsDir, { recursive: true });
@@ -16,7 +17,7 @@ async function seedSignal(
     '---',
     `id: ${id}`,
     `content_hash: hash-${id}`,
-    'valid_until: 2027-12-31',
+    `valid_until: ${validUntil}`,
     'verdict: approved',
     'pattern: architectural-decision-record',
     `topic_tags: ${JSON.stringify(topicTags)}`,
@@ -40,6 +41,23 @@ describe('handleScoreConfidence', () => {
     }
   });
 
+  it('returns cold-start (not a matching error) when the only records are expired', async () => {
+    const vaultDir = await mkdtemp(join(tmpdir(), 'toto-sc-'));
+    try {
+      await seedSignal(vaultDir, 'adr-001', ['auth', 'service-boundary'], '2000-01-01');
+      await seedSignal(vaultDir, 'adr-002', ['auth', 'service-boundary'], '2000-01-01');
+      const result = await handleScoreConfidence(
+        { ruling: 'Should the auth service own the service-boundary token?' },
+        vaultDir,
+      );
+      expect(result.tier).toBe('LOW');
+      expect(result.matchCount).toBe(0);
+      expect(result.disqualifiers[0]).toContain('toto backfill');
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true });
+    }
+  });
+
   it('returns HIGH for two relevant, coherent records matched by the ruling', async () => {
     const vaultDir = await mkdtemp(join(tmpdir(), 'toto-sc-'));
     try {
@@ -52,6 +70,26 @@ describe('handleScoreConfidence', () => {
       expect(result.tier).toBe('HIGH');
       expect(result.matchCount).toBe(2);
       expect(result.disqualifiers).toHaveLength(0);
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true });
+    }
+  });
+
+  it('matches tags on word boundaries, not as substrings of larger words', async () => {
+    const vaultDir = await mkdtemp(join(tmpdir(), 'toto-sc-'));
+    try {
+      // Both tags appear ONLY as substrings of larger words in the ruling:
+      // "cat" in "concatenation", "auth" in "reauthorization". A substring match
+      // would select both records and wrongly score HIGH; whole-word matching
+      // must select neither.
+      await seedSignal(vaultDir, 'adr-001', ['cat', 'auth']);
+      await seedSignal(vaultDir, 'adr-002', ['cat', 'auth']);
+      const result = await handleScoreConfidence(
+        { ruling: 'Improve concatenation during reauthorization.' },
+        vaultDir,
+      );
+      expect(result.tier).toBe('LOW');
+      expect(result.matchCount).toBe(0);
     } finally {
       await rm(vaultDir, { recursive: true, force: true });
     }

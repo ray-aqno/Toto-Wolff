@@ -6,6 +6,7 @@ paths-ignore = [
   '''package-lock\.json''',
   '''yarn\.lock''',
   '''**/ci\.yml''',
+  '''*gitleaks.toml''',
 ]
 
 [allowlist]

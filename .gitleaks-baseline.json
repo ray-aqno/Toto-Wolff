@@ -1,6 +1,29 @@
 [
  {
   "Description": "Generic API Key assignment",
+  "StartLine": 25,
+  "EndLine": 25,
+  "StartColumn": 17,
+  "EndColumn": 62,
+  "Match": "REDACTED=sk-ci-smoke-test-placeholder-not-real'",
+  "Secret": "REDACTED",
+  "File": ".gitleaks.toml",
+  "SymlinkFile": "",
+  "Commit": "6e84d3624b917e45a738eb9910395f03d7369a87",
+  "Entropy": 2.807355,
+  "Author": "Rayyan Aquino",
+  "Email": "rayyan.aquino26@gmail.com",
+  "Date": "2026-08-06T03:22:55Z",
+  "Message": "fix: add gitleaks baseline to ignore false positive in historical commit",
+  "Tags": [
+   "key",
+   "generic"
+  ],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "6e84d3624b917e45a738eb9910395f03d7369a87:.gitleaks.toml:generic-api-key:25"
+ },
+ {
+  "Description": "Generic API Key assignment",
   "StartLine": 200,
   "EndLine": 200,
   "StartColumn": 22,

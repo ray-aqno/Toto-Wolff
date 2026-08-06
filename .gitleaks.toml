@@ -8,6 +8,12 @@ regexes = [
   '''test-key''',
   '''placeholder''',
 ]
+paths = [
+  '''pnpm-lock.yaml''',
+  '''pnpm-workspace.yaml''',
+  '''package-lock.json''',
+  '''yarn.lock''',
+]
 
 [[rules]]
 id = "manifest-auth-token"

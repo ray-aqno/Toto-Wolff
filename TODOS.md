@@ -4,7 +4,73 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 
 ---
 
-## P2 — Pre-v1.4 (added 2026-07-08, /investigate preemptive pass)
+## P2 — Pre-v1.4 (added 2026-07-10, /ship adversarial review)
+
+### T-CLAUDE-JSON-FALLBACK-DEFAULT: Credential exposure shifted from opt-in to default (accepted risk)
+
+**What:** Before this PR, reading a credential from `~/.claude.json` required a human to manually export it in shell env. After the F1 fallback (`packages/core/src/utils/anthropic.ts`), the file-fallback is the *primary* credential path for marketplace installs (the plugin manifest embeds no token, so most users hit the fallback by default, not as an edge case). Same file, same scope (`mcpServers.toto-wolff.env` only), but exposure shifted from opt-in to default.
+
+**Decision:** Accepted, 2026-07-10, during `/ship` adversarial review. Rationale: anything that could read `~/.claude.json` before this PR could already read it — this doesn't add a new reader, it makes the MCP server one of the processes that reads it by default instead of only when manually configured. This is the direct, intended consequence of F1's goal (remove manual-export friction). Not a new attack surface, a acknowledged tradeoff.
+
+**Depends on:** Nothing — this is a risk-acceptance record, not an action item. Revisit if a future incident implicates this path.
+
+---
+
+### T-PLUGIN-NO-BUILD-GATE: No build/artifact gate between merge and plugin execution
+
+**What:** The plugin launches the MCP server directly from `packages/mcp-server/src/index.ts` / `packages/core/src/**` via `npx tsx` (chosen because `dist/` is gitignored and marketplace installs don't run `pnpm build`). Unlike the manual-wiring fallback path (which still requires `pnpm build` first), there's no build/typecheck/CI gate between "merged to main" and "running with live credential access on every user's machine" for the plugin-install path specifically.
+
+**Why:** Flagged during `/ship` adversarial review (2026-07-10) as a real but bounded gap — CI already runs typecheck+tests+lint on every push to `main`, so broken/malicious code doesn't reach `main` uncaught; it just isn't a *distinct* build gate standing between merge and plugin execution. Accepted for now — a real fix (committing `dist/`, or a proper release/build pipeline for the plugin distribution path) is separate, larger scope than this PR.
+
+**Note:** The *specific* silent-regression risk this item originally bundled with (no CI proof the declared launch command actually boots) is now closed — see the `T-PLUGIN-LAUNCH-REGRESSION closed` entry in Completed (v1.4.0). What remains open here is the broader question: should there be a reviewed build artifact between merge and execution at all, not just a test that today's `src/` launches.
+
+**Depends on:** Nothing structural — this is a scope/architecture decision (build pipeline vs. live-source execution), not a bug.
+
+---
+
+### T-CLAUDE-JSON-RACE: readClaudeJsonCredentials doesn't distinguish "no creds" from "file mid-write"
+
+**What:** `packages/core/src/utils/anthropic.ts`'s `readClaudeJsonCredentials()` treats a `JSON.parse` failure (e.g. because `~/.claude.json` — a file Claude Code itself rewrites frequently — was mid-write) identically to "file legitimately has no credentials," returning `undefined` silently in both cases. Result: intermittent, non-deterministic `AssertionError` crashes at MCP server startup with no diagnostic distinguishing the two failure modes.
+
+**Why:** Low-severity reliability/observability gap flagged during `/ship` adversarial review (2026-07-10). Not a security hole — worth a targeted catch that logs (to stderr, never the credential value) which failure mode occurred, so a flaky startup crash is distinguishable from a genuine missing-config error.
+
+**Depends on:** Nothing structural.
+
+---
+
+### T-SKILL-PATH-TRAVERSAL-GUARD: No explicit path-traversal guard note in vendored skill prose
+
+**What:** The `p10`/`llm-council`/`the-cabinet` skills resolve `vaultPath` and a generated slug, then write files to `{vaultPath}/{logDir}/{slug}.md`. This is agent-driven (LLM reads `SKILL.md` prose), not deterministic code, so there's no programmatic guard against a `vaultPath` or slug containing `../` segments beyond trusting the agent to behave.
+
+**Why:** Flagged during `/ship` adversarial review (2026-07-10). Not fixable as a code patch (no function to change) — worth an explicit one-line guard note in each skill's Step 0: "resolved vaultPath and slug MUST be validated as not containing `..` before any write."
+
+**Depends on:** Nothing structural. Small, mechanical prose addition to 3 files when picked up.
+
+---
+
+## P2 — Pre-v1.4 (added 2026-07-10, /ship plan-completion audit)
+
+### T-F1-SETUP-E2E: Live ./setup verification of the ~/.claude.json credential fallback
+
+**What:** Run `./setup` on a machine (or scrubbed environment) with no `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` exported in shell, but with `~/.claude.json`'s `mcpServers.toto-wolff.env` populated, and confirm the MCP server actually starts and successfully resolves credentials via the fallback added in `packages/core/src/utils/anthropic.ts`.
+
+**Why:** This was the plan's own stated "Next" step (`P10-Plans/2026-07-09-toto-wolff-mcp-auth-claude-json-fallback.md`) and never ran this session — only unit-tested (13/13 passing, including explicit env-unset + file-fallback cases). Deferred per user call during `/ship`'s plan-completion audit: the unit tests already exercise this exact logic path at the function boundary; only the shell/setup-script integration wiring is unverified.
+
+**Depends on:** Nothing structural.
+
+---
+
+### T-F3-SKILL-LIVE-FLOW: Live-test the p10/llm-council/the-cabinet first-run config flow
+
+**What:** Actually invoke `/p10`, `/council`, or `/cabinet` fresh (no cached `vaultPath`) to confirm the "Step 0 — Config Resolution" first-run `AskUserQuestion` prompt and the headless fail-loud fallback fire correctly, as described in the byte-identical prose added to all 3 vendored skill files this PR.
+
+**Why:** These are LLM-instruction-following skills, not deterministic code with a test harness — the prose was verified consistent across all 3 files but never exercised live. Deferred per user call during `/ship`'s plan-completion audit: the real test is the next time someone actually runs one of these skills fresh.
+
+**Depends on:** Nothing structural.
+
+---
+
+## P2 — Pre-v1.4 (added 2026-07-09, /investigate retrospective pass)
 
 ### T-DASHBOARD-LINT: Split `renderDashboardHtml` before v1.4 UI/UX work
 
@@ -29,6 +95,13 @@ Deferred work from the v0.0.2.0 CEO review (2026-06-04). Items are P1/P2/P3 — 
 **Depends on:** Nothing structural. Deferred until downstream usage shows this friction is actually costing time, not implemented preemptively.
 
 **Note:** Does not touch any of the 5 binding Arbiter conditions from `P10-Plans/2026-07-06-toto-wolff-linear-sync-skill.md` (Step 0 connector pre-flight, Step 5 confirm-before-write, description template, dynamic status resolution, closed `save_issue` param set) — Step 2's walkthrough narration was not one of them, so this can be scoped as a small revision without full re-arbitration when picked up.
+
+---
+
+## Completed (v1.4.0, 2026-07-10)
+
+- **Fixed `pnpm typecheck` silently checking zero files** — root `typecheck` script was `tsc --noEmit` against a `tsconfig.json` with `"files": []`, which type-checks nothing and exits 0 without `-b` (build mode). Discovered live during `/ship`'s verification gate when `pnpm typecheck` passed on a real `exactOptionalPropertyTypes` violation that `pnpm build` caught immediately — meaning CI's `Typecheck` step had been a no-op the whole time, not just for this PR. Fixed to `tsc -b` — `--noEmit` is incompatible with build mode here since referenced `composite: true` projects must emit `.d.ts` for downstream consumers (CI caught this: `tsc -b --noEmit` failed with `TS6310: Referenced project may not disable emit`); build artifacts are gitignored so this is equivalent to what `pnpm build` already produces. Verified locally by reintroducing the same bug class and confirming it's caught.
+- **`T-PLUGIN-LAUNCH-REGRESSION` closed** — added a `plugin-launch-smoke-test` CI job (`.github/workflows/ci.yml`) that installs the plugin fresh via `claude plugin marketplace add`/`claude plugin install`, confirms no `dist/` exists (proving it's a build-free install), reads the launch `command`/`args` directly out of the *installed* `plugin.json` (not a hand-copied duplicate — fails the moment the manifest drifts from what actually works), and confirms the process stays alive for 5s. Closed per a Cabinet-conditioned follow-up on v1.4.0 (Feynman + Karpathy both flagged this gap; Cabinet record: `~/.toto/vault/Cabinet/2026-07-10-toto-wolff-v1.4.0-mcp-plugin-distribution.md`).
 
 ---
 

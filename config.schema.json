@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "toto-wolff skill config",
+  "description": "Shared config for the p10, llm-council, and the-cabinet skills bundled in the toto-wolff plugin. Resolved per the 4-step order documented in each skill's Step 0 — Config Resolution section: TOTO_VAULT_PATH env var > settings.local.json > global ~/.claude/CLAUDE.md prose > hardcoded default.",
+  "type": "object",
+  "properties": {
+    "vaultPath": {
+      "type": "string",
+      "description": "Root vault directory. Default: ~/.toto/vault"
+    },
+    "p10": {
+      "type": "object",
+      "properties": {
+        "planDir": { "type": "string", "description": "Default: P10-Plans" }
+      }
+    },
+    "council": {
+      "type": "object",
+      "properties": {
+        "logDir": { "type": "string", "description": "Default: Council/Congressional-Records" }
+      }
+    },
+    "cabinet": {
+      "type": "object",
+      "properties": {
+        "logDir": { "type": "string", "description": "Default: Cabinet" }
+      }
+    }
+  },
+  "required": ["vaultPath"]
+}

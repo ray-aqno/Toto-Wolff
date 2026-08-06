@@ -129,20 +129,3 @@ export class SignalIndex {
     return this.records.slice();
   }
 }
-
-/**
- * Returns true if the Signals/ directory is absent (ENOENT) or contains
- * zero .md files. Single source of truth for cold-start detection in the
- * scoring path. Non-ENOENT errors re-throw (P10 Rule 7).
- */
-export async function isSignalDirEmpty(vaultPath: string): Promise<boolean> {
-  assert(typeof vaultPath === 'string' && vaultPath.length > 0, 'vaultPath must be non-empty string');
-  const dir = join(vaultPath, 'Signals');
-  try {
-    const entries = await readdir(dir); // P10 Rule 2: entries bounded by dir contents
-    return entries.filter((e) => e.endsWith('.md')).length === 0;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return true;
-    throw err; // P10 Rule 7: non-ENOENT errors surface, never swallowed
-  }
-}

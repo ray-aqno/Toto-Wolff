@@ -92,9 +92,24 @@ Execution agent reads Obsidian draft — status: approved required to proceed
 
 ---
 
-## Workflow
+## Step 0 — Config Resolution
 
-### Step 1 — Codebase Scout (Haiku, parallel subagents)
+Resolve `vaultPath` and this skill's log/plan directory before doing anything else. Same 4-step order in every skill this plugin bundles (p10, llm-council, the-cabinet) — do not deviate, this consistency is what keeps the lookup unambiguous:
+
+1. `TOTO_VAULT_PATH` env var, if set — always wins.
+2. `<plugin-root>/settings.local.json`, if the plugin was installed via `claude plugin add` and the file exists.
+3. Global `~/.claude/CLAUDE.md` prose (the legacy convention — still honored, not removed).
+4. Hardcoded default (`~/.toto/vault`), if nothing above resolved.
+
+Print which source won (e.g. `resolved vaultPath from: env TOTO_VAULT_PATH`) before proceeding — this line is load-bearing, not cosmetic: without it, an env var silently shadowing a `settings.local.json` override becomes an invisible footgun.
+
+**First-run / no cached resolution beyond the hardcoded default:** if there's an interactive session (TTY available), ask the user for `vaultPath` (and this skill's log/plan dir, if it differs from the default) via `AskUserQuestion`, then write the answer to `<plugin-root>/settings.local.json` (source #2 above) so future runs skip the prompt. If writing fails (e.g. read-only plugin dir), use the answered value for this run only and warn that the prompt will repeat next time.
+
+**No interactive session available (headless, CI, scripted `claude plugin add`):** do NOT wait on `AskUserQuestion` — it has no path to a human here. Fall through to source #4 (hardcoded default) and emit a fail-loud stderr warning naming the exact remediation: `set TOTO_VAULT_PATH=<path> or create <plugin-root>/settings.local.json before running in a non-interactive environment`. Never proceed silently as if a value were confirmed when it wasn't.
+
+---
+
+## Step 1 — Codebase Scout (Haiku, parallel subagents)
 
 Spawn 2–4 scout subagents to map the codebase relevant to the task. Each Agent tool
 call MUST set these parameters explicitly — do not rely on defaults:
@@ -140,7 +155,9 @@ Scout D: Check gstack /freeze registry — flag any locked modules in scope
 Scouts output a **codebase snapshot**: file list, relevant functions, existing violations,
 freeze flags. Passed to P10 Analyzer — not to the user directly.
 
-### Step 2 — P10 Analysis (Sonnet)
+---
+
+## Step 2 — P10 Analysis (Sonnet)
 
 Agent tool call: `model: 'claude-sonnet-4-6'`, `subagent_type: 'general-purpose'`.
 This step makes judgment calls across 10 interacting rules, not a search — a scoped
@@ -167,7 +184,9 @@ For each of the 10 rules, assess impact on the task:
 **Pre-conditions:** [what must be true before execution begins]
 ```
 
-### Step 3 — Draft Plan (Sonnet)
+---
+
+## Step 3 — Draft Plan (Sonnet)
 
 Agent tool call: `model: 'claude-sonnet-4-6'`, `subagent_type: 'general-purpose'`.
 Drafting a staged plan is synthesis, not search — general-purpose is the right fit.
@@ -208,7 +227,9 @@ Write a staged, P10-compliant implementation plan:
 One draft per task or per named stage. Multi-stage tasks: one draft per stage, linked
 in the Obsidian index.
 
-### Step 4 — P10 Arbiter (Opus)
+---
+
+## Step 4 — P10 Arbiter (Opus)
 
 Agent tool call: `model: 'claude-opus-4-8'`, `subagent_type: 'general-purpose'`.
 Already correctly scoped to receive only the compressed analysis/draft, not raw
@@ -246,15 +267,13 @@ After revision: Sonnet updates draft (~400 tok), Opus re-reviews. Maximum one cy
 Blocked drafts cannot proceed. Resolution typically requires a `/council` session —
 the block reason becomes the council input.
 
-### Step 5 — Obsidian Commit (Haiku)
+---
 
-Config (set in `CLAUDE.md`):
-```
-P10_VAULT_PATH=/path/to/your/obsidian/vault
-P10_PLAN_DIR=P10-Plans
-```
+## Step 5 — Obsidian Commit (Haiku)
 
-**File:** `{P10_VAULT_PATH}/P10-Plans/YYYY-MM-DD-{task-slug}.md`
+Uses `vaultPath` and `p10.planDir` (default `P10-Plans`) resolved in Step 0.
+
+**File:** `{vaultPath}/{p10.planDir}/YYYY-MM-DD-{task-slug}.md`
 
 **Frontmatter:**
 ```yaml
@@ -294,7 +313,7 @@ Update `P10-Plans/INDEX.md` with each new draft (date, task, stage, status).
 
 ```
 Before writing any code, read:
-{P10_VAULT_PATH}/P10-Plans/{draft-filename}.md
+{vaultPath}/{p10.planDir}/{draft-filename}.md
 
 Verify status is `approved` and arbiter_action is `approved`.
 If status is anything other than `approved` — STOP. Do not execute.

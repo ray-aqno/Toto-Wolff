@@ -5,6 +5,7 @@ paths-ignore = [
   '''pnpm-workspace\.yaml''',
   '''package-lock\.json''',
   '''yarn\.lock''',
+  '''**/ci\.yml''',
 ]
 
 [allowlist]
@@ -19,6 +20,11 @@ regexes = [
   '''@smithy/credential-provider-imds''',
   '''credential-provider-''',
   '''token-providers''',
+  '''sk-ci-smoke-test-placeholder-not-real''',
+  '''REDACTED=sk-ci-smoke-test-placeholder-not-real''',
+  '''ANTHROPIC_API_KEY=sk-ci-smoke-test-placeholder-not-real''',
+  '''ANTHROPIC_API_KEY=''',
+  '''ANTHROPIC_API_KEY''',
 ]
 
 [[rules]]
@@ -48,4 +54,11 @@ regexes = [
   '''secrets\.''',
   '''\$\{\{''',
   '''YOUR_''',
+  '''sk-ci-smoke-test-placeholder-not-real''',
+  '''REDACTED=sk-ci-smoke-test-placeholder-not-real''',
+  '''placeholder''',
+  '''smoke-test''',
+  '''ci-smoke-test''',
+  '''ANTHROPIC_API_KEY''',
+  '''ANTHROPIC_AUTH_TOKEN''',
 ]

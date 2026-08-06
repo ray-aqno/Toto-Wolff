@@ -7,6 +7,10 @@ regexes = [
   '''example-key''',
   '''test-key''',
   '''placeholder''',
+  '''@aws-sdk/credential-provider-''',
+  '''@aws-sdk/token-providers''',
+  '''credential-provider-''',
+  '''token-providers''',
 ]
 paths = [
   '''pnpm-lock.yaml''',

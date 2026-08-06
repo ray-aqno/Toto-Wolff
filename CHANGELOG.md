@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.1] - 2025-08-05
+
+### Added
+- **Strangler Fig Migration Complete (6 stages)** — Unified governance stack from legacy skills to core services + MCP tools:
+  - **Stage 1: Core Services** — `CabinetService`, `SafetyCarService`, `KarpathyService`, `DRSService`, `SubagentService` in `@toto-wolff/core`
+  - **Stage 2: MCP Tools + Dashboard** — 5 new tools (`cabinet_run`, `safety_car_run`, `karpathy_check`, `drs_check`, `subagent_list`) + 7 dashboard sections (Council, P10, Cabinet, SafetyCar, Karpathy, DRS, Subagent)
+  - **Stage 3: Thin Skills** — cabinet, safety-car, karpathy, drs, subagent skills routing to MCP tools (< 200 lines each, no core imports)
+  - **Stage 4: DRS PreToolUse Hook** — Installed at `.pi/hooks.json`, fires on every mutating tool call, 5 deterministic rules with override support
+  - **Stage 5: Config/Docs Unification** — Single source `.toto/config.yml` generates `AGENTS.md`, `CLAUDE.md`, `.toto/drs-config.json`, `.toto/freeze.json` via `pnpm generate:all`
+  - **Stage 6: Hardening** — All builds pass (`tsc --strict`), 105 tests pass, lint clean on new code
+- **Cabinet Release Gate** — Three equal Opus seats (Garry Tan, Feynman, Karpathy), any-seat veto, unanimous-to-ship
+- **Safety Car Adversarial Review** — Post-P10, pre-execution stress test across 5 risk categories
+- **Karpathy Execution Verification** — 4 rules (simplicity, surgical, goal-driven, think-before-coding) at every P10 stage
+- **DRS Boundary Enforcement** — Ambient PreToolUse hook, 5 rules (frozen, scope, auth, tenant, destructive)
+- **Subagent Orchestration** — Parallel scouts, adversarial review, verification chains
+- **Config Generators** — `scripts/generate-agents-md.ts`, `scripts/generate-claude-md.ts`, `scripts/generate-drs-config.ts`
+
+### Changed
+- **Vault fully session-memory backed** — Replaced Obsidian filesystem vault with pi's durable session memory (`~/.pi/sessions/governance/`)
+- **Single-source configuration** — All governance config now in `.toto/config.yml`; AGENTS.md/CLAUDE.md are generated artifacts
+- **MCP as primary interface** — All 11 governance operations exposed as MCP tools; CLI/skills delegate to MCP
+
+### Fixed
+- **DRS hook false positives** — Resolved Rule 2 (out-of-scope) by adding allowed_paths for packages/, scripts/, .agents/, tests/, docs/
+- **TypeScript strict compliance** — All new code passes `tsc --strict --noEmit`
+- **Dashboard empty states** — Added per-card empty-state copy for all 7 governance types (T9 completion)
+
 ## [1.3.0] - 2026-07-06
 
 ### Added
@@ -39,7 +66,7 @@ Closes the two conditions the Cabinet attached to v1.1.0 (`2026-07-01-v1.1.0-tag
 ### Added
 - Decision reversal auto-detection: `detectReversal()` in `packages/core/src/utils/reversalDetector.ts` scans prior `SignalRecord`s for a topic-matched, conflicting verdict; wired into `CouncilService.run()` via optional `currentTags`/`priors` params (backward-compatible defaults).
 - Shared `jaccardSimilarity`/`JACCARD_MATCH_THRESHOLD` extracted to `packages/core/src/utils/jaccard.ts`; `scoreConfidence.ts` now imports from core instead of duplicating the implementation.
-- Local governance pre-commit hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`): greps staged diffs against `.toto/sensitive-patterns.json` and blocks the commit with a `/council` prompt on a match. Host-agnostic — no GitHub Actions dependency, replaces the blocked auto-trigger design from the 2026-06-29 council ruling.
+- Local governance pre-commit hook (`scripts/extensions/pre-commit`, installed via `scripts/install-hooks.sh`): greps staged diffs against `.toto/sensitive-patterns.json` and blocks the commit with a `/council` prompt on a match. Host-agnostic — no GitHub Actions dependency, replaces the blocked auto-trigger design from the 2026-06-29 council ruling.
 - `scripts/check-patterns.ts` (`pnpm check-patterns`): lint gate keeping `.toto/sensitive-patterns.json` and the CLAUDE.md `##sensitive-patterns` fence in sync; rejects overbroad patterns (bare `.*`, `.+`, empty string) that would match every diff. Runs locally and in a new read-only `check-patterns` CI job (`contents: read`, no `pull_request_target`).
 - `toto doctor` now checks whether the governance pre-commit hook is installed.
 - `tests/pre-commit.bats` (8 tests) and `tests/toto-report.bats` (1 live test, 2 pre-green pending E4).
@@ -226,3 +253,4 @@ Closes the two conditions the Cabinet attached to v1.1.0 (`2026-07-01-v1.1.0-tag
 
 ### Security
 - Hardcoded dev credentials (`SuperAdmin/R3solv3!`) from MCP marketplace skill redacted to `<YOUR_USERNAME>/<YOUR_PASSWORD>` placeholders before first commit.
+# CI trigger

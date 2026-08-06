@@ -10,12 +10,26 @@ export interface DashboardStats {
   councilCount: number;
   p10Count: number;
   blockedCount: number;
+  cabinetCount: number;
+  safetyCarCount: number;
+  karpathyCount: number;
+  drsCount: number;
+  subagentCount: number;
   generatedAt: string;
 }
 
 /** Narrows an unknown value to the valid record type union. */
-export function isValidItemType(t: unknown): t is 'council' | 'p10' {
-  assert(t === 'council' || t === 'p10', `isValidItemType: unexpected type value '${String(t)}'`);
+export function isValidItemType(t: unknown): t is 'council' | 'p10' | 'cabinet' | 'safety-car' | 'karpathy' | 'drs' | 'subagent' {
+  assert(
+    t === 'council' ||
+    t === 'p10' ||
+    t === 'cabinet' ||
+    t === 'safety-car' ||
+    t === 'karpathy' ||
+    t === 'drs' ||
+    t === 'subagent',
+    `isValidItemType: unexpected type value '${String(t)}'`,
+  );
   return true;
 }
 
@@ -36,6 +50,9 @@ export function extractStatus(content: string): string {
   if (raw.includes('approved')) return 'approved';
   if (raw.includes('blocked')) return 'blocked';
   if (raw.includes('revision')) return 'revision-required';
+  if (raw.includes('pass')) return 'pass';
+  if (raw.includes('fail')) return 'fail';
+  if (raw.includes('conditional')) return 'conditional';
   const result = raw.slice(0, 40);
   assert(result.length <= 40, 'extractStatus: result must not exceed 40 chars');
   return result;
@@ -87,14 +104,27 @@ export async function readRecentItems(
 
 /**
  * Builds a full DashboardResult snapshot from the vault.
- * Reads Council/Congressional-Records and P10-Plans directories.
+ * Reads Council/Congressional-Records, P10-Plans, Cabinet, SafetyCar, Karpathy, DRS, and Subagent directories.
  */
 export async function handleDashboardStatus(vaultPath: string): Promise<DashboardResult> {
   assert(isAbsolute(vaultPath), 'handleDashboardStatus: vaultPath must be absolute');
 
-  const [councilData, p10Data] = await Promise.all([
+  const [
+    councilData,
+    p10Data,
+    cabinetData,
+    safetyCarData,
+    karpathyData,
+    drsData,
+    subagentData,
+  ] = await Promise.all([
     readRecentItems(vaultPath, 'Council/Congressional-Records', 5),
     readRecentItems(vaultPath, 'P10-Plans', 5),
+    readRecentItems(vaultPath, 'Cabinet', 5),
+    readRecentItems(vaultPath, 'SafetyCar', 5),
+    readRecentItems(vaultPath, 'Karpathy', 5),
+    readRecentItems(vaultPath, 'DRS', 5),
+    readRecentItems(vaultPath, 'Subagent', 5),
   ]);
 
   const blockedItems: DashboardResult['blockedItems'] = [
@@ -110,11 +140,40 @@ export async function handleDashboardStatus(vaultPath: string): Promise<Dashboar
         isValidItemType('p10');
         return { type: 'p10' as const, date: i.date, excerpt: i.excerpt };
       }),
+    ...cabinetData.items
+      .filter((i) => i.status === 'held')
+      .map((i) => {
+        isValidItemType('cabinet');
+        return { type: 'cabinet' as const, date: i.date, excerpt: i.excerpt };
+      }),
+    ...safetyCarData.items
+      .filter((i) => i.status === 'fail')
+      .map((i) => {
+        isValidItemType('safety-car');
+        return { type: 'safety-car' as const, date: i.date, excerpt: i.excerpt };
+      }),
+    ...karpathyData.items
+      .filter((i) => i.status === 'fail')
+      .map((i) => {
+        isValidItemType('karpathy');
+        return { type: 'karpathy' as const, date: i.date, excerpt: i.excerpt };
+      }),
+    ...drsData.items
+      .filter((i) => i.status === 'blocked')
+      .map((i) => {
+        isValidItemType('drs');
+        return { type: 'drs' as const, date: i.date, excerpt: i.excerpt };
+      }),
   ];
 
   const result: DashboardResult = {
     councilSessions: { count: councilData.all.length, recent: councilData.items },
     p10Plans: { count: p10Data.all.length, recent: p10Data.items },
+    cabinetSessions: { count: cabinetData.all.length, recent: cabinetData.items },
+    safetyCarReports: { count: safetyCarData.all.length, recent: safetyCarData.items },
+    karpathyChecks: { count: karpathyData.all.length, recent: karpathyData.items },
+    drsEvents: { count: drsData.all.length, recent: drsData.items },
+    subagentLists: { count: subagentData.all.length, recent: subagentData.items },
     blockedItems,
     generatedAt: new Date().toISOString(),
   };

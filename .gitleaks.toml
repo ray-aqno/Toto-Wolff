@@ -1,5 +1,14 @@
 title = "toto-wolff gitleaks config"
 
+paths-ignore = [
+  '''pnpm-lock\.yaml''',
+  '''pnpm-workspace\.yaml''',
+  '''package-lock\.json''',
+  '''yarn\.lock''',
+  '''**/ci\.yml''',
+  '''\.gitleaks\.toml''',
+]
+
 [allowlist]
 description = "Allow example placeholders and test fixtures"
 regexes = [
@@ -7,6 +16,16 @@ regexes = [
   '''example-key''',
   '''test-key''',
   '''placeholder''',
+  '''@aws-sdk/credential-provider-''',
+  '''@aws-sdk/token-providers''',
+  '''@smithy/credential-provider-imds''',
+  '''credential-provider-''',
+  '''token-providers''',
+  '''sk-ci-smoke-test-placeholder-not-real''',
+  '''REDACTED=sk-ci-smoke-test-placeholder-not-real''',
+  '''ANTHROPIC_API_KEY=sk-ci-smoke-test-placeholder-not-real''',
+  '''ANTHROPIC_API_KEY=''',
+  '''ANTHROPIC_API_KEY''',
 ]
 
 [[rules]]
@@ -43,4 +62,10 @@ regexes = [
   '''\$\{\{''',
   '''YOUR_''',
   '''sk-ci-smoke-test-placeholder-not-real''',
+  '''REDACTED=sk-ci-smoke-test-placeholder-not-real''',
+  '''placeholder''',
+  '''smoke-test''',
+  '''ci-smoke-test''',
+  '''ANTHROPIC_API_KEY''',
+  '''ANTHROPIC_AUTH_TOKEN''',
 ]

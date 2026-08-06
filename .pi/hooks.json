@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${HOME}/.agents/skills/toto-governance/drs/bin/drs-check.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

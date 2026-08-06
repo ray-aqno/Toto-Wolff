@@ -4,6 +4,11 @@ import { renderDashboardHtml, type DashboardResult } from './dashboard_html.js';
 const emptyResult: DashboardResult = {
   councilSessions: { count: 0, recent: [] },
   p10Plans: { count: 0, recent: [] },
+  cabinetSessions: { count: 0, recent: [] },
+  safetyCarReports: { count: 0, recent: [] },
+  karpathyChecks: { count: 0, recent: [] },
+  drsEvents: { count: 0, recent: [] },
+  subagentLists: { count: 0, recent: [] },
   blockedItems: [],
   generatedAt: '2026-07-08T00:00:00Z',
 };
@@ -24,6 +29,11 @@ const populatedResult: DashboardResult = {
       { date: '2026-07-02', excerpt: 'Plan B', status: 'blocked' },
     ],
   },
+  cabinetSessions: { count: 0, recent: [] },
+  safetyCarReports: { count: 0, recent: [] },
+  karpathyChecks: { count: 0, recent: [] },
+  drsEvents: { count: 0, recent: [] },
+  subagentLists: { count: 0, recent: [] },
   blockedItems: [{ type: 'p10', date: '2026-07-02', excerpt: 'Blocked "quote" & entity test' }],
   generatedAt: '2026-07-08T00:00:00Z',
 };
@@ -31,6 +41,11 @@ const populatedResult: DashboardResult = {
 const mixedEmptyResult: DashboardResult = {
   councilSessions: { count: 2, recent: [{ date: '2026-07-01', excerpt: 'Session', status: 'approved' }] },
   p10Plans: { count: 0, recent: [] },
+  cabinetSessions: { count: 0, recent: [] },
+  safetyCarReports: { count: 0, recent: [] },
+  karpathyChecks: { count: 0, recent: [] },
+  drsEvents: { count: 0, recent: [] },
+  subagentLists: { count: 0, recent: [] },
   blockedItems: [],
   generatedAt: '2026-07-08T00:00:00Z',
 };

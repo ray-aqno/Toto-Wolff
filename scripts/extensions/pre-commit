@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # .git/hooks/pre-commit — toto-wolff governance gate
-# Source: scripts/hooks/pre-commit. Install via scripts/install-hooks.sh.
+# Source: scripts/extensions/pre-commit. Install via scripts/install-hooks.sh.
 # P10-R2 LOOP BOUND: one grep pass per pattern in .toto/sensitive-patterns.json (max 20)
 set -euo pipefail
 

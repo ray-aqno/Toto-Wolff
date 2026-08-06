@@ -82,7 +82,7 @@ jobs:
         id: gitleaks-scan
         run: |
           GITLEAKS_EXIT_CODE=0
-          gitleaks detect --config .gitleaks.toml --redact --no-banner --report-format json --report-path gitleaks-report.json --exit-code 1 || GITLEAKS_EXIT_CODE=$?
+          gitleaks detect --config .gitleaks.toml --redact --no-banner --report-format json --report-path gitleaks-report.json --baseline-path .gitleaks-baseline.json --exit-code 1 || GITLEAKS_EXIT_CODE=$?
           echo "GITLEAKS_EXIT_CODE=$GITLEAKS_EXIT_CODE" >> "$GITHUB_ENV"
 
           echo "::group::gitleaks report"

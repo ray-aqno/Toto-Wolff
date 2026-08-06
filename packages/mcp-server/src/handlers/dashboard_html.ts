@@ -15,7 +15,12 @@ export interface DashboardItem {
 export interface DashboardResult {
   councilSessions: { count: number; recent: DashboardItem[] };
   p10Plans: { count: number; recent: DashboardItem[] };
-  blockedItems: Array<{ type: 'council' | 'p10'; date: string; excerpt: string }>;
+  cabinetSessions: { count: number; recent: DashboardItem[] };
+  safetyCarReports: { count: number; recent: DashboardItem[] };
+  karpathyChecks: { count: number; recent: DashboardItem[] };
+  drsEvents: { count: number; recent: DashboardItem[] };
+  subagentLists: { count: number; recent: DashboardItem[] };
+  blockedItems: Array<{ type: 'council' | 'p10' | 'cabinet' | 'safety-car' | 'karpathy' | 'drs'; date: string; excerpt: string }>;
   generatedAt: string;
 }
 
@@ -187,9 +192,28 @@ function sessionBarChart(items: DashboardItem[]): string {
   return `<svg id="bar-chart" viewBox="0 0 ${labelW + chartW + 32} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${labelW + chartW + 32}px;height:${svgH}px">${bars}</svg>`;
 }
 
-function sectorBadge(type: 'council' | 'p10'): string {
-  const color = type === 'council' ? '#00D2BE' : '#C0C0C0';
-  return `<span style="display:inline-block;background:${color};color:#0d0d0d;font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:2px;letter-spacing:.05em">${type === 'council' ? 'COUNCIL' : 'P10'}</span>`;
+function sectorBadge(type: 'council' | 'p10' | 'cabinet' | 'safety-car' | 'karpathy' | 'drs' | 'subagent'): string {
+  const colors: Record<string, string> = {
+    council: '#00D2BE',
+    p10: '#C0C0C0',
+    cabinet: '#00D2BE',
+    'safety-car': '#e09020',
+    karpathy: '#e03030',
+    drs: '#e03030',
+    subagent: '#00D2BE',
+  };
+  const labels: Record<string, string> = {
+    council: 'COUNCIL',
+    p10: 'P10',
+    cabinet: 'CABINET',
+    'safety-car': 'SAFETY',
+    karpathy: 'KARPATHY',
+    drs: 'DRS',
+    subagent: 'AGENT',
+  };
+  const color = colors[type] ?? '#888';
+  const label = labels[type] ?? type.toUpperCase();
+  return `<span style="display:inline-block;background:${color};color:#0d0d0d;font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:2px;letter-spacing:.05em">${label}</span>`;
 }
 
 /**
@@ -255,6 +279,133 @@ function buildReversalCard(sessionCount: number, reversalPct: number, reversalCo
   return `<div class="reversal-frac" style="color:${reversalColor}">${reversalLabel}</div>
     <div class="reversal-pct" style="color:${reversalColor}" data-count="${reversalPct}" data-suffix="%">0%</div>
     <div class="reversal-diag">${reversalPct === 0 ? 'ALL RULINGS CLEAN' : reversalPct < 15 ? 'HEALTHY SIGNAL' : reversalPct < 30 ? 'WATCH THE TREND' : 'GOVERNANCE PRESSURE'}</div>`;
+}
+
+/** Body of card-cabinet. */
+function buildCabinetCard(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="card" id="card-cabinet" data-panel="cabinet" style="--delay:.22s">
+    <div class="card-header">
+      <span class="card-label">Cabinet Gates</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="panel-empty">No cabinet gates yet — run /cabinet to start</div>
+  </div>`;
+  }
+  return `<div class="card" id="card-cabinet" data-panel="cabinet" style="--delay:.22s">
+    <div class="card-header">
+      <span class="card-label">Cabinet Gates</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="stat-big" data-count="${count}">0</div>
+    <div class="stat-unit">Release Gates</div>
+    <hr class="sep">
+    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-cabinet')}`;
+}
+
+/** Body of card-safety-car. */
+function buildSafetyCarCard(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="card" id="card-safety-car" data-panel="safety-car" style="--delay:.24s">
+    <div class="card-header">
+      <span class="card-label">Safety Car</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="panel-empty">No safety car reviews yet</div>
+  </div>`;
+  }
+  const passCount = recent.filter((i) => i.status === 'pass').length;
+  const conditionalCount = recent.filter((i) => i.status === 'conditional').length;
+  const failCount = recent.filter((i) => i.status === 'fail').length;
+  return `<div class="card" id="card-safety-car" data-panel="safety-car" style="--delay:.24s">
+    <div class="card-header">
+      <span class="card-label">Safety Car</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${failCount > 0 ? 'red' : conditionalCount > 0 ? 'amber' : ''}"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="stat-big" data-count="${count}">0</div>
+    <div class="stat-unit">Adversarial Reviews</div>
+    <hr class="sep">
+    <div style="display:flex;gap:.5rem;font-size:.65rem;color:var(--dim)">
+      <span style="color:#00D2BE">✓ ${passCount}</span>
+      <span style="color:#e09020">~ ${conditionalCount}</span>
+      <span style="color:#e03030">✗ ${failCount}</span>
+    </div>`;
+}
+
+/** Body of card-karpathy. */
+function buildKarpathyCard(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="card" id="card-karpathy" data-panel="karpathy" style="--delay:.26s">
+    <div class="card-header">
+      <span class="card-label">Karpathy Checks</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="panel-empty">No karpathy checks yet</div>
+  </div>`;
+  }
+  const passCount = recent.filter((i) => i.status === 'pass').length;
+  const failCount = recent.filter((i) => i.status === 'fail').length;
+  return `<div class="card" id="card-karpathy" data-panel="karpathy" style="--delay:.26s">
+    <div class="card-header">
+      <span class="card-label">Karpathy Checks</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${failCount > 0 ? 'red' : ''}"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="stat-big" data-count="${count}">0</div>
+    <div class="stat-unit">Execution Verifications</div>
+    <hr class="sep">
+    <div style="display:flex;gap:.5rem;font-size:.65rem;color:var(--dim)">
+      <span style="color:#00D2BE">✓ ${passCount}</span>
+      <span style="color:#e03030">✗ ${failCount}</span>
+    </div>`;
+}
+
+/** Body of card-drs. */
+function buildDrsCard(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="card" id="card-drs" data-panel="drs" style="--delay:.28s">
+    <div class="card-header">
+      <span class="card-label">DRS Blocks</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="panel-empty">No DRS events recorded</div>
+  </div>`;
+  }
+  const blockedCount = recent.filter((i) => i.status === 'blocked').length;
+  const allowedCount = recent.filter((i) => i.status === 'allowed').length;
+  return `<div class="card" id="card-drs" data-panel="drs" style="--delay:.28s">
+    <div class="card-header">
+      <span class="card-label">DRS Blocks</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot ${blockedCount > 0 ? 'red' : ''}"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="stat-big" data-count="${count}">0</div>
+    <div class="stat-unit">Boundary Checks</div>
+    <hr class="sep">
+    <div style="display:flex;gap:.5rem;font-size:.65rem;color:var(--dim)">
+      <span style="color:#00D2BE">✓ ${allowedCount}</span>
+      <span style="color:#e03030">✗ ${blockedCount}</span>
+    </div>`;
+}
+
+/** Body of card-subagent. */
+function buildSubagentCard(count: number, recent: DashboardItem[]): string {
+  if (count === 0) {
+    return `<div class="card" id="card-subagent" data-panel="subagent" style="--delay:.3s">
+    <div class="card-header">
+      <span class="card-label">Subagents</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="panel-empty">No subagents registered</div>
+  </div>`;
+  }
+  return `<div class="card" id="card-subagent" data-panel="subagent" style="--delay:.3s">
+    <div class="card-header">
+      <span class="card-label">Subagents</span>
+      <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
+    </div>
+    <div class="stat-big" data-count="${count}">0</div>
+    <div class="stat-unit">Registered Agents</div>
+    <hr class="sep">
+    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-subagent')}`;
 }
 
 /** Returns the client-side `<script>` block: card animation, panel drill-down, click handling. Depends only on `jsonData`. */
@@ -385,6 +536,11 @@ function buildDashboardClientScript(jsonData: string): string {
       case 'p10':      return buildP10Panel();
       case 'compliance': return buildCompliancePanel();
       case 'reversal': return buildReversalPanel();
+      case 'cabinet':  return buildCabinetPanel();
+      case 'safety-car': return buildSafetyCarPanel();
+      case 'karpathy': return buildKarpathyPanel();
+      case 'drs':      return buildDrsPanel();
+      case 'subagent': return buildSubagentPanel();
       case 'roles':    return '<div class="panel-empty">No personas active — run toto persona add</div>';
       case 'history':  return buildHistoryPanel();
       case 'blocked':  return buildBlockedPanel();
@@ -526,6 +682,84 @@ function buildDashboardClientScript(jsonData: string): string {
     return html;
   }
 
+  function buildCabinetPanel() {
+    const sessions = D.cabinetSessions.recent;
+    let html = '<div class="psec"><div class="psec-label">Cabinet Gates (' + D.cabinetSessions.count + ')</div>';
+    if (!sessions.length) {
+      html += '<div class="panel-empty">No cabinet gates recorded</div>';
+    } else {
+      sessions.slice().reverse().forEach((item) => {
+        const sc = item.status === 'held' ? '#e03030' : item.status === 'approved-with-conditions' ? '#e09020' : '#00D2BE';
+        const sl = item.status === 'held' ? 'HELD' : item.status === 'approved-with-conditions' ? 'CONDITIONAL' : 'APPROVED';
+        html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:' + sc + '20;color:' + sc + ';border:1px solid ' + sc + '40">' + sl + '</span><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildSafetyCarPanel() {
+    const items = D.safetyCarReports.recent;
+    let html = '<div class="psec"><div class="psec-label">Safety Car Reviews (' + D.safetyCarReports.count + ')</div>';
+    if (!items.length) {
+      html += '<div class="panel-empty">No safety car reviews recorded</div>';
+    } else {
+      items.slice().reverse().forEach((item) => {
+        const sc = item.status === 'fail' ? '#e03030' : item.status === 'conditional' ? '#e09020' : '#00D2BE';
+        const sl = item.status === 'fail' ? 'FAIL' : item.status === 'conditional' ? 'CONDITIONAL' : 'PASS';
+        html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:' + sc + '20;color:' + sc + ';border:1px solid ' + sc + '40">' + sl + '</span><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildKarpathyPanel() {
+    const items = D.karpathyChecks.recent;
+    let html = '<div class="psec"><div class="psec-label">Karpathy Checks (' + D.karpathyChecks.count + ')</div>';
+    if (!items.length) {
+      html += '<div class="panel-empty">No karpathy checks recorded</div>';
+    } else {
+      items.slice().reverse().forEach((item) => {
+        const sc = item.status === 'fail' ? '#e03030' : '#00D2BE';
+        const sl = item.status === 'fail' ? 'FAIL' : 'PASS';
+        html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:' + sc + '20;color:' + sc + ';border:1px solid ' + sc + '40">' + sl + '</span><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildDrsPanel() {
+    const items = D.drsEvents.recent;
+    let html = '<div class="psec"><div class="psec-label">DRS Events (' + D.drsEvents.count + ')</div>';
+    if (!items.length) {
+      html += '<div class="panel-empty">No DRS events recorded</div>';
+    } else {
+      items.slice().reverse().forEach((item) => {
+        const sc = item.status === 'blocked' ? '#e03030' : '#00D2BE';
+        const sl = item.status === 'blocked' ? 'BLOCKED' : 'ALLOWED';
+        html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:' + sc + '20;color:' + sc + ';border:1px solid ' + sc + '40">' + sl + '</span><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildSubagentPanel() {
+    const items = D.subagentLists.recent;
+    let html = '<div class="psec"><div class="psec-label">Subagents (' + D.subagentLists.count + ')</div>';
+    if (!items.length) {
+      html += '<div class="panel-empty">No subagents registered</div>';
+    } else {
+      items.slice().reverse().forEach((item) => {
+        html += '<div class="prec"><div class="prec-meta"><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
   function escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
@@ -535,6 +769,11 @@ function buildDashboardClientScript(jsonData: string): string {
     p10:        ['P10 PLANS',           'Execution plan log'],
     compliance: ['P10 COMPLIANCE',      'Approval breakdown'],
     reversal:   ['REVERSAL RATE',       'Revision-required analysis'],
+    cabinet:    ['CABINET GATES',       'Release gate log'],
+    'safety-car': ['SAFETY CAR',        'Adversarial review log'],
+    karpathy:   ['KARPATHY CHECKS',     'Execution verification log'],
+    drs:        ['DRS BLOCKS',          'Boundary check log'],
+    subagent:   ['SUBAGENTS',           'Registered agents log'],
     history:    ['SESSION HISTORY',     'Monthly distribution'],
     blocked:    ['BLOCKED ITEMS',       'Active blockers'],
     rulings:    ['RECENT RULINGS',      'Full ruling log'],
@@ -889,6 +1128,12 @@ function buildMainSection(data: DashboardResult, m: ReturnType<typeof computeDas
     </div>
     ${buildReversalCard(data.councilSessions.count, m.reversalPct, m.reversalColor, m.reversalLabel)}
   </div>
+
+  ${buildCabinetCard(data.cabinetSessions.count, data.cabinetSessions.recent)}
+  ${buildSafetyCarCard(data.safetyCarReports.count, data.safetyCarReports.recent)}
+  ${buildKarpathyCard(data.karpathyChecks.count, data.karpathyChecks.recent)}
+  ${buildDrsCard(data.drsEvents.count, data.drsEvents.recent)}
+  ${buildSubagentCard(data.subagentLists.count, data.subagentLists.recent)}
 
   ${buildRoleAdoptionCard()}
 

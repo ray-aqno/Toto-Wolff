@@ -98,59 +98,7 @@ Opus chairs only the final synthesis. This mirrors gstack's `benchmark-models` p
 
 ---
 
-## Claude Code Subagent Integration
-
-Council members run as **parallel Task subagents** in Claude Code. The dispatcher spawns
-them concurrently; results are collected before briefing begins.
-
-### Dispatch pattern (Claude Code)
-
-```
-Task 1: Scout (Haiku) — Skeptic persona, sub-question A
-Task 2: Scout (Haiku) — Minimalist persona, sub-question B
-Task 3: Analyst (Sonnet) — Domain Expert persona, sub-question C
-Task 4: Analyst (Sonnet) — Risk Auditor persona, sub-question D
-```
-
-Each Agent tool call MUST set these parameters explicitly — do not rely on defaults:
-
-- **Scouts:** `model: 'claude-haiku-4-5-20251001'`, `subagent_type: 'Explore'` — scouts
-  only surface gut-checks and edge cases, they never write or edit. Inheriting the
-  parent session's model here is the single largest cost driver in this skill.
-- **Analysts:** `model: 'claude-sonnet-4-6'`, `subagent_type: 'general-purpose'` —
-  domain synthesis and risk-surface judgment genuinely need general-purpose reasoning,
-  not a search-scoped agent. Do not use `general-purpose` for scouts just because it's
-  the default; that's the exact mistake this fix closes.
-
-**Read-scope bound (both roles):** "Inspect at most 15 files. Do not read any file
-end-to-end unless the sub-question specifically requires its full content — prefer
-targeted lookups and cite line ranges." Capping response length alone doesn't help if
-the member still burns unbounded tokens reading input.
-
-**Report-length bound (both roles):** "Report back in under 400 words (scouts) / 600
-words (analysts), structured, file:line citations only — no full file dumps."
-
-All four tasks run in parallel. Dispatcher waits for all results before passing to Briefer.
-
-### Mid-deliberation context gathering
-
-Analysts (and scouts on remand) may themselves spawn subagents to:
-- Read relevant files (`bash_tool`: grep, cat, find)
-- Run tests or type checks to validate assumptions
-- Query gbrain (if configured) for codebase context
-- Check gstack's `/freeze` registry before recommending changes to locked modules
-
-**Subagent spawning rule:** Members may spawn up to **2 context subagents** each.
-Context subagents are Haiku-only (cost control): `model: 'claude-haiku-4-5-20251001'`,
-`subagent_type: 'Explore'`, same read-scope (max 15 files, no full-file reads unless
-required) and report-length (under 400 words) bounds as the top-level scouts. Results
-are appended to member output before the Briefer runs.
-
----
-
-## Workflow
-
-### Step 0 — Config Resolution
+## Step 0 — Config Resolution
 
 Resolve `vaultPath` and this skill's log/plan directory before doing anything else. Same 4-step order in every skill this plugin bundles (p10, llm-council, the-cabinet) — do not deviate, this consistency is what keeps the lookup unambiguous:
 
@@ -165,7 +113,9 @@ Print which source won (e.g. `resolved vaultPath from: env TOTO_VAULT_PATH`) bef
 
 **No interactive session available (headless, CI, scripted `claude plugin add`):** do NOT wait on `AskUserQuestion` — it has no path to a human here. Fall through to source #4 (hardcoded default) and emit a fail-loud stderr warning naming the exact remediation: `set TOTO_VAULT_PATH=<path> or create <plugin-root>/settings.local.json before running in a non-interactive environment`. Never proceed silently as if a value were confirmed when it wasn't.
 
-### Step 1 — Dispatch
+---
+
+## Step 1 — Dispatch
 
 Decompose the problem into 4 sub-questions (2 scout, 2 analyst). Rules:
 

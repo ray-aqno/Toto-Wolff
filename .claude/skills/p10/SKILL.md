@@ -92,9 +92,7 @@ Execution agent reads Obsidian draft — status: approved required to proceed
 
 ---
 
-## Workflow
-
-### Step 0 — Config Resolution
+## Step 0 — Config Resolution
 
 Resolve `vaultPath` and this skill's log/plan directory before doing anything else. Same 4-step order in every skill this plugin bundles (p10, llm-council, the-cabinet) — do not deviate, this consistency is what keeps the lookup unambiguous:
 
@@ -109,7 +107,9 @@ Print which source won (e.g. `resolved vaultPath from: env TOTO_VAULT_PATH`) bef
 
 **No interactive session available (headless, CI, scripted `claude plugin add`):** do NOT wait on `AskUserQuestion` — it has no path to a human here. Fall through to source #4 (hardcoded default) and emit a fail-loud stderr warning naming the exact remediation: `set TOTO_VAULT_PATH=<path> or create <plugin-root>/settings.local.json before running in a non-interactive environment`. Never proceed silently as if a value were confirmed when it wasn't.
 
-### Step 1 — Codebase Scout (Haiku, parallel subagents)
+---
+
+## Step 1 — Codebase Scout (Haiku, parallel subagents)
 
 Spawn 2–4 scout subagents to map the codebase relevant to the task. Each Agent tool
 call MUST set these parameters explicitly — do not rely on defaults:
@@ -155,7 +155,9 @@ Scout D: Check gstack /freeze registry — flag any locked modules in scope
 Scouts output a **codebase snapshot**: file list, relevant functions, existing violations,
 freeze flags. Passed to P10 Analyzer — not to the user directly.
 
-### Step 2 — P10 Analysis (Sonnet)
+---
+
+## Step 2 — P10 Analysis (Sonnet)
 
 Agent tool call: `model: 'claude-sonnet-4-6'`, `subagent_type: 'general-purpose'`.
 This step makes judgment calls across 10 interacting rules, not a search — a scoped
@@ -182,7 +184,9 @@ For each of the 10 rules, assess impact on the task:
 **Pre-conditions:** [what must be true before execution begins]
 ```
 
-### Step 3 — Draft Plan (Sonnet)
+---
+
+## Step 3 — Draft Plan (Sonnet)
 
 Agent tool call: `model: 'claude-sonnet-4-6'`, `subagent_type: 'general-purpose'`.
 Drafting a staged plan is synthesis, not search — general-purpose is the right fit.
@@ -223,7 +227,9 @@ Write a staged, P10-compliant implementation plan:
 One draft per task or per named stage. Multi-stage tasks: one draft per stage, linked
 in the Obsidian index.
 
-### Step 4 — P10 Arbiter (Opus)
+---
+
+## Step 4 — P10 Arbiter (Opus)
 
 Agent tool call: `model: 'claude-opus-4-8'`, `subagent_type: 'general-purpose'`.
 Already correctly scoped to receive only the compressed analysis/draft, not raw
@@ -261,7 +267,9 @@ After revision: Sonnet updates draft (~400 tok), Opus re-reviews. Maximum one cy
 Blocked drafts cannot proceed. Resolution typically requires a `/council` session —
 the block reason becomes the council input.
 
-### Step 5 — Obsidian Commit (Haiku)
+---
+
+## Step 5 — Obsidian Commit (Haiku)
 
 Uses `vaultPath` and `p10.planDir` (default `P10-Plans`) resolved in Step 0.
 

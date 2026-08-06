@@ -5,7 +5,7 @@
 set -euo pipefail
 
 readonly TOTO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-readonly HOOK_SRC="${TOTO_DIR}/scripts/hooks/pre-commit"
+readonly HOOK_SRC="${TOTO_DIR}/scripts/extensions/pre-commit"
 readonly TARGET_REPO="${1:-$(git rev-parse --show-toplevel)}"
 
 # R5 guard 1: source hook file exists

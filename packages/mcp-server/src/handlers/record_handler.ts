@@ -8,6 +8,11 @@ const MAX_CONTENT_BYTES = 100_000;
 const TYPE_TO_DIR: Record<string, string> = {
   council: join('Council', 'Congressional-Records'),
   p10: 'P10-Plans',
+  cabinet: 'Cabinet',
+  'safety-car': 'SafetyCar',
+  karpathy: 'Karpathy',
+  drs: 'DRS',
+  subagent: 'Subagent',
 };
 
 /** Returns true only if resolved path is strictly inside vaultPath (not a sibling prefix). */

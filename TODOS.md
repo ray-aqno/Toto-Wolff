@@ -130,7 +130,7 @@ Council ruling `2026-07-01-strangler-fig-seam-bugs` (lean mode, ~86K tokens vs. 
 
 ## Completed (v1.0.2)
 
-- **T2: Local governance pre-commit hook** — original GitHub Actions design BLOCKED by council (2026-06-29-t2-github-actions-seam-test: fails silently for 90%+ of fork PRs, adds a write-credentialed dependency). Redesigned as a host-agnostic local hook: `scripts/hooks/pre-commit` + `scripts/install-hooks.sh`, single-source pattern list in `.toto/sensitive-patterns.json`, `scripts/check-patterns.ts` lint gate keeping CLAUDE.md in sync, read-only advisory CI job. `toto doctor` surfaces install state. 8/8 bats tests passing. Shipped 2026-07-01.
+- **T2: Local governance pre-commit hook** — original GitHub Actions design BLOCKED by council (2026-06-29-t2-github-actions-seam-test: fails silently for 90%+ of fork PRs, adds a write-credentialed dependency). Redesigned as a host-agnostic local hook: `scripts/extensions/pre-commit` + `scripts/install-hooks.sh`, single-source pattern list in `.toto/sensitive-patterns.json`, `scripts/check-patterns.ts` lint gate keeping CLAUDE.md in sync, read-only advisory CI job. `toto doctor` surfaces install state. 8/8 bats tests passing. Shipped 2026-07-01.
 - **T5: Decision reversal auto-detection** — `detectReversal()` in `packages/core/src/utils/reversalDetector.ts`, wired into `CouncilService.run()` via optional `currentTags`/`priors` params. Shared `jaccardSimilarity` extracted to core. Shipped 2026-07-01.
 
 ## Completed (v0.0.4.0)

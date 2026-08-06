@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Tests for scripts/hooks/pre-commit and scripts/install-hooks.sh.
+# Tests for scripts/extensions/pre-commit and scripts/install-hooks.sh.
 # Run: bats tests/pre-commit.bats
 # Requires: bats-core >= 1.0, git, jq
 
 REPO_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
-HOOK_SCRIPT="${REPO_DIR}/scripts/hooks/pre-commit"
+HOOK_SCRIPT="${REPO_DIR}/scripts/extensions/pre-commit"
 INSTALL_SCRIPT="${REPO_DIR}/scripts/install-hooks.sh"
 
 setup() {

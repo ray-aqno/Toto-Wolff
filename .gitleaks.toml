@@ -1,5 +1,12 @@
 title = "toto-wolff gitleaks config"
 
+paths-ignore = [
+  '''**/pnpm-lock.yaml''',
+  '''**/pnpm-workspace.yaml''',
+  '''**/package-lock.json''',
+  '''**/yarn.lock''',
+]
+
 [allowlist]
 description = "Allow example placeholders and test fixtures"
 regexes = [
@@ -13,10 +20,10 @@ regexes = [
   '''token-providers''',
 ]
 paths = [
-  '''pnpm-lock.yaml''',
-  '''pnpm-workspace.yaml''',
-  '''package-lock.json''',
-  '''yarn.lock''',
+  '''**/pnpm-lock.yaml''',
+  '''**/pnpm-workspace.yaml''',
+  '''**/package-lock.json''',
+  '''**/yarn.lock''',
 ]
 
 [[rules]]

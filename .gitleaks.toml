@@ -16,6 +16,7 @@ regexes = [
   '''placeholder''',
   '''@aws-sdk/credential-provider-''',
   '''@aws-sdk/token-providers''',
+  '''@smithy/credential-provider-imds''',
   '''credential-provider-''',
   '''token-providers''',
 ]

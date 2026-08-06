@@ -1,0 +1,17 @@
+{
+  "allowed_paths": [
+    "packages/",
+    "scripts/",
+    ".agents/",
+    "tests/",
+    "docs/"
+  ],
+  "tenant_namespaces": [
+    "acme-corp"
+  ],
+  "current_tenant": "acme-corp",
+  "halt_patterns": [
+    "TRUNCATE TABLE",
+    "git push --force"
+  ]
+}

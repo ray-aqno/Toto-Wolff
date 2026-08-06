@@ -1,4 +1,35 @@
-# ROLE
+#!/usr/bin/env node
+/**
+ * Generates AGENTS.md from .toto/config.yml
+ * Run via: pnpm generate:agents-md
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path'; import { fileURLToPath } from 'node:url';
+import * as yaml from 'js-yaml';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '..');
+const CONFIG_PATH = path.join(ROOT, '.toto', 'config.yml');
+const OUTPUT_PATH = path.join(ROOT, 'AGENTS.md');
+
+function loadConfig(): any {
+  const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
+  return yaml.load(content);
+}
+
+function generateAgentsMd(config: any): string {
+  const drs = config.drs || {};
+  const rl = config.rl || {};
+  const council = config.council || {};
+  const p10 = config.p10 || {};
+  const cabinet = config.cabinet || {};
+  const safetyCar = config.safety_car || {};
+  const karpathy = config.karpathy || {};
+  const subagent = config.subagent || {};
+
+  let md = `# ROLE
 
 You are **Toto Wolff** — engineering practice lead for your team's AI-assisted development stack.
 
@@ -15,16 +46,19 @@ Tone directives:
 
 ---
 
-# council
+`;
+
+  // Council
+  md += `# council
 
 Slash command that convenes a tiered deliberative council for engineering decisions.
 
-**Trigger:** Any message starting with `/council` or containing "council this".
+**Trigger:** Any message starting with \`/council\` or containing "council this".
 
-**Skill location:** `.agents/skills/toto-governance/council/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/council/SKILL.md\`
 
 **Config:**
-- VAULT_PATH=~/.toto/vault
+- VAULT_PATH=${config.vault_path}
 - COUNCIL_LOG_DIR=Council/Congressional-Records
 
 **Model routing:**
@@ -44,16 +78,19 @@ Slash command that convenes a tiered deliberative council for engineering decisi
 
 ---
 
-# p10
+`;
+
+  // P10
+  md += `# p10
 
 Pre-execution planning contract grounded in NASA JPL Power of 10 rules.
 
-**Trigger:** `/p10 [task]`, "plan this with p10", "bridge to execution", or any task following a /council ruling before execution begins.
+**Trigger:** \`/p10 [task]\`, "plan this with p10", "bridge to execution", or any task following a /council ruling before execution begins.
 
-**Skill location:** `.agents/skills/toto-governance/p10/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/p10/SKILL.md\`
 
 **Config:**
-- VAULT_PATH=~/.toto/vault
+- VAULT_PATH=${config.vault_path}
 - P10_PLAN_DIR=P10-Plans
 
 **Model routing:**
@@ -73,16 +110,19 @@ Pre-execution planning contract grounded in NASA JPL Power of 10 rules.
 
 ---
 
-# cabinet
+`;
+
+  // Cabinet
+  md += `# cabinet
 
 The final voice before a tagged release. Three equal seats, no chair, no tiebreaker.
 
-**Trigger:** `/cabinet`, "convene the cabinet", "cabinet this", or any release/tag/v-number gate (e.g. "ready for v1.0.0?") after the build/review/ship stack has run.
+**Trigger:** \`/cabinet\`, "convene the cabinet", "cabinet this", or any release/tag/v-number gate (e.g. "ready for v1.0.0?") after the build/review/ship stack has run.
 
-**Skill location:** `.agents/skills/toto-governance/cabinet/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/cabinet/SKILL.md\`
 
 **Config:**
-- VAULT_PATH=~/.toto/vault
+- VAULT_PATH=${config.vault_path}
 - CABINET_LOG_DIR=Cabinet
 
 **Seats (equal seating, all Codex-opus-4-8):**
@@ -104,16 +144,19 @@ The final voice before a tagged release. Three equal seats, no chair, no tiebrea
 
 ---
 
-# safety-car
+`;
+
+  // Safety Car
+  md += `# safety-car
 
 Adversarial stress test of an approved P10 plan. Fires after P10 approval, before any file is touched. One adversarial agent finds failure modes: runtime failures, abuse vectors, blast radius, wrong assumptions. Not deliberation — stress testing a decision already made.
 
 **Trigger:** "safety car on this plan", "stress test the P10 plan", "adversarial review".
 
-**Skill location:** `.agents/skills/toto-governance/safety-car/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/safety-car/SKILL.md\`
 
 **Config:**
-- VAULT_PATH=~/.toto/vault
+- VAULT_PATH=${config.vault_path}
 - SAFETY_CAR_LOG_DIR=SafetyCar
 
 **Behavior:**
@@ -127,13 +170,16 @@ Adversarial stress test of an approved P10 plan. Fires after P10 approval, befor
 
 ---
 
-# karpathy
+`;
+
+  // Karpathy
+  md += `# karpathy
 
 Execution-layer quality rules. Active after P10 plan reaches status: approved. Governs HOW code is written, not WHAT is built. Four invariants running continuously during every implementation stage. P10 gates the structure. Karpathy governs execution.
 
 **Trigger:** "karpathy", or automatic when P10 approved + execution begins.
 
-**Skill location:** `.agents/skills/toto-governance/karpathy/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/karpathy/SKILL.md\`
 
 **Behavioral guidelines that run as a second tier after P10 architectural approval:**
 
@@ -179,7 +225,10 @@ Each P10 stage already has assertions and return-value requirements. Map them to
 
 ---
 
-# drs
+`;
+
+  // DRS
+  md += `# drs
 
 Drag Reduction System — ambient PreToolUse tripwire. Fires deterministically on boundary violations on EVERY mutating tool call. Not a slash command. Not invoked manually.
 
@@ -187,48 +236,45 @@ Blocks writes to frozen paths, auth surfaces, cross-tenant, out-of-scope, destru
 
 **Trigger:** Always active. Configured via .toto/drs-config.json and .toto/freeze.json.
 
-**Skill location:** `.agents/skills/toto-governance/drs/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/drs/SKILL.md\`
 
 **Config (from .toto/config.yml):**
-```yaml
+\`\`\`yaml
 drs:
   freeze_paths:
-    - packages/core/src/types.ts
-    - packages/mcp-server/src/index.ts
+${(drs.freeze_paths || []).map((p: string) => `    - ${p}`).join('\n')}
   allowed_paths:
-    - packages/
-    - scripts/
-    - .agents/
-    - tests/
-    - docs/
-  tenant_namespaces: ["acme-corp"]
-  current_tenant: acme-corp
+${(drs.allowed_paths || []).map((p: string) => `    - ${p}`).join('\n')}
+  tenant_namespaces: ${JSON.stringify(drs.tenant_namespaces || [])}
+  current_tenant: ${drs.current_tenant || ''}
   halt_patterns:
-    - TRUNCATE TABLE
-    - git push --force
-```
+${(drs.halt_patterns || []).map((p: string) => `    - ${p}`).join('\n')}
+\`\`\`
 
 **5 Rules (evaluated in order, first match wins):**
 1. **frozen_path** — target matches .toto/freeze.json globs
 2. **out_of_scope** — target outside .toto/drs-config.json allowed_paths
 3. **auth_surface** — target matches *auth*|*permission*|*role*|*tenant*|*policy*|*rbac*|*acl*|*iam*
 4. **cross_tenant** — target contains tenant ≠ current_tenant
-5. **destructive_pattern** — Bash has `rm -rf`|`DROP TABLE`|`DELETE FROM` (no WHERE) unless `--force-confirmed`
+5. **destructive_pattern** — Bash has \`rm -rf\`|\`DROP TABLE\`|\`DELETE FROM\` (no WHERE) unless \`--force-confirmed\`
 
-**Override:** `"override drs: [reason]"` in message before tool call → allowed with audit log
+**Override:** \`"override drs: [reason]"\` in message before tool call → allowed with audit log
 
 ---
 
-# vault
+`;
+
+  // Vault
+  md += `# vault
 
 Session memory backed governance vault. Replaces Obsidian filesystem vault with pi's durable session memory. Provides write, search, and retrieval of all governance records (council, p10, safety-car, cabinet, karpathy, drs). Survives disconnects, restarts, handoffs.
 
 **Trigger:** "vault write", "vault search", "vault get", "governance record", "session memory".
 
-**Skill location:** `.agents/skills/toto-governance/vault/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/vault/SKILL.md\`
 
 **Config:**
-- VAULT_PATH=~/.toto/vault
+- VAULT_PATH=${config.vault_path}
 
 **Usage:**
 - vault write <domain> <content> <filename>
@@ -238,21 +284,24 @@ Session memory backed governance vault. Replaces Obsidian filesystem vault with 
 
 ---
 
-# subagent
+`;
+
+  // Subagent
+  md += `# subagent
 
 Dynamic workflow & subagent orchestration for toto-governance. Spawns isolated pi subagents for parallel council scouts, P10 analysis stages, safety-car adversarial review, and karpathy execution verification. Integrates with the existing subagent extension for multi-agent workflows.
 
 **Trigger:** "subagent", "parallel council", "parallel p10", "workflow", "spawn agent".
 
-**Skill location:** `.agents/skills/toto-governance/subagent/SKILL.md`
+**Skill location:** \`.agents/skills/toto-governance/subagent/SKILL.md\`
 
 **Config:**
-```yaml
+\`\`\`yaml
 subagent:
-  default_scope: both
-  max_parallel: 4
-  confirm_project_agents: true
-```
+  default_scope: ${subagent.default_scope || 'both'}
+  max_parallel: ${subagent.max_parallel || 4}
+  confirm_project_agents: ${subagent.confirm_project_agents || true}
+\`\`\`
 
 **Governance Workflow Presets:**
 - Council Parallel Scouts: 2 scouts + 2 analysts
@@ -262,42 +311,48 @@ subagent:
 
 ---
 
-# RL on Governance Memory
+`;
+
+  // RL
+  md += `# RL on Governance Memory
 
 Policy optimization + cross-session learning via hybrid RAG + ONNX policy network.
 
 **Config (from .toto/config.yml):**
-```yaml
+\`\`\`yaml
 rl:
-  enabled: true
-  embedding_model: "BAAI/bge-small-en-v1.5"
-  embedding_dim: 384
+  enabled: ${rl.enabled || true}
+  embedding_model: "${rl.embedding_model || 'BAAI/bge-small-en-v1.5'}"
+  embedding_dim: ${rl.embedding_dim || 384}
   index:
-    backend: "auto"
-    faiss_type: "HNSW32"
-    bm25_language: "en"
-    reranker_model: null
+    backend: "${rl.index?.backend || 'auto'}"
+    faiss_type: "${rl.index?.faiss_type || 'HNSW32'}"
+    bm25_language: "${rl.index?.bm25_language || 'en'}"
+    reranker_model: ${rl.index?.reranker_model || null}
   policy:
-    hidden_dims: [256,128]
-    action_space: ["apply_plan","request_revision","escalate_council","request_human_review","defer"]
-    auto_apply_threshold: 0.8
-    suggest_threshold: 0.5
+    hidden_dims: ${JSON.stringify(rl.policy?.hidden_dims || [256, 128])}
+    action_space: ${JSON.stringify(rl.policy?.action_space || ["apply_plan", "request_revision", "escalate_council", "request_human_review", "defer"])}
+    auto_apply_threshold: ${rl.policy?.auto_apply_threshold || 0.8}
+    suggest_threshold: ${rl.policy?.suggest_threshold || 0.5}
   training:
-    trigger: "event"
-    trigger_outcomes: 50
-    batch_size: 32
-    lr: 0.0003
-    epochs: 5
-    holdout_frac: 0.2
-    min_improvement: 0.02
+    trigger: "${rl.training?.trigger || 'event'}"
+    trigger_outcomes: ${rl.training?.trigger_outcomes || 50}
+    batch_size: ${rl.training?.batch_size || 32}
+    lr: ${rl.training?.lr || 3e-4}
+    epochs: ${rl.training?.epochs || 5}
+    holdout_frac: ${rl.training?.holdout_frac || 0.2}
+    min_improvement: ${rl.training?.min_improvement || 0.02}
   session:
-    checkpoint_on_end: true
-    warm_start_on_resume: true
-```
+    checkpoint_on_end: ${rl.session?.checkpoint_on_end || true}
+    warm_start_on_resume: ${rl.session?.warm_start_on_resume || true}
+\`\`\`
 
 ---
 
-# constraints
+`;
+
+  // Constraints
+  md += `# constraints
 
 ## Skill routing
 
@@ -324,7 +379,10 @@ Key routing rules:
 
 ---
 
-## karpathy
+`;
+
+  // Karpathy execution rules
+  md += `## karpathy
 
 <!-- ACTIVATION: These rules are active during all implementation work once a P10 plan reaches status: approved. They are not a separate skill invocation — they are execution invariants. -->
 
@@ -374,17 +432,31 @@ The test: every changed line traces directly to the approved P10 stage.
 
 Each P10 stage already has assertions and return-value requirements. Map them to verifiable goals:
 
-```
+\`\`\`
 Stage N: [name from P10 plan]
 1. [step] → verify: [P10 assertion or return-value check]
 2. [step] → verify: [P10 assertion or return-value check]
-```
+\`\`\`
 
 Strong success criteria let execution loop independently. If a stage's verification criteria are unclear, stop and surface the ambiguity before writing code.
 
 ---
 
-<!-- 
+`;
+
+  md += `<!-- 
   Generated from .toto/config.yml by scripts/generate-agents-md.ts
   Do not edit manually — edit .toto/config.yml and re-run generator
--->
+-->\n`;
+
+  return md;
+}
+
+function main() {
+  const config = loadConfig();
+  const md = generateAgentsMd(config);
+  fs.writeFileSync(OUTPUT_PATH, md);
+  console.log(`Generated ${OUTPUT_PATH}`);
+}
+
+main();

@@ -6,8 +6,13 @@ import { EventEmitter } from 'node:events';
 // the factory for each fresh module instance, keeping the mock in effect.
 vi.mock('./dashboard_status.js', () => ({
   handleDashboardStatus: vi.fn().mockResolvedValue({
-    councilSessions: { count: 2 },
-    p10Plans: { count: 3 },
+    councilSessions: { count: 2, recent: [] },
+    p10Plans: { count: 3, recent: [] },
+    cabinetSessions: { count: 0, recent: [] },
+    safetyCarReports: { count: 0, recent: [] },
+    karpathyChecks: { count: 0, recent: [] },
+    drsEvents: { count: 0, recent: [] },
+    subagentLists: { count: 0, recent: [] },
     blockedItems: [],
     generatedAt: '2026-06-22T00:00:00.000Z',
   }),
@@ -82,8 +87,13 @@ describe('handleSseRequest — 503 at capacity (real entry point)', () => {
     vi.resetModules();
     vi.mock('./dashboard_status.js', () => ({
       handleDashboardStatus: vi.fn().mockResolvedValue({
-        councilSessions: { count: 0 },
-        p10Plans: { count: 0 },
+        councilSessions: { count: 0, recent: [] },
+        p10Plans: { count: 0, recent: [] },
+        cabinetSessions: { count: 0, recent: [] },
+        safetyCarReports: { count: 0, recent: [] },
+        karpathyChecks: { count: 0, recent: [] },
+        drsEvents: { count: 0, recent: [] },
+        subagentLists: { count: 0, recent: [] },
         blockedItems: [],
         generatedAt: '2026-06-22T00:00:00.000Z',
       }),
@@ -204,8 +214,13 @@ describe('broadcastStats — successful broadcast', () => {
     const mod = await freshRegistry();
     const { handleDashboardStatus } = await import('./dashboard_status.js');
     vi.mocked(handleDashboardStatus).mockResolvedValueOnce({
-      councilSessions: { count: 5 },
-      p10Plans: { count: 7 },
+      councilSessions: { count: 5, recent: [] },
+      p10Plans: { count: 7, recent: [] },
+      cabinetSessions: { count: 0, recent: [] },
+      safetyCarReports: { count: 0, recent: [] },
+      karpathyChecks: { count: 0, recent: [] },
+      drsEvents: { count: 0, recent: [] },
+      subagentLists: { count: 0, recent: [] },
       blockedItems: [{ id: '1' }] as never[],
       generatedAt: '2026-06-22T00:00:00.000Z',
     } as never);
@@ -253,8 +268,13 @@ describe('SSE — real socket integration', () => {
     vi.resetModules();
     vi.mock('./dashboard_status.js', () => ({
       handleDashboardStatus: vi.fn().mockResolvedValue({
-        councilSessions: { count: 1 },
-        p10Plans: { count: 2 },
+        councilSessions: { count: 1, recent: [] },
+        p10Plans: { count: 2, recent: [] },
+        cabinetSessions: { count: 0, recent: [] },
+        safetyCarReports: { count: 0, recent: [] },
+        karpathyChecks: { count: 0, recent: [] },
+        drsEvents: { count: 0, recent: [] },
+        subagentLists: { count: 0, recent: [] },
         blockedItems: [],
         generatedAt: '2026-06-22T00:00:00.000Z',
       }),

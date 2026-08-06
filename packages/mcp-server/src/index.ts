@@ -4,11 +4,16 @@ import assert from 'node:assert';
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { VaultService, CouncilService, P10Service } from '@toto-wolff/core';
+import { VaultService, CouncilService, P10Service, CabinetService, SafetyCarService, KarpathyService, DRSService, SubagentService } from '@toto-wolff/core';
 import { MCPValidationError, handleVaultWrite } from './handlers/vault_write.js';
 import { handleVaultSearch } from './handlers/vault_search.js';
 import { handleCouncilRun } from './handlers/council_run.js';
 import { handleP10Plan } from './handlers/p10_plan.js';
+import { handleCabinetRun } from './handlers/cabinet_run.js';
+import { handleSafetyCarRun } from './handlers/safety_car_run.js';
+import { handleKarpathyCheck } from './handlers/karpathy_check.js';
+import { handleDrsCheck } from './handlers/drs_check.js';
+import { handleSubagentList } from './handlers/subagent_list.js';
 import { renderDashboardHtml } from './handlers/dashboard_html.js';
 import { handleDashboardStatus } from './handlers/dashboard_status.js';
 import { handleSseRequest } from './handlers/sse_handler.js';
@@ -31,14 +36,24 @@ assert(isAbsolute(VAULT_PATH), 'VAULT_PATH must be absolute');
 const vault = new VaultService(VAULT_PATH);
 const council = new CouncilService(vault);
 const p10 = new P10Service(vault);
+const cabinet = new CabinetService(vault);
+const safetyCar = new SafetyCarService(vault);
+const karpathy = new KarpathyService(vault);
+const drs = new DRSService();
+const subagent = new SubagentService();
 
 const TOOLS: Record<string, (body: unknown) => Promise<unknown> | unknown> = {
-  vault_write:        (body) => handleVaultWrite(body, vault),
-  vault_search:       (body) => handleVaultSearch(body, vault),
-  council_run:        (body) => handleCouncilRun(body, council, VAULT_PATH),
-  p10_plan:           (body) => handleP10Plan(body, p10),
-  dashboard_status:   ()     => handleDashboardStatus(VAULT_PATH),
-  score_confidence:   (body) => handleScoreConfidence(body, VAULT_PATH),
+  vault_write:         (body) => handleVaultWrite(body, vault),
+  vault_search:        (body) => handleVaultSearch(body, vault),
+  council_run:         (body) => handleCouncilRun(body, council, VAULT_PATH),
+  p10_plan:            (body) => handleP10Plan(body, p10),
+  cabinet_run:         (body) => handleCabinetRun(body, cabinet),
+  safety_car_run:      (body) => handleSafetyCarRun(body, safetyCar),
+  karpathy_check:      (body) => handleKarpathyCheck(body, karpathy),
+  drs_check:           (body) => handleDrsCheck(body, drs),
+  subagent_list:       (body) => handleSubagentList(body, subagent),
+  dashboard_status:    ()     => handleDashboardStatus(VAULT_PATH),
+  score_confidence:    (body) => handleScoreConfidence(body, VAULT_PATH),
 };
 
 const MAX_BODY_BYTES = 65_536;
@@ -142,12 +157,17 @@ const mcpServer = new McpServer(
 
 mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
-    { name: 'vault_write',       description: 'Write a record to the toto vault',                inputSchema: { type: 'object' as const, properties: { content: { type: 'string' }, filename: { type: 'string' } }, required: ['content', 'filename'] } },
-    { name: 'vault_search',      description: 'Search vault records by query string',             inputSchema: { type: 'object' as const, properties: { query: { type: 'string' } }, required: ['query'] } },
-    { name: 'council_run',       description: 'Run a council deliberation session',               inputSchema: { type: 'object' as const, properties: { question: { type: 'string' }, currentTags: { type: 'array' as const, items: { type: 'string' as const } }, priors: { type: 'array' as const, items: { type: 'object' as const } } }, required: ['question'] } },
-    { name: 'p10_plan',          description: 'Generate a P10 pre-execution plan',                inputSchema: { type: 'object' as const, properties: { task: { type: 'string' } }, required: ['task'] } },
-    { name: 'dashboard_status',  description: 'Get current vault stats for the dashboard',       inputSchema: { type: 'object' as const, properties: {} } },
-    { name: 'score_confidence',  description: 'Score confidence of a council ruling',             inputSchema: { type: 'object' as const, properties: { ruling: { type: 'string' } }, required: ['ruling'] } },
+    { name: 'vault_write',         description: 'Write a record to the toto vault',                   inputSchema: { type: 'object' as const, properties: { content: { type: 'string' }, filename: { type: 'string' } }, required: ['content', 'filename'] } },
+    { name: 'vault_search',        description: 'Search vault records by query string',                inputSchema: { type: 'object' as const, properties: { query: { type: 'string' } }, required: ['query'] } },
+    { name: 'council_run',         description: 'Run a council deliberation session',                  inputSchema: { type: 'object' as const, properties: { question: { type: 'string' }, currentTags: { type: 'array' as const, items: { type: 'string' as const } }, priors: { type: 'array' as const, items: { type: 'object' as const } } }, required: ['question'] } },
+    { name: 'p10_plan',            description: 'Generate a P10 pre-execution plan',                   inputSchema: { type: 'object' as const, properties: { task: { type: 'string' } }, required: ['task'] } },
+    { name: 'cabinet_run',         description: 'Run a cabinet release gate',                          inputSchema: { type: 'object' as const, properties: { subject: { type: 'string' }, version: { type: 'string' }, evidence_brief: { type: 'string' } }, required: ['subject', 'version'] } },
+    { name: 'safety_car_run',      description: 'Run safety car adversarial review on a P10 plan',     inputSchema: { type: 'object' as const, properties: { plan_path: { type: 'string' } }, required: ['plan_path'] } },
+    { name: 'karpathy_check',      description: 'Check implementation against Karpathy rules',         inputSchema: { type: 'object' as const, properties: { plan_path: { type: 'string' }, stage: { type: 'string' }, diff: { type: 'string' } }, required: ['plan_path', 'stage'] } },
+    { name: 'drs_check',           description: 'Check a tool call against DRS boundary rules',        inputSchema: { type: 'object' as const, properties: { tool: { type: 'string', enum: ['Write', 'Edit', 'NotebookEdit', 'Bash'] }, target_path: { type: 'string' }, command: { type: 'string' }, message_before: { type: 'string' } }, required: ['tool'] } },
+    { name: 'subagent_list',       description: 'List available subagents',                             inputSchema: { type: 'object' as const, properties: { scope: { type: 'string', enum: ['user', 'project', 'both'] } } } },
+    { name: 'dashboard_status',    description: 'Get current vault stats for the dashboard',            inputSchema: { type: 'object' as const, properties: {} } },
+    { name: 'score_confidence',    description: 'Score confidence of a council ruling',                 inputSchema: { type: 'object' as const, properties: { ruling: { type: 'string' } }, required: ['ruling'] } },
   ],
 }));
 

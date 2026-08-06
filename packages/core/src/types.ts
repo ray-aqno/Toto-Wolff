@@ -60,6 +60,176 @@ export interface P10Result {
   budgetFlag?: 'fanout_overrun';
 }
 
+export interface P10Result {
+  status: P10Status | 'error';
+  planPath?: string;
+  error?: string;
+  /** Set only when checkSessionBudget() detects a structural fan-out violation. */
+  budgetFlag?: 'fanout_overrun';
+}
+
+// ============================================================================
+// CabinetService types
+// ============================================================================
+
+export type CabinetVerdict = 'ship' | 'conditional' | 'block';
+export type CabinetSeat = 'garry_tan' | 'feynman' | 'karpathy';
+
+export interface CabinetSeatResult {
+  seat: CabinetSeat;
+  verdict: CabinetVerdict;
+  oneLine: string;
+  reasoning: string;
+  condition?: string;
+  blockingDefect?: string;
+  whatWouldChangeVote: string;
+}
+
+export interface CabinetResult {
+  ruling: 'approved' | 'approved-with-conditions' | 'held';
+  seats: CabinetSeatResult[];
+  convergence: string;
+  tension: string;
+  blockingDefect?: string;
+  conditions: string[];
+  recordPath: string;
+}
+
+export class CabinetError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CabinetError';
+  }
+}
+
+// ============================================================================
+// SafetyCarService types
+// ============================================================================
+
+export type SafetyCarCategory =
+  | 'runtime_failure'
+  | 'abuse_vector'
+  | 'blast_radius'
+  | 'wrong_assumption'
+  | 'partial_failure';
+
+export type SafetyCarSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+export interface SafetyCarRisk {
+  category: SafetyCarCategory;
+  severity: SafetyCarSeverity;
+  description: string;
+  mitigation: string;
+  planRef: string;
+}
+
+export interface SafetyCarReport {
+  planPath: string;
+  risks: SafetyCarRisk[];
+  criticalCount: number;
+  highCount: number;
+  verdict: 'pass' | 'fail' | 'conditional';
+  summary: string;
+}
+
+export class SafetyCarError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SafetyCarError';
+  }
+}
+
+// ============================================================================
+// KarpathyService types
+// ============================================================================
+
+export type KarpathyRule =
+  | 'simplicity'
+  | 'surgical'
+  | 'goal_driven'
+  | 'think_before_coding';
+
+export interface KarpathyViolation {
+  rule: KarpathyRule;
+  file: string;
+  line: number;
+  description: string;
+  suggestion: string;
+}
+
+export interface KarpathyCheck {
+  stage: string;
+  status: 'pass' | 'fail';
+  violations: KarpathyViolation[];
+  summary: string;
+}
+
+export class KarpathyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'KarpathyError';
+  }
+}
+
+// ============================================================================
+// DRSService types
+// ============================================================================
+
+export type DRSRule = 1 | 2 | 3 | 4 | 5;
+export type DRSTool = 'Write' | 'Edit' | 'NotebookEdit' | 'Bash';
+
+export interface DRSCheckInput {
+  tool: DRSTool;
+  targetPath?: string;
+  command?: string;
+  messageBefore?: string;
+}
+
+export interface DRSResult {
+  allowed: boolean;
+  ruleFired?: DRSRule;
+  reason?: string;
+  override?: boolean;
+  overrideReason?: string;
+}
+
+export interface DRSConfig {
+  freezePaths: string[];
+  allowedPaths: string[];
+  tenantNamespaces: string[];
+  currentTenant: string;
+  haltPatterns: string[];
+}
+
+export class DRSError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DRSError';
+  }
+}
+
+// ============================================================================
+// SubagentService types
+// ============================================================================
+
+export interface AgentConfig {
+  name: string;
+  description: string;
+  tools: string;
+  model: string;
+  thinking: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'max';
+  systemPrompt: string;
+  source: 'user' | 'project';
+  filePath: string;
+}
+
+export class SubagentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SubagentError';
+  }
+}
+
 /**
  * Closed enum of valid pattern values for SignalRecord.
  * Adding a new pattern requires a code change — this is intentional (write-path enforcement).

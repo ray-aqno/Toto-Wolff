@@ -19,6 +19,11 @@ function buildStatsPayload(vaultPath: string): Promise<DashboardStats> {
   return handleDashboardStatus(vaultPath).then((data) => ({
     councilCount: data.councilSessions.count,
     p10Count: data.p10Plans.count,
+    cabinetCount: data.cabinetSessions.count,
+    safetyCarCount: data.safetyCarReports.count,
+    karpathyCount: data.karpathyChecks.count,
+    drsCount: data.drsEvents.count,
+    subagentCount: data.subagentLists.count,
     blockedCount: data.blockedItems.length,
     generatedAt: data.generatedAt,
   }));

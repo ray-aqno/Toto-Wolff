@@ -18,12 +18,14 @@
     "typecheck": "tsc -b",
     "check-patterns": "tsx --tsconfig scripts/tsconfig.json scripts/check-patterns.ts",
     "bump-version": "tsx --tsconfig scripts/tsconfig.json scripts/bump-version.ts",
+    "migrate-config": "tsx --tsconfig scripts/tsconfig.json scripts/migrate-config.ts",
     "generate:agents-md": "tsx --tsconfig scripts/tsconfig.json scripts/generate-agents-md.ts",
     "generate:claude-md": "tsx --tsconfig scripts/tsconfig.json scripts/generate-claude-md.ts",
     "generate:drs-config": "tsx --tsconfig scripts/tsconfig.json scripts/generate-drs-config.ts",
     "generate:all": "pnpm generate:agents-md && pnpm generate:claude-md && pnpm generate:drs-config"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

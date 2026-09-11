@@ -49,6 +49,9 @@ export function createAnthropicClient(): Anthropic {
     const fromFile = readClaudeJsonEnv(MCP_KEY);
     apiKey = fromFile.apiKey;
     authToken = fromFile.authToken;
+    if (fromFile.baseUrl && !process.env['ANTHROPIC_BASE_URL']) {
+      process.env['ANTHROPIC_BASE_URL'] = fromFile.baseUrl;
+    }
   }
 
   assert(

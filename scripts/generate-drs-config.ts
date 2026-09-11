@@ -31,12 +31,17 @@ function main() {
     tenant_namespaces: drs.tenant_namespaces || [],
     current_tenant: drs.current_tenant || '',
     halt_patterns: drs.halt_patterns || [],
+    // Only emit permissive when explicitly set — DRSService.ts's loadConfig()
+    // treats its absence as false (fail-closed default), and this must
+    // reach the generated runtime config for the config.yml documentation
+    // comment on this field to have any actual effect.
+    ...(typeof drs.permissive === 'boolean' ? { permissive: drs.permissive } : {}),
   };
   fs.writeFileSync(DRS_CONFIG_PATH, JSON.stringify(drsConfig, null, 2));
   console.log(`Generated ${DRS_CONFIG_PATH}`);
 
   // Generate freeze.json
-  const freeze = drs.freeze_paths || [];
+  const freeze = { frozen: drs.freeze_paths || [] };
   fs.writeFileSync(FREEZE_PATH, JSON.stringify(freeze, null, 2));
   console.log(`Generated ${FREEZE_PATH}`);
 }

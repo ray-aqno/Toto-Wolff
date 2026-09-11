@@ -1,4 +1,6 @@
-[
-  "packages/core/src/types.ts",
-  "packages/mcp-server/src/index.ts"
-]
+{
+  "frozen": [
+    "packages/core/src/types.ts",
+    "packages/mcp-server/src/index.ts"
+  ]
+}

@@ -8,6 +8,7 @@ export { CabinetService } from './CabinetService.js';
 export { SafetyCarService } from './SafetyCarService.js';
 export { KarpathyService } from './KarpathyService.js';
 export { DRSService } from './DRSService.js';
+export { HookSystem, HookSystemInstance, type HookExecutor, type HookContext, type HookResult, type HookConfig, type HookSystemConfig } from './hooks/index.js';
 export { SubagentService } from './SubagentService.js';
 export * from './types.js';
 export { jaccardSimilarity, JACCARD_MATCH_THRESHOLD } from './utils/jaccard.js';

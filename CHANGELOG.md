@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] - 2026-09-10
+
+### Added
+- **DRS `permissive` config flag** — Explicit opt-out for Rule 2 (out-of-scope write). By default, an empty `allowed_paths` now means "nothing allowed" (fail-closed), not "no restriction." Set `permissive: true` in `.toto/config.yml`'s `drs:` block to restore the old no-restriction behavior for an empty scope list.
+- **DRS `configSource` diagnostic** — `DRSService` now publicly exposes where its active config actually came from (`cwd-relative`, `env:TOTO_DRS_CONFIG`, or `deny-all-fallback`), so a resolution failure from an unexpected working directory is a visible signal instead of an indistinguishable "everything is blocked" state.
+- **DRS override audit trail (TS/MCP path)** — `checkOverride()`'s accepted overrides now write a durable vault record (mirroring the bash hook's existing `write_override_record()`), closing the fabricated-audit-trail gap named in audit finding L2-003.
+- **`DRSService.test.ts`** — New contract-test suite (Rules 1/2/4 on known-bad fixtures, permissive opt-out, cwd-relative resolution failure/`TOTO_DRS_CONFIG` override, override-anchoring, and rule-precedence pinning).
+
+### Changed
+- **DRS Rule 2 fails closed by default** — Breaking behavior change: `rule2_scope()`'s old bypass (`allowedPaths.length === 0 → allow`) is removed. Any deployment relying on an empty `allowed_paths` meaning "no restriction" must now set `permissive: true` explicitly.
+- **DRS override scope narrowed (TS/MCP path)** — `message_before: "override drs: <reason>"` on the `drs_check` tool now bypasses Rules 2/3/4 only. It no longer bypasses Rule 1 (frozen path — a curated list an override shouldn't defeat) or Rule 5 (destructive pattern — already has its own narrower `--force-confirmed` override). This is a live behavior change from the previous undocumented all-5-rules bypass.
+- **DRS hook registration moved** — The live PreToolUse hook is now registered in `.claude/settings.local.json`, pointing at the tracked `.claude/skills/drs/bin/drs-check.sh`. `.pi/hooks.json` (which pointed at a stale, divergent external fork) is removed.
+- **`.toto/freeze.json` schema** — Now `{"frozen": [...]}` instead of a bare array, matching `DRSService.ts`'s own tolerant parse and fixing a schema mismatch that silently broke the bash hook's Rule 1 check (both the jq and python3 code paths).
+- **`.toto/config.yml`'s `drs.allowed_paths` widened** — Added `.toto/`, `.claude/`, `P10-Plans/`, `.pi/sessions/`, `.github/`, and repo-root essentials (`CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `package.json`, `pnpm-lock.yaml`) so Rule 2's new fail-closed default doesn't block this repo's own normal write traffic.
+- **Override documentation corrected at 5 sites** (`generate-claude-md.ts`, `generate-agents-md.ts`, `.claude/skills/drs/SKILL.md`, and `drs-check.sh`'s own comment/echo text) — previously described a single message-based override mechanism; now accurately describes the two distinct mechanisms (TS/MCP path, Rules 2/3/4 only, audited; bash-hook path, `DRS_OVERRIDE_REASON` env var only, any rule) and their different scopes.
+
+### Fixed
+- **DRS hook exit code** — `drs_halt()` now exits 2, not 1. This harness's PreToolUse contract only blocks on exit code 2, so every rule that fired via the bash hook was previously non-blocking regardless of whether it detected a real violation.
+- **`PROJECT_ROOT` miscalculation in `drs-check.sh`** — Was resolving to `.claude/` (3 `..` from `.claude/skills/drs/bin`), not the repo root, so the hook could never actually find `.toto/drs-config.json` or `.toto/freeze.json`. Now resolves correctly (4 `..`).
+- **Rules 2, 4, and the custom-`halt_patterns` half of Rule 5 silently no-op'd when `jq` was absent** (no `else` branch existed at all) — all three now have real python3 fallbacks, verified end-to-end on a machine without `jq` installed.
+- **`DRS_OVERRIDE_REASON` validation gate (L2-004)** — Previously any non-empty value was accepted with no further checks. Now rejects whitespace-only and common placeholder values (`reason`, `todo`, `n/a`, etc.) via a new `validate_override_reason()` helper.
+
 ## [1.4.1] - 2025-08-05
 
 ### Added

@@ -3,9 +3,9 @@ import http from "node:http";
 import https from "node:https";
 import path from "node:path";
 import os from "node:os";
+import { readClaudeJsonEnv } from "@toto-wolff/core";
 
 const SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
-const CLAUDE_JSON_PATH = path.join(os.homedir(), ".claude.json");
 const MCP_KEY = "toto-wolff";
 const DEFAULT_VAULT_PATH = path.join(os.homedir(), ".toto", "vault");
 
@@ -30,26 +30,18 @@ export function checkEnv(env: Record<string, string | undefined> = process.env):
  * mcpServers["toto-wolff"].env — used as fallback for enterprise/proxy setups
  * where the token is not exported to the shell environment.
  */
-async function readTokenFromClaudeJson(): Promise<string | undefined> {
-  try {
-    const raw = await fs.readFile(CLAUDE_JSON_PATH, "utf8");
-    const json = JSON.parse(raw) as Record<string, unknown>;
-    const servers = json.mcpServers as Record<string, unknown> | undefined;
-    const entry = servers?.[MCP_KEY] as Record<string, unknown> | undefined;
-    const env = entry?.env as Record<string, string> | undefined;
-    return env?.["ANTHROPIC_AUTH_TOKEN"] ?? env?.["ANTHROPIC_API_KEY"];
-  } catch {
-    return undefined;
-  }
+function readTokenFromClaudeJson(): string | undefined {
+  const { authToken, apiKey } = readClaudeJsonEnv(MCP_KEY);
+  return authToken ?? apiKey;
 }
 
 /** Check that at least one Anthropic auth env var is set and non-empty. */
-async function checkAuthToken(): Promise<CheckResult> {
+function checkAuthToken(): CheckResult {
   const label = "ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY";
   if (checkEnv(process.env as Record<string, string | undefined>)) {
     return { label, passed: true, detail: "set (env)" };
   }
-  const fromJson = await readTokenFromClaudeJson();
+  const fromJson = readTokenFromClaudeJson();
   if (typeof fromJson === "string" && fromJson.length > 0) {
     return { label, passed: true, detail: `set (~/.claude.json mcpServers.${MCP_KEY}.env)` };
   }
@@ -212,8 +204,8 @@ function printCheck(result: CheckResult, info = false): void {
 export async function runDoctor(): Promise<void> {
   process.stdout.write("toto doctor\n\n");
 
-  const [authResult, mcpResult, vaultResult, hookResult, ollamaResult] = await Promise.all([
-    checkAuthToken(),
+  const authResult = checkAuthToken();
+  const [mcpResult, vaultResult, hookResult, ollamaResult] = await Promise.all([
     checkMcpEntry(),
     checkVaultPath(),
     checkHookInstalled(),

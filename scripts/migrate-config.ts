@@ -20,6 +20,10 @@ export interface MigrationResult {
   error?: string;
 }
 
+/**
+ * Migrate the legacy local config while defaulting to a non-destructive dry run.
+ * Returns a structured result so callers can report changes and failures consistently.
+ */
 export function migrateConfig(dryRun = true): MigrationResult {
   const changes: string[] = [];
 

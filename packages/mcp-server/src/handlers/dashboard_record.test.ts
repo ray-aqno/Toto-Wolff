@@ -5,6 +5,7 @@ import path from 'node:path';
 
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
+  mkdir: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { readFile } from 'node:fs/promises';

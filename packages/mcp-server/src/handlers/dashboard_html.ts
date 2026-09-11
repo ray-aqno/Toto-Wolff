@@ -108,10 +108,10 @@ function injectPanelScript(): string {
           body.innerHTML = '';
           body.appendChild(pre);
         })
-        .catch(function () {
+        .catch(function (status) {
           if (spinner) { spinner.className = ''; }
           body.style.display = '';
-          body.textContent = 'Record not found.';
+          body.textContent = status === 404 ? 'Record not found.' : 'Could not load record — check your connection and try again.';
         });
     });
   });
@@ -158,7 +158,7 @@ function arcGauge(pct: number, color: string, label: string, id: string): string
 }
 
 function sparkline(values: number[], color: string, id: string): string {
-  if (values.length < 2) return `<svg viewBox="0 0 160 40" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:40px"><text x="80" y="24" text-anchor="middle" fill="#444" font-size="10">no data</text></svg>`;
+  if (values.length < 2) return `<svg viewBox="0 0 160 40" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:160px;height:40px"><text x="80" y="24" text-anchor="middle" fill="#444" font-size="10">no data</text></svg>`;
   const max = Math.max(...values); const min = Math.min(...values); const range = max - min || 1;
   const w = 160; const h = 40; const pad = 4;
   const pts = values.map((v, i) => {
@@ -168,7 +168,7 @@ function sparkline(values: number[], color: string, id: string): string {
   });
   const lastPt = pts[pts.length - 1]!.split(',');
   const pathLen = (w - pad * 2) * 1.2;
-  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="width:${w}px;height:${h}px">
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${w}px;height:${h}px">
     <polyline id="${id}" points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-dasharray="${pathLen}" stroke-dashoffset="${pathLen}" style="transition:stroke-dashoffset 1.4s ease-out"/>
     <circle class="spark-dot" cx="${lastPt[0]}" cy="${lastPt[1]}" r="3" fill="${color}" opacity="0"/>
   </svg>`;
@@ -190,6 +190,26 @@ function sessionBarChart(items: DashboardItem[]): string {
     <text class="bar-val" x="${labelW + 4}" y="${y + barH - 4}" fill="#00D2BE" font-family="'JetBrains Mono',monospace" font-size="9" opacity="0">${val}</text>`;
   }).join('\n    ');
   return `<svg id="bar-chart" viewBox="0 0 ${labelW + chartW + 32} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${labelW + chartW + 32}px;height:${svgH}px">${bars}</svg>`;
+}
+
+/**
+ * Groups items into monthly (YYYY-MM) buckets and returns bucket counts in
+ * chronological order — a real per-period signal for sparklines to plot,
+ * replacing the previous synthetic always-rising index sequence
+ * (`items.map((_, i) => i + 1)`). Mirrors sessionBarChart's own bucketing
+ * strategy. Non-empty input always yields a non-empty output, mirroring
+ * sparkline()'s own length>=2 "no data" guard at its input boundary.
+ */
+function bucketByPeriod(items: DashboardItem[]): number[] {
+  if (items.length === 0) return [];
+  const groups: Record<string, number> = {};
+  for (const item of items) {
+    const key = item.date.slice(0, 7) || 'unknown';
+    groups[key] = (groups[key] ?? 0) + 1;
+  }
+  const counts = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
+  assert(counts.length >= 1, 'bucketByPeriod: non-empty input must yield non-empty output');
+  return counts;
 }
 
 function sectorBadge(type: 'council' | 'p10' | 'cabinet' | 'safety-car' | 'karpathy' | 'drs' | 'subagent'): string {
@@ -248,7 +268,7 @@ function buildVelocityCard(count: number, recent: DashboardItem[]): string {
   return `<div class="stat-big" data-count="${count}">0</div>
     <div class="stat-unit">Council Sessions</div>
     <hr class="sep">
-    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-council')}`;
+    ${sparkline(bucketByPeriod(recent), '#00D2BE', 'spark-council')}`;
 }
 
 /** Body of card-p10. Empty-check keys off `count`, the same field rendered as stat-big. */
@@ -259,7 +279,7 @@ function buildP10Card(count: number, recent: DashboardItem[]): string {
   return `<div class="stat-big" data-count="${count}" style="color:var(--silver)">0</div>
     <div class="stat-unit">Execution Plans</div>
     <hr class="sep">
-    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-p10')}`;
+    ${sparkline(bucketByPeriod(recent), '#00D2BE', 'spark-p10')}`;
 }
 
 /** Body of card-compliance. Empty-check keys off `recentCount`, the same source as `approved`. */
@@ -300,7 +320,7 @@ function buildCabinetCard(count: number, recent: DashboardItem[]): string {
     <div class="stat-big" data-count="${count}">0</div>
     <div class="stat-unit">Release Gates</div>
     <hr class="sep">
-    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-cabinet')}`;
+    ${sparkline(bucketByPeriod(recent), '#00D2BE', 'spark-cabinet')}`;
 }
 
 /** Body of card-safety-car. */
@@ -405,17 +425,12 @@ function buildSubagentCard(count: number, recent: DashboardItem[]): string {
     <div class="stat-big" data-count="${count}">0</div>
     <div class="stat-unit">Registered Agents</div>
     <hr class="sep">
-    ${sparkline(recent.map((_, i) => i + 1), '#00D2BE', 'spark-subagent')}`;
+    ${sparkline(bucketByPeriod(recent), '#00D2BE', 'spark-subagent')}`;
 }
 
-/** Returns the client-side `<script>` block: card animation, panel drill-down, click handling. Depends only on `jsonData`. */
-function buildDashboardClientScript(jsonData: string): string {
-  return `<script>
-(function () {
-  // ── Data ───────────────────────────────────────────────────────────────
-  const D = ${jsonData};
-
-  // ── Helpers ────────────────────────────────────────────────────────────
+/** Status color/label helpers plus the card entrance IntersectionObserver. */
+function buildStatusAndEntranceScript(): string {
+  return `  // ── Helpers ────────────────────────────────────────────────────────────
   function statusColor(s) {
     return s === 'revision-required' ? '#e03030' : s === 'approved' ? '#00D2BE' : s === 'blocked' ? '#e03030' : '#888';
   }
@@ -446,7 +461,12 @@ function buildDashboardClientScript(jsonData: string): string {
       if (t < 1) requestAnimationFrame(step);
     })(performance.now());
   }
+`;
+}
 
+/** Sparkline, arc-gauge, and bar-chart entrance animations. */
+function buildSparkGaugeBarsScript(): string {
+  return `
   // ── Sparklines ─────────────────────────────────────────────────────────
   function animateSpark(id) {
     const el = document.getElementById(id);
@@ -493,7 +513,12 @@ function buildDashboardClientScript(jsonData: string): string {
       }, i * 60 + 200);
     });
   }
+`;
+}
 
+/** Fires all entrance animations once the first card is visible; click ripple effect. */
+function buildFireAllAndRippleScript(): string {
+  return `
   // fire once
   let animated = false;
   function fireAll() {
@@ -502,6 +527,7 @@ function buildDashboardClientScript(jsonData: string): string {
       animateCount(el, parseInt(el.dataset.count || '0', 10), 900, el.dataset.suffix || '');
     });
     animateSpark('spark-council'); animateSpark('spark-p10');
+    animateSpark('spark-cabinet'); animateSpark('spark-subagent');
     animateGauge('gauge-compliance');
     animateBars();
   }
@@ -521,7 +547,17 @@ function buildDashboardClientScript(jsonData: string): string {
     card.appendChild(r);
     r.addEventListener('animationend', () => r.remove());
   }
+`;
+}
 
+/** Composes the card animation helpers: status/entrance, sparklines/gauge/bars, fire-all/ripple. */
+function buildAnimationHelpersScript(): string {
+  return `${buildStatusAndEntranceScript()}${buildSparkGaugeBarsScript()}${buildFireAllAndRippleScript()}`;
+}
+
+/** Detail-panel DOM refs, the panel-content dispatch switch, and the status pill helper. */
+function buildPanelDispatchScript(): string {
+  return `
   // ── Panel ──────────────────────────────────────────────────────────────
   const panel     = document.getElementById('panel');
   const panelTitle = document.getElementById('panel-title');
@@ -553,7 +589,12 @@ function buildDashboardClientScript(jsonData: string): string {
     const c = statusColor(s); const l = statusLabel(s);
     return '<span class="prec-pill" style="background:' + c + '20;color:' + c + ';border:1px solid ' + c + '40">' + l + '</span>';
   }
+`;
+}
 
+/** Velocity and P10 detail-panel builders. */
+function buildVelocityP10PanelsScript(): string {
+  return `
   function buildVelocityPanel() {
     const sessions = D.councilSessions.recent;
     const revisions = sessions.filter((i) => i.status === 'revision-required').length;
@@ -586,7 +627,12 @@ function buildDashboardClientScript(jsonData: string): string {
     html += '</div>';
     return html;
   }
+`;
+}
 
+/** Compliance and reversal detail-panel builders. */
+function buildComplianceReversalPanelsScript(): string {
+  return `
   function buildCompliancePanel() {
     const plans = D.p10Plans.recent;
     const approved = plans.filter((i) => i.status === 'approved').length;
@@ -627,7 +673,12 @@ function buildDashboardClientScript(jsonData: string): string {
     html += '</div>';
     return html;
   }
+`;
+}
 
+/** Session-history and blocked-items detail-panel builders. */
+function buildHistoryBlockedPanelsScript(): string {
+  return `
   function buildHistoryPanel() {
     const sessions = D.councilSessions.recent;
     const groups = {};
@@ -665,7 +716,12 @@ function buildDashboardClientScript(jsonData: string): string {
     html += '</div>';
     return html;
   }
+`;
+}
 
+/** Rulings and cabinet detail-panel builders. */
+function buildRulingsCabinetPanelsScript(): string {
+  return `
   function buildRulingsPanel() {
     const sessions = D.councilSessions.recent;
     const clean    = sessions.filter((s) => s.status === 'approved').length;
@@ -697,7 +753,12 @@ function buildDashboardClientScript(jsonData: string): string {
     html += '</div>';
     return html;
   }
+`;
+}
 
+/** Safety-car and karpathy detail-panel builders. */
+function buildSafetyCarKarpathyPanelsScript(): string {
+  return `
   function buildSafetyCarPanel() {
     const items = D.safetyCarReports.recent;
     let html = '<div class="psec"><div class="psec-label">Safety Car Reviews (' + D.safetyCarReports.count + ')</div>';
@@ -729,7 +790,12 @@ function buildDashboardClientScript(jsonData: string): string {
     html += '</div>';
     return html;
   }
+`;
+}
 
+/** DRS and subagent detail-panel builders, the escHtml helper, and the panel-label map. */
+function buildDrsSubagentPanelLabelsScript(): string {
+  return `
   function buildDrsPanel() {
     const items = D.drsEvents.recent;
     let html = '<div class="psec"><div class="psec-label">DRS Events (' + D.drsEvents.count + ')</div>';
@@ -778,7 +844,17 @@ function buildDashboardClientScript(jsonData: string): string {
     blocked:    ['BLOCKED ITEMS',       'Active blockers'],
     rulings:    ['RECENT RULINGS',      'Full ruling log'],
   };
+`;
+}
 
+/** Composes the panel dispatch, all detail-panel builders, and panel labels. */
+function buildPanelBuilderScript(): string {
+  return `${buildPanelDispatchScript()}${buildVelocityP10PanelsScript()}${buildComplianceReversalPanelsScript()}${buildHistoryBlockedPanelsScript()}${buildRulingsCabinetPanelsScript()}${buildSafetyCarKarpathyPanelsScript()}${buildDrsSubagentPanelLabelsScript()}`;
+}
+
+/** Panel open/close, card click/keydown handlers, and the Escape-key listener. */
+function buildInteractionWiringScript(): string {
+  return `
   function openPanel(type, card) {
     // Deactivate old card
     if (activeCard) activeCard.classList.remove('active');
@@ -828,12 +904,22 @@ function buildDashboardClientScript(jsonData: string): string {
   // ── Close button + Escape ──────────────────────────────────────────────
   panelClose.addEventListener('click', closePanel);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
-})();
+`;
+}
+
+/** Returns the client-side `<script>` block: card animation, panel drill-down, click handling. Depends only on `jsonData`. */
+function buildDashboardClientScript(jsonData: string): string {
+  return `<script>
+(function () {
+  // ── Data ───────────────────────────────────────────────────────────────
+  const D = ${jsonData};
+
+${buildAnimationHelpersScript()}${buildPanelBuilderScript()}${buildInteractionWiringScript()}})();
 </script>`;
 }
 
-/** Returns the static `<head>` block: meta tags, fonts, CSS. Takes no dashboard data. */
-function buildDashboardHead(): string {
+/** Head meta tags, title, font links, and the opening `<style>` tag. */
+function buildHeadMeta(): string {
   return `<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -841,18 +927,28 @@ function buildDashboardHead(): string {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+`;
+}
+
+/** CSS reset, `:root` design-token custom properties, and base html/body rules. */
+function buildBaseStyles(): string {
+  return `  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
   :root {
     --teal: #00D2BE; --silver: #C0C0C0;
     --bg: #0d0d0d; --surf: #121212; --card: #181818; --border: #242424;
-    --text: #f0f0f0; --dim: #555; --red: #e03030; --amber: #e09020;
+    --text: #f0f0f0; --dim: #555; --label: #9a9a9a; --red: #e03030; --amber: #e09020;
     --mono: 'JetBrains Mono', 'Courier New', monospace;
     --panel-w: 420px;
   }
   html, body { height: 100%; background: var(--bg); color: var(--text) }
   body { font-family: var(--mono); font-size: 14px; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden }
 
-  /* ── Header ─────────────────────────────────────────────────────────── */
+`;
+}
+
+/** Sticky header and the main card grid. */
+function buildHeaderAndGridStyles(): string {
+  return `  /* ── Header ─────────────────────────────────────────────────────────── */
   .header {
     background: var(--surf); border-bottom: 2px solid var(--teal);
     padding: .7rem 1.5rem; display: flex; align-items: center; justify-content: space-between;
@@ -878,7 +974,12 @@ function buildDashboardHead(): string {
   }
   body.panel-open .main { margin-right: var(--panel-w) }
 
-  /* ── Card ────────────────────────────────────────────────────────────── */
+`;
+}
+
+/** Card base state, visible/hover/active transitions, and the click-ripple effect. */
+function buildCardBaseStyles(): string {
+  return `  /* ── Card ────────────────────────────────────────────────────────────── */
   .card {
     background: var(--card); border: 1px solid var(--border); border-radius: 4px;
     padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: .5rem;
@@ -889,6 +990,7 @@ function buildDashboardHead(): string {
   .card.visible { opacity: 1; transform: translateY(0) }
   .card:hover   { border-color: #2e2e2e; box-shadow: 0 0 0 1px #00D2BE18, 0 4px 24px #00000060 }
   .card.active  { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 4px 32px #00D2BE18; background: #1c1f1f }
+  @media (max-width: 640px) { .main { grid-template-columns: 1fr } }
 
   /* click ripple */
   .card { position: relative; overflow: hidden }
@@ -899,8 +1001,13 @@ function buildDashboardHead(): string {
   }
   @keyframes ripple-anim { to { transform: scale(4); opacity: 0 } }
 
-  .card-header  { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem }
-  .card-label   { font-family: var(--mono); font-size: .62rem; color: var(--dim); letter-spacing: .13em; text-transform: uppercase }
+`;
+}
+
+/** Card header/label/chevron, stat/gauge/reversal styles, and the blocked/decision row styles. */
+function buildCardDetailStyles(): string {
+  return `  .card-header  { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem }
+  .card-label   { font-family: var(--mono); font-size: .62rem; color: var(--label); letter-spacing: .13em; text-transform: uppercase }
   .card-chevron { font-size: .6rem; color: var(--dim); transition: color .2s, transform .2s }
   .card.active .card-chevron { color: var(--teal); transform: rotate(90deg) }
   .sector-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0 }
@@ -928,7 +1035,12 @@ function buildDashboardHead(): string {
   .decision-excerpt { color: var(--silver); font-size: .78rem }
   .sep { border: none; border-top: 1px solid var(--border); margin: .2rem 0 }
 
-  /* ── Detail panel ────────────────────────────────────────────────────── */
+`;
+}
+
+/** Detail-panel shell: position, header, title/sub/close button. */
+function buildPanelShellStyles(): string {
+  return `  /* ── Detail panel ────────────────────────────────────────────────────── */
   .panel {
     position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel-w);
     background: var(--surf); border-left: 1px solid var(--border);
@@ -959,7 +1071,12 @@ function buildDashboardHead(): string {
   .panel-close:hover { border-color: var(--teal); color: var(--teal) }
   .panel-close:focus { outline: 2px solid var(--teal); outline-offset: 2px }
 
-  .panel-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; scrollbar-width: thin; scrollbar-color: #333 transparent }
+`;
+}
+
+/** Detail-panel body: sections, stat rows, record rows, empty state. */
+function buildPanelBodyStyles(): string {
+  return `  .panel-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; scrollbar-width: thin; scrollbar-color: #333 transparent }
   .panel-body::-webkit-scrollbar { width: 4px }
   .panel-body::-webkit-scrollbar-thumb { background: #333 }
 
@@ -989,7 +1106,12 @@ function buildDashboardHead(): string {
   /* panel empty */
   .panel-empty { font-family: var(--mono); font-size: .7rem; color: var(--dim); padding: 1rem 0 }
 
-  /* ── Footer ──────────────────────────────────────────────────────────── */
+`;
+}
+
+/** Footer, empty state, SSE connection status, panel spinner, and mobile overlay breakpoints. */
+function buildMiscStyles(): string {
+  return `  /* ── Footer ──────────────────────────────────────────────────────────── */
   .footer { background: var(--surf); border-top: 1px solid var(--border); padding: .5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; transition: margin-right .35s cubic-bezier(.4,0,.2,1) }
   body.panel-open .footer { margin-right: var(--panel-w) }
   .footer-label { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .08em }
@@ -1018,7 +1140,12 @@ function buildDashboardHead(): string {
   @media (max-width: 767px) {
     #panel { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100; overflow-y: auto; background: rgba(13,13,13,.97) }
   }
-</style>
+`;
+}
+
+/** Returns the static `<head>` block: meta tags, fonts, CSS. Takes no dashboard data. */
+function buildDashboardHead(): string {
+  return `${buildHeadMeta()}${buildBaseStyles()}${buildHeaderAndGridStyles()}${buildCardBaseStyles()}${buildCardDetailStyles()}${buildPanelShellStyles()}${buildPanelBodyStyles()}${buildMiscStyles()}</style>
 </head>
 `;
 }
@@ -1036,7 +1163,7 @@ function computeDashboardMetrics(data: DashboardResult): {
   compliancePct: number;
   gaugeColor: string;
 } {
-  const empty = data.councilSessions.count === 0 && data.p10Plans.count === 0;
+  const empty = data.councilSessions.count === 0 && data.p10Plans.count === 0 && data.blockedItems.length === 0;
   const revisions = data.councilSessions.recent.filter((i) => i.status === 'revision-required').length;
   const reversalPct = data.councilSessions.count === 0 ? 0 : Math.round((revisions / data.councilSessions.count) * 100);
   const reversalLabel = data.councilSessions.count === 0 ? 'N/A' : `${revisions} / ${data.councilSessions.count}`;

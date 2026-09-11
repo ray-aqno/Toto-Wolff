@@ -2,13 +2,8 @@ import * as readline from "node:readline";
 import * as http from "node:http";
 import * as https from "node:https";
 import { createAnthropicClient } from "@toto-wolff/core";
+import { TEAL, SILVER, BOLD, DIM, RESET } from "../colors.js";
 
-// ─── ANSI palette (Mercedes Silver Arrows) ────────────────────────────────
-const TEAL    = "\x1b[36m";   // #00D2BE approximation
-const SILVER  = "\x1b[37m";
-const BOLD    = "\x1b[1m";
-const DIM     = "\x1b[2m";
-const RESET   = "\x1b[0m";
 const CLEAR   = "\x1b[2K\r";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];

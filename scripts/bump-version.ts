@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 const REPO_ROOT = resolve(new URL('.', import.meta.url).pathname, '..');
 const VERSION_FILE = resolve(REPO_ROOT, 'VERSION');
-const PACKAGE_DIRS = ['.', 'packages/core', 'packages/cli', 'packages/mcp-server', 'packages/dashboard', 'packages/personas'];
+const PACKAGE_DIRS = ['.', 'packages/core', 'packages/cli', 'packages/mcp-server'];
 
 /**
  * All package.json versions track the root VERSION file in lockstep — this
@@ -33,7 +33,7 @@ function main(): void {
     process.exit(1);
   }
 
-  // P10-R2 LOOP BOUND: fixed-length array, ≤ 6 iterations
+  // P10-R2 LOOP BOUND: fixed-length array, ≤ 4 iterations
   for (const dir of PACKAGE_DIRS) {
     const pkgPath = resolve(REPO_ROOT, dir, 'package.json');
     if (!existsSync(pkgPath)) {

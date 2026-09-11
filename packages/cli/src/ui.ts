@@ -1,14 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-
-// ─── ANSI ─────────────────────────────────────────────────────────────────
-const T  = "\x1b[36m";   // teal  (#00D2BE)
-const S  = "\x1b[37m";   // silver
-const B  = "\x1b[1m";    // bold
-const D  = "\x1b[2m";    // dim
-const G  = "\x1b[32m";   // green
-const R  = "\x1b[0m";    // reset
+import { TEAL, SILVER, BOLD, DIM, GREEN, RESET } from "./colors.js";
 
 // ─── Radio quotes pool ────────────────────────────────────────────────────
 const QUOTES: string[] = [
@@ -103,14 +96,14 @@ export async function printLandingUI(): Promise<void> {
 
   const vaultConnected = councilCount !== null && p10Count !== null;
   const statsLine = vaultConnected
-    ? `${T}${councilCount}${R} council sessions  ${T}${p10Count}${R} P10 plans`
-    : `${D}vault not connected — run ${T}toto doctor${R}`;
+    ? `${TEAL}${councilCount}${RESET} council sessions  ${TEAL}${p10Count}${RESET} P10 plans`
+    : `${DIM}vault not connected — run ${TEAL}toto doctor${RESET}`;
 
   const pitStatus = !vaultConnected
     ? ""
     : blockedCount > 0
-      ? `\n  ${"\x1b[31m"}⚠  ${blockedCount} BLOCKED${R}${D} — execution halted on ${blockedCount} plan${blockedCount > 1 ? "s" : ""}. Run ${R}${T}toto audit${R}${D} for details.${R}`
-      : `\n  ${G}●${R}${D}  pit lane clear — no blocked plans${R}`;
+      ? `\n  ${"\x1b[31m"}⚠  ${blockedCount} BLOCKED${RESET}${DIM} — execution halted on ${blockedCount} plan${blockedCount > 1 ? "s" : ""}. Run ${RESET}${TEAL}toto audit${RESET}${DIM} for details.${RESET}`
+      : `\n  ${GREEN}●${RESET}${DIM}  pit lane clear — no blocked plans${RESET}`;
 
   const cmds: Array<[string, string]> = [
     ["init",      "Register MCP server in Claude Code"],
@@ -126,25 +119,25 @@ export async function printLandingUI(): Promise<void> {
   ];
 
   const cmdLines = cmds
-    .map(([name, desc]) => `  ${T}${B}${pad(name, 11)}${R}${S}${desc}${R}`)
+    .map(([name, desc]) => `  ${TEAL}${BOLD}${pad(name, 11)}${RESET}${SILVER}${desc}${RESET}`)
     .join("\n");
 
   const quote = dailyQuote();
 
   const ui = `
-${T}${B}╔══════════════════════════════════════════════════╗
+${TEAL}${BOLD}╔══════════════════════════════════════════════════╗
 ║  🏎   TOTO — Engineering Governance Stack        ║
 ║  Mercedes-AMG Petronas · Brackley HQ             ║
-╚══════════════════════════════════════════════════╝${R}
+╚══════════════════════════════════════════════════╝${RESET}
 
 ${cmdLines}
 
-  ${D}──────────────────────────────────────────────────${R}
+  ${DIM}──────────────────────────────────────────────────${RESET}
   ${statsLine}${pitStatus}
 
-  ${D}"${quote}"${R}
+  ${DIM}"${quote}"${RESET}
 
-  ${D}Run ${R}${T}toto <command> --help${R}${D} for usage.${R}
+  ${DIM}Run ${RESET}${TEAL}toto <command> --help${RESET}${DIM} for usage.${RESET}
 
 `;
 

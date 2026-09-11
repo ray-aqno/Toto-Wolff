@@ -139,7 +139,7 @@ Council ruling `2026-07-01-strangler-fig-seam-bugs` (lean mode, ~86K tokens vs. 
 - **Universal auth** — `createAnthropicClient()` in `packages/core/src/utils/anthropic.ts` accepts `ANTHROPIC_API_KEY` alone (personal key) or `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` (enterprise/Manifest path). P10Service and CouncilService both migrated. Shipped 2026-06-11.
 - **Git-tolerant vault** — `VaultService.commitFile` detects missing `.git` via `git rev-parse --git-dir` exit-128, skips commit observably, write is source of truth. Fresh evaluator clones no longer crash on vault write. Shipped 2026-06-11.
 - **P10BlockedError seam** — `p10_plan` handler catches `P10BlockedError` before generic handler; returns HTTP 200 `{status:'blocked'}`, writes fixed string to stderr (no vault path leak). Shipped 2026-06-11.
-- **Dashboard package** — `packages/dashboard` implemented — terminal governance dashboard. Shipped 2026-06-15.
+- **Dashboard package** — `packages/dashboard` implemented — terminal governance dashboard. Shipped 2026-06-15. (Removed 2026-09-10 per council ruling 2026-09-05-toto-dash-consolidation — the terminal rollup was ported into `toto dashboard --terminal` in `packages/cli`.)
 - **Self-integration** — toto-wolff MCP server registered in Claude Code settings. Shipped 2026-06-15.
 
 ## Completed (v0.0.2.0)

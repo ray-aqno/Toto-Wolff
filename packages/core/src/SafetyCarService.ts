@@ -115,22 +115,7 @@ PLAN PATH: ${planPath}`;
   }
 
   private parseRisks(raw: string, planPath: string): SafetyCarRisk[] {
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed.risks)) return [];
-      return parsed.risks.map((r: unknown) => {
-        const risk = r as Record<string, unknown>;
-        return {
-          category: risk.category as SafetyCarCategory,
-          severity: risk.severity as SafetyCarSeverity,
-          description: String(risk.description ?? ''),
-          mitigation: String(risk.mitigation ?? ''),
-          planRef: String(risk.planRef ?? planPath),
-        };
-      });
-    } catch {
-      return [];
-    }
+    return parseSafetyCarRisks(raw, planPath);
   }
 
   private validateRisks(risks: SafetyCarRisk[]): SafetyCarRisk[] {
@@ -187,5 +172,32 @@ PLAN PATH: ${planPath}`;
       }
     }
     return parts.join(' ');
+  }
+}
+
+/**
+ * Parses the reviewer model's raw JSON response into SafetyCarRisk[].
+ * Preserves the existing strategy verbatim: JSON.parse, then map each
+ * entry's fields (coercing to the expected shape), falling back to
+ * `planPath` for a missing `planRef`. Returns `[]` on any parse failure
+ * or when `risks` isn't an array — not a bug to fix, matching this
+ * service's existing fail-to-empty behavior.
+ */
+export function parseSafetyCarRisks(raw: string, planPath: string): SafetyCarRisk[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.risks)) return [];
+    return parsed.risks.map((r: unknown) => {
+      const risk = r as Record<string, unknown>;
+      return {
+        category: risk.category as SafetyCarCategory,
+        severity: risk.severity as SafetyCarSeverity,
+        description: String(risk.description ?? ''),
+        mitigation: String(risk.mitigation ?? ''),
+        planRef: String(risk.planRef ?? planPath),
+      };
+    });
+  } catch {
+    return [];
   }
 }

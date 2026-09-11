@@ -20,7 +20,6 @@ assignees: ''
 - [ ] `packages/mcp-server` (tools, HTTP endpoints)
 - [ ] `packages/cli` (`toto` commands)
 - [ ] `packages/dashboard` (HTML renderer)
-- [ ] `packages/personas` (persona stubs)
 - [ ] `.claude/skills/` (slash commands)
 - [ ] Documentation only
 

@@ -55,7 +55,7 @@
 | **ReversalDetector** | `packages/core/src/utils/reversalDetector.ts` | ✅ Working | 100% — Jaccard on tags, bounded priors |
 | **CLI Commands** | `packages/cli/src/commands/*.ts` | ✅ Working | 12 commands (init, doctor, whoami, search, last, audit, dashboard, radio, backfill, upgrade, synthesize, report) |
 | **MCP Server** | `packages/mcp-server/src/` | ✅ Working | 90% — 6 tools + SSE dashboard + HTTP endpoints |
-| **Dashboard** | `packages/dashboard/src/index.ts` | ✅ Working | 100% — terminal ANSI + HTML render |
+| **Dashboard** | `packages/dashboard/src/index.ts` | ⚠️ Removed 2026-09-10 | Historical row — the terminal-ANSI capability was ported into `toto dashboard --terminal` (`packages/cli`); the HTML render lives in `packages/mcp-server`. `packages/dashboard` itself no longer exists. |
 | **mcp-client extension** | `.pi/agent/extensions/mcp-client/` | ✅ Fixed | Works after npm install + dynamic imports |
 | **subagent extension** | `.pi/agent/extensions/subagent/` | ✅ Fixed | agent-list, agent-show commands work |
 

@@ -267,7 +267,14 @@ export class CouncilService {
   }
 }
 
-function parseRuling(raw: string): CouncilRuling {
+/**
+ * Parses the Chairman's ruling text into a structured CouncilRuling.
+ * Regex-matches a `status:` line against the three known values
+ * (case-insensitive); defaults to `'blocked'` if no match is found (fail
+ * closed, not fail open). `summary` is the raw ruling text, truncated to
+ * 500 chars.
+ */
+export function parseRuling(raw: string): CouncilRuling {
   const match = raw.match(/status:\s*(approved|revision-required|blocked)/i);
   const status = (match?.[1]?.toLowerCase() ?? 'blocked') as CouncilStatus;
   return { status, summary: raw.slice(0, 500) };

@@ -1,6 +1,9 @@
 # Local gstack session state and security reports — machine-specific, never commit
 .gstack/
 
+# CI-generated gitleaks scan report (ci.yml writes this every run) — never commit
+gitleaks-report.json
+
 # Local Claude Code permission overrides — machine-specific, never commit
 .claude/settings.local.json
 .claude/launch.json

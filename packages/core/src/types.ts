@@ -60,14 +60,6 @@ export interface P10Result {
   budgetFlag?: 'fanout_overrun';
 }
 
-export interface P10Result {
-  status: P10Status | 'error';
-  planPath?: string;
-  error?: string;
-  /** Set only when checkSessionBudget() detects a structural fan-out violation. */
-  budgetFlag?: 'fanout_overrun';
-}
-
 // ============================================================================
 // CabinetService types
 // ============================================================================
@@ -93,13 +85,6 @@ export interface CabinetResult {
   blockingDefect?: string;
   conditions: string[];
   recordPath: string;
-}
-
-export class CabinetError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CabinetError';
-  }
 }
 
 // ============================================================================
@@ -132,13 +117,6 @@ export interface SafetyCarReport {
   summary: string;
 }
 
-export class SafetyCarError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SafetyCarError';
-  }
-}
-
 // ============================================================================
 // KarpathyService types
 // ============================================================================
@@ -162,13 +140,6 @@ export interface KarpathyCheck {
   status: 'pass' | 'fail';
   violations: KarpathyViolation[];
   summary: string;
-}
-
-export class KarpathyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'KarpathyError';
-  }
 }
 
 // ============================================================================
@@ -201,13 +172,6 @@ export interface DRSConfig {
   haltPatterns: string[];
 }
 
-export class DRSError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DRSError';
-  }
-}
-
 // ============================================================================
 // SubagentService types
 // ============================================================================
@@ -221,13 +185,6 @@ export interface AgentConfig {
   systemPrompt: string;
   source: 'user' | 'project';
   filePath: string;
-}
-
-export class SubagentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SubagentError';
-  }
 }
 
 /**

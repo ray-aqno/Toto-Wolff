@@ -172,6 +172,14 @@ These four P10 rules apply to every file in this repo:
 
 Dev dependencies (vitest, typescript, esbuild) are fine.
 
+### Dependency version pinning (open question)
+
+Current state: dependency versioning uses caret ranges (`^x.y.z`) throughout — 24 caret-ranged entries across the root `package.json` and the 4 package manifests, confirmed by grep, none pinned to an exact version.
+
+The tradeoff: caret ranges get security patches and minor fixes automatically, but risk an unreviewed transitive break landing silently. Exact pins are more reproducible and predictable, but require someone to actively bump and re-verify versions rather than getting fixes for free.
+
+This is left as an **open question for a maintainer to decide, not resolved here** — pinning all 24 is a real transitive-resolution-risk decision with real ongoing maintenance cost, not something a hygiene pass should call unilaterally.
+
 ### Docstring policy
 
 jCodeMunch builds symbol summaries from docstrings. Without them, summaries fall back to the function signature, which is less useful for search and navigation.

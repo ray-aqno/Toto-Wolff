@@ -323,7 +323,15 @@ status: approved | revision-required | blocked
 summary: [one paragraph — what you approved or why you blocked]
 required-changes: [if revision-required, list the specific changes needed]`;
 
-function parseP10Ruling(raw: string): P10Ruling {
+/**
+ * Parses the Arbiter's ruling text into a structured P10Ruling.
+ * Extracts two fields: `status` (regex-matched against the three known
+ * values, case-insensitive, defaults to `'blocked'` on no match — fail
+ * closed, not fail open) and an optional `requiredChanges` (only present
+ * when a `required-changes:` line is found). `summary` is the raw ruling
+ * text, truncated to 500 chars.
+ */
+export function parseP10Ruling(raw: string): P10Ruling {
   const match = raw.match(/status:\s*(approved|revision-required|blocked)/i);
   const status = (match?.[1]?.toLowerCase() ?? 'blocked') as P10Status;
   const changesMatch = raw.match(/required.changes?:\s*([^\n]+)/i);

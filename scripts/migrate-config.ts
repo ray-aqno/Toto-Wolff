@@ -20,108 +20,134 @@ export interface MigrationResult {
   error?: string;
 }
 
-export function migrateConfig(dryRun = true): MigrationResult {
+/**
+ * Migrate the legacy local config while defaulting to a non-destructive dry run.
+ * Returns a structured result so callers can report changes and failures consistently.
+ *
+ * `configPath` defaults to the real repo config and exists so tests (and only
+ * tests) can point this at a dedicated fixture instead of a developer's own
+ * `.toto/config.yml` — CLI behavior is unaffected.
+ */
+export function migrateConfig(dryRun = true, configPath: string = CONFIG_PATH): MigrationResult {
   const changes: string[] = [];
 
-  if (!existsSync(CONFIG_PATH)) {
-    return { success: false, changes, error: `Config not found: ${CONFIG_PATH}` };
+  if (!existsSync(configPath)) {
+    return { success: false, changes, error: `Config not found: ${configPath}` };
   }
 
-  const content = readFileSync(CONFIG_PATH, 'utf-8');
-  const config = yaml.load(content) as Record<string, unknown>;
+  // backupCreated is tracked separately from backupPath so a parse/validation
+  // failure — which happens before any backup is written — can't report a
+  // backupPath that was only ever computed, never created on disk.
+  let backupPath: string | undefined;
+  let backupCreated = false;
 
-  // Check if already migrated
-  if (config.provider || config.vault || config.hooks) {
-    return { success: true, changes: ['Already migrated — provider, vault, hooks sections present'] };
-  }
+  try {
+    const content = readFileSync(configPath, 'utf-8');
+    const parsed = yaml.load(content);
 
-  // Create backup
-  const backupPath = `${CONFIG_PATH}.backup.${Date.now()}`;
-  if (!dryRun) {
-    writeFileSync(backupPath, content, 'utf-8');
-    changes.push(`Created backup: ${backupPath}`);
-  } else {
-    changes.push(`Would create backup: ${backupPath}`);
-  }
-
-  // Add provider section
-  config.provider = {
-    default: 'anthropic',
-    providers: [
-      {
-        id: 'anthropic',
-        name: 'Anthropic',
-        models: [
-          'claude-opus-4-8',
-          'claude-sonnet-4-6',
-          'claude-haiku-4-5-20251001',
-          'claude-opus-4-0',
-          'claude-sonnet-4-0',
-          'claude-3-5-sonnet-20241022',
-          'claude-3-5-haiku-20241022',
-          'claude-3-opus-20240229',
-        ],
-        timeoutMs: 60000,
-        maxRetries: 3,
-      },
-    ],
-  };
-  changes.push('Added provider section');
-
-  // Add vault section
-  config.vault = {
-    backend: 'file',
-    options: {
-      rootPath: config.vault_path ?? '~/.toto/vault',
-      queueMaxSize: 100,
-    },
-  };
-  changes.push('Added vault section');
-
-  // Add hooks section
-  config.hooks = {
-    maxChainLength: 5,
-    hooks: [
-      {
-        id: 'drs',
-        name: 'Drag Reduction System',
-        priority: 10,
-        enabled: true,
-      },
-    ],
-  };
-  changes.push('Added hooks section');
-
-  // Write new config
-  // Full yaml.dump(config, ...) on the mutated, fully-parsed config object —
-  // not a static template. The old template was non-derived from the parsed
-  // config (only vault_path was interpolated), so it silently destroyed every
-  // other user customization on every migration run — the actual dominant
-  // blast radius of L1-005/L1-006, not the parser bug alone. Comment loss
-  // (e.g. "# === Vault ===" section headers) is an accepted, stated cost,
-  // mitigated by the pre-existing backup file above. No hybrid static/dump
-  // fallback — that branch would ship the exact bug this fixes.
-  const newContent = yaml.dump(config, { lineWidth: -1, noRefs: true });
-
-  if (!dryRun) {
-    const tmpPath = `${CONFIG_PATH}.tmp.${process.pid}`;
-    try {
-      writeFileSync(tmpPath, newContent, 'utf-8');
-      renameSync(tmpPath, CONFIG_PATH);
-      changes.push('Wrote new config');
-    } catch (err) {
-      return {
-        success: false,
-        changes,
-        error: `Failed to write config: ${err instanceof Error ? err.message : String(err)}`,
-        backupPath,
-      };
+    // yaml.load('') returns undefined, and a scalar or array would otherwise
+    // pass the cast below and fail later at config.provider with a confusing
+    // error — reject anything that isn't a real mapping up front.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Config must contain a YAML mapping');
     }
-  } else {
-    changes.push('Would write new config (dry-run)');
-  }
+    const config = parsed as Record<string, unknown>;
 
-  return { success: true, changes, ...(dryRun ? {} : { backupPath }) };
+    // Check if already migrated
+    if (config.provider || config.vault || config.hooks) {
+      return { success: true, changes: ['Already migrated — provider, vault, hooks sections present'] };
+    }
+
+    // Create backup
+    backupPath = `${configPath}.backup.${Date.now()}`;
+    if (!dryRun) {
+      writeFileSync(backupPath, content, 'utf-8');
+      backupCreated = true;
+      changes.push(`Created backup: ${backupPath}`);
+    } else {
+      changes.push(`Would create backup: ${backupPath}`);
+    }
+
+    // Add provider section
+    config.provider = {
+      default: 'anthropic',
+      providers: [
+        {
+          id: 'anthropic',
+          name: 'Anthropic',
+          models: [
+            'claude-opus-4-8',
+            'claude-sonnet-4-6',
+            'claude-haiku-4-5-20251001',
+            'claude-opus-4-0',
+            'claude-sonnet-4-0',
+            'claude-3-5-sonnet-20241022',
+            'claude-3-5-haiku-20241022',
+            'claude-3-opus-20240229',
+          ],
+          timeoutMs: 60000,
+          maxRetries: 3,
+        },
+      ],
+    };
+    changes.push('Added provider section');
+
+    // Add vault section
+    config.vault = {
+      backend: 'file',
+      options: {
+        rootPath: config.vault_path ?? '~/.toto/vault',
+        queueMaxSize: 100,
+      },
+    };
+    changes.push('Added vault section');
+
+    // Add hooks section
+    config.hooks = {
+      maxChainLength: 5,
+      hooks: [
+        {
+          id: 'drs',
+          name: 'Drag Reduction System',
+          priority: 10,
+          enabled: true,
+        },
+      ],
+    };
+    changes.push('Added hooks section');
+
+    // Write new config
+    // Full yaml.dump(config, ...) on the mutated, fully-parsed config object —
+    // not a static template. The old template was non-derived from the parsed
+    // config (only vault_path was interpolated), so it silently destroyed every
+    // other user customization on every migration run — the actual dominant
+    // blast radius of L1-005/L1-006, not the parser bug alone. Comment loss
+    // (e.g. "# === Vault ===" section headers) is an accepted, stated cost,
+    // mitigated by the pre-existing backup file above. No hybrid static/dump
+    // fallback — that branch would ship the exact bug this fixes.
+    const newContent = yaml.dump(config, { lineWidth: -1, noRefs: true });
+
+    if (!dryRun) {
+      const tmpPath = `${configPath}.tmp.${process.pid}`;
+      writeFileSync(tmpPath, newContent, 'utf-8');
+      renameSync(tmpPath, configPath);
+      changes.push('Wrote new config');
+    } else {
+      changes.push('Would write new config (dry-run)');
+    }
+
+    return { success: true, changes, ...(dryRun ? {} : { backupPath }) };
+  } catch (err) {
+    // Covers parse failures, the mapping-shape check, backup-write failures,
+    // and the atomic temp-write + rename — all report the same MigrationResult
+    // shape instead of throwing past the CLI's only error boundary.
+    return {
+      success: false,
+      changes,
+      error: `Migration failed: ${err instanceof Error ? err.message : String(err)}`,
+      ...(backupCreated && backupPath ? { backupPath } : {}),
+    };
+  }
 }
 
 // CLI — guarded so importing migrateConfig() (e.g. from a test) does not

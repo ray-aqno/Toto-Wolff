@@ -30,9 +30,12 @@ const MCP_KEY = 'toto-wolff';
  *      var above resolved. This is a one-time synchronous file read at client
  *      construction (not per-request), so it does not sit on any hot path.
  *
- * At least one of {API_KEY, AUTH_TOKEN} must be resolved from either source. The
- * SDK reads ANTHROPIC_BASE_URL from the environment on its own when baseURL is
- * unset, so proxy users do not need to wire it in here.
+ * At least one of {API_KEY, AUTH_TOKEN} must be resolved from either source.
+ * ANTHROPIC_BASE_URL follows the same resolution: the environment wins, and
+ * the file's baseUrl is used only when credentials themselves fell back to
+ * the file — so a proxy's token and its own base URL travel together instead
+ * of a stray env ANTHROPIC_BASE_URL pointing a file-sourced token at the
+ * wrong endpoint.
  *
  * Credentials are passed explicitly (null disables the SDK's own env lookup)
  * so the assertion below is the single source of truth for required auth.
@@ -41,6 +44,7 @@ const MCP_KEY = 'toto-wolff';
 export function createAnthropicClient(): Anthropic {
   let apiKey = process.env['ANTHROPIC_API_KEY'];
   let authToken = process.env['ANTHROPIC_AUTH_TOKEN'];
+  let baseURL = process.env['ANTHROPIC_BASE_URL'];
 
   const haveEnvApiKey = typeof apiKey === 'string' && apiKey.length > 0;
   const haveEnvAuthToken = typeof authToken === 'string' && authToken.length > 0;
@@ -49,6 +53,7 @@ export function createAnthropicClient(): Anthropic {
     const fromFile = readClaudeJsonEnv(MCP_KEY);
     apiKey = fromFile.apiKey;
     authToken = fromFile.authToken;
+    baseURL = fromFile.baseUrl ?? baseURL;
   }
 
   assert(
@@ -56,5 +61,5 @@ export function createAnthropicClient(): Anthropic {
       (typeof authToken === 'string' && authToken.length > 0),
     'ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked shell environment and ~/.claude.json mcpServers.toto-wolff.env)',
   );
-  return new Anthropic({ apiKey: apiKey ?? null, authToken: authToken ?? null });
+  return new Anthropic({ apiKey: apiKey ?? null, authToken: authToken ?? null, baseURL });
 }

@@ -1,10 +1,48 @@
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import assert from "node:assert";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { VaultServiceV2 } from "@toto-wolff/core";
 
 const MAX_PLAN_FILES = 500; // P10 Rule 2 — upper bound on P10-Plans/ scan
 const MAX_FILE_BYTES = 10_240; // P10 Rule 3 — skip oversized plan files
+
+let vaultPromise: Promise<VaultServiceV2> | null = null;
+
+/**
+ * Lazily construct (and memoize) the V2 vault facade for this vaultPath.
+ * On construction failure the memo is cleared so the next call retries.
+ */
+function getVault(vaultPath: string): Promise<VaultServiceV2> {
+  if (vaultPromise === null) {
+    vaultPromise = VaultServiceV2.create({ backend: "file", options: { rootPath: vaultPath } }).catch(
+      (err: unknown) => {
+        vaultPromise = null;
+        throw err;
+      },
+    );
+  }
+  return vaultPromise;
+}
+
+/**
+ * Lists P10-Plans/ .md files for this vaultPath, or null if the directory
+ * is missing or unreadable — this endpoint's contract treats a missing dir
+ * as a failure (500), not an empty match list.
+ */
+async function listPlanFiles(
+  vaultPath: string,
+  plansDir: string,
+): Promise<{ vault: VaultServiceV2; entries: string[] } | null> {
+  try {
+    const vault = await getVault(vaultPath);
+    const dirExists = await vault.exists(plansDir);
+    if (!dirExists) return null;
+    const entries = (await vault.listDir(plansDir)).filter((e) => e.endsWith(".md")).slice(0, MAX_PLAN_FILES);
+    return { vault, entries };
+  } catch {
+    return null;
+  }
+}
 
 /** Shape of one citation match returned by the endpoint. */
 interface ReversedEntry {
@@ -74,28 +112,29 @@ export async function handleVaultReversed(
     return;
   }
 
-  const plansDir = join(vaultPath, "P10-Plans");
-  let entries: string[];
-  try {
-    entries = (await readdir(plansDir)).filter((e) => e.endsWith(".md")).slice(0, MAX_PLAN_FILES);
-  } catch {
+  const plansDir = "P10-Plans";
+  const listed = await listPlanFiles(vaultPath, plansDir);
+  if (listed === null) {
     res.writeHead(500, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "vault read failed" }));
     return;
   }
+  const { vault, entries } = listed;
 
   const matches: ReversedEntry[] = [];
 
   for (let i = 0; i < entries.length; i++) { // P10 Rule 2: bounded by entries.length <= MAX_PLAN_FILES
     const entry = entries[i];
     if (entry == null) continue;
-    let raw: string;
+    let raw: string | null;
     try {
-      const bytes = await readFile(join(plansDir, entry));
-      if (bytes.byteLength > MAX_FILE_BYTES) continue;
-      raw = bytes.toString("utf8");
+      raw = await vault.read(join(plansDir, entry));
     } catch {
       continue;
     }
+    if (raw === null) continue;
+    // MAX_FILE_BYTES is a byte-size cap; re-derive UTF-8 byte length from
+    // the decoded string rather than truncating on character count.
+    if (Buffer.byteLength(raw, "utf8") > MAX_FILE_BYTES) continue;
     const citedIds = extractCitedIds(raw);
     if (!citedIds.includes(verdictId)) continue;
     matches.push({

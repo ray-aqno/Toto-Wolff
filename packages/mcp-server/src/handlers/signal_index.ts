@@ -1,7 +1,6 @@
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import assert from "node:assert";
-import { isSignalRecord } from "@toto-wolff/core";
+import { isSignalRecord, VaultServiceV2 } from "@toto-wolff/core";
 import type { SignalRecord } from "@toto-wolff/core";
 
 const MAX_RECORDS = 500; // P10 Rule 2 — upper bound on Signals/ directory scan
@@ -62,6 +61,7 @@ function parseFrontmatter(raw: string, sourceHint: string): Record<string, unkno
 export class SignalIndex {
   private readonly vaultPath: string;
   private records: SignalRecord[] = [];
+  private vaultPromise: Promise<VaultServiceV2> | null = null;
 
   constructor(vaultPath: string) {
     assert(vaultPath.length > 0, "vaultPath must be non-empty");
@@ -69,21 +69,29 @@ export class SignalIndex {
   }
 
   /**
+   * Lazily construct (and memoize) the V2 vault facade for this instance.
+   * On construction failure the memo is cleared so the next call retries.
+   */
+  private getVault(): Promise<VaultServiceV2> {
+    if (this.vaultPromise === null) {
+      this.vaultPromise = VaultServiceV2.create({ backend: "file", options: { rootPath: this.vaultPath } }).catch(
+        (err: unknown) => {
+          this.vaultPromise = null;
+          throw err;
+        },
+      );
+    }
+    return this.vaultPromise;
+  }
+
+  /**
    * Loads all valid, non-expired SignalRecords from VAULT_PATH/Signals/.
    * Capped at MAX_RECORDS. Replaces any previously loaded records.
    */
   async load(): Promise<void> {
-    const dir = join(this.vaultPath, "Signals");
-    let entries: string[];
-    try {
-      entries = (await readdir(dir)).filter((e) => e.endsWith(".md")).slice(0, MAX_RECORDS);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        this.records = [];
-        return;
-      }
-      throw err;
-    }
+    const vault = await this.getVault();
+    // listDir() already returns [] for a missing directory; other errors propagate.
+    const entries = (await vault.listDir("Signals")).filter((e) => e.endsWith(".md")).slice(0, MAX_RECORDS);
 
     const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const loaded: SignalRecord[] = [];
@@ -91,14 +99,16 @@ export class SignalIndex {
     for (let i = 0; i < entries.length; i++) { // P10 Rule 2: bounded by entries.length <= MAX_RECORDS
       const entry = entries[i];
       if (entry == null) continue;
-      let raw: string;
+      let raw: string | null;
       try {
-        const bytes = await readFile(join(dir, entry));
-        if (bytes.byteLength > MAX_RECORD_BYTES) continue;
-        raw = bytes.toString("utf8");
+        raw = await vault.read(join("Signals", entry));
       } catch {
         continue;
       }
+      if (raw === null) continue;
+      // MAX_RECORD_BYTES is a byte-size cap; re-derive UTF-8 byte length
+      // from the decoded string rather than truncating on character count.
+      if (Buffer.byteLength(raw, "utf8") > MAX_RECORD_BYTES) continue;
       let fm: Record<string, unknown>;
       try {
         fm = parseFrontmatter(raw, entry);

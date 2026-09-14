@@ -12,6 +12,10 @@ import path from 'node:path';
 
 const CLAUDE_JSON_PATH = path.join(os.homedir(), '.claude.json');
 
+/**
+ * Reads credential values from ~/.claude.json for the given MCP server.
+ * Returns an empty object when the file is missing, malformed, or has no matching credentials.
+ */
 export function readClaudeJsonEnv(mcpKey: string): { apiKey?: string; authToken?: string; baseUrl?: string } {
   try {
     const raw = fs.readFileSync(CLAUDE_JSON_PATH, 'utf8');

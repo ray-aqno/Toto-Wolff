@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, renameSync } from 'node:fs';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, renameSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import os from 'node:os';
 import * as yaml from 'js-yaml';
@@ -16,14 +16,23 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 // migrateConfig()'s own tests point it (via the injected `configPath` param)
-// at a dedicated fixture in the OS temp dir, never at the real, gitignored
-// .toto/config.yml — a test run must not touch a developer's live config.
-const TEST_CONFIG_PATH = join(os.tmpdir(), 'toto-wolff-migrate-config-test-fixture.yml');
+// at a dedicated fixture, never at the real, gitignored .toto/config.yml — a
+// test run must not touch a developer's live config. Each test gets its own
+// mkdtemp directory (not a fixed shared path) so overlapping test runs on the
+// same host can't collide, and afterEach removes that whole directory —
+// config.yml, the .tmp.<pid> file, any .backup.* file, and the
+// .direct-write-check fixture all live inside it, so one recursive rm covers
+// every artifact even if a test aborts before its own local cleanup runs.
+let tmpDir: string;
+let TEST_CONFIG_PATH: string;
+
+beforeEach(() => {
+  tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-migrate-config-'));
+  TEST_CONFIG_PATH = join(tmpDir, 'config.yml');
+});
 
 afterEach(() => {
-  if (existsSync(TEST_CONFIG_PATH)) unlinkSync(TEST_CONFIG_PATH);
-  const tmpPath = `${TEST_CONFIG_PATH}.tmp.${process.pid}`;
-  if (existsSync(tmpPath)) unlinkSync(tmpPath);
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 describe('js-yaml round-trip (regression for the dropped-array-items defect)', () => {

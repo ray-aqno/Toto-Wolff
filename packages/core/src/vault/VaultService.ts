@@ -27,6 +27,13 @@ export class VaultService {
   private backend: StorageBackend;
   private readonly config: VaultConfig;
   private lock: Promise<unknown> = Promise.resolve();
+  /**
+   * Set once close() has actually released this service's reference.
+   * Without it, a second close() call would release a second reference it
+   * was never granted — fatal for a backend shared with other VaultService
+   * instances, since it can evict the backend while they still use it.
+   */
+  private closed = false;
 
   private constructor(config: VaultConfig, backend: StorageBackend) {
     this.config = config;
@@ -77,13 +84,30 @@ export class VaultService {
       throw new Error(`Unknown backend: ${config.backend}`);
     }
 
-    await backend.initialize();
+    // VaultFactory.create() already granted this reference; if initialize()
+    // rejects, no VaultService is ever constructed to eventually release it
+    // — roll the acquisition back here or it leaks (a phantom reference that
+    // survives every real owner, so the backend can never actually evict).
+    try {
+      await backend.initialize();
+    } catch (err) {
+      await VaultFactory.release(config.backend, {
+        id: config.backend,
+        name: config.backend,
+        options: config.options,
+      });
+      throw err;
+    }
     return new VaultService(config, backend);
   }
 
   /** Switch to a different backend at runtime (hot-swap). */
   async switchBackend(config: VaultConfig): Promise<void> {
     return this.enqueue(async () => {
+      if (this.closed) {
+        throw new Error('Cannot switchBackend on a closed VaultService');
+      }
+
       // Drain pending commits from current backend before switching
       const commitFn = this.backend.commit?.bind(this.backend);
       if (commitFn) {
@@ -100,7 +124,18 @@ export class VaultService {
         throw new Error(`Unknown backend: ${config.backend}`);
       }
 
-      await newBackend.initialize();
+      // Same rollback as create() above — a rejected initialize() must not
+      // leave the just-granted reference to newBackend uncounted-for.
+      try {
+        await newBackend.initialize();
+      } catch (err) {
+        await VaultFactory.release(config.backend, {
+          id: config.backend,
+          name: config.backend,
+          options: config.options,
+        });
+        throw err;
+      }
 
       // Release this service's reference to the old backend (see
       // releaseBackend()) before this.config is overwritten below — it
@@ -260,9 +295,19 @@ export class VaultService {
     });
   }
 
-  /** Close the vault and clean up resources. */
+  /**
+   * Close the vault and release this service's reference to its backend.
+   * Idempotent — a second call is a no-op, since this service already gave
+   * up its one reference on the first call and holds no claim to release
+   * again (releasing twice would evict a backend still in use by whichever
+   * other VaultService instances share it).
+   */
   async close(): Promise<void> {
-    return this.enqueue(() => this.releaseBackend());
+    return this.enqueue(async () => {
+      if (this.closed) return;
+      this.closed = true;
+      await this.releaseBackend();
+    });
   }
 }
 

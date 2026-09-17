@@ -31,6 +31,12 @@ export class VaultFactoryImpl {
     this.registerClass('file', FileStorage);
   }
 
+  /**
+   * Register an already-constructed backend instance under its own `id`.
+   * `create(id)` returns this exact instance from then on, regardless of
+   * config, and its lifecycle is the caller's to manage — `release()` never
+   * closes it. Throws if `id` is already registered.
+   */
   register(backend: StorageBackend): void {
     if (this.backends.has(backend.id)) {
       throw new Error(`Backend already registered: ${backend.id}`);
@@ -38,6 +44,11 @@ export class VaultFactoryImpl {
     this.backends.set(backend.id, backend);
   }
 
+  /**
+   * Register a backend class under `id` so `create(id, config)` can
+   * construct (and config-cache) instances of it on demand. Throws if `id`
+   * already has a registered class.
+   */
   registerClass(id: string, backendClass: new (config: StorageConfig) => StorageBackend): void {
     if (this.backendClasses.has(id)) {
       throw new Error(`Backend class already registered: ${id}`);
@@ -45,6 +56,16 @@ export class VaultFactoryImpl {
     this.backendClasses.set(id, backendClass);
   }
 
+  /**
+   * Get (or construct) a backend for `id`. An explicitly `register()`'d
+   * instance always wins, ignoring `config`. Otherwise constructs a new
+   * instance of the class registered under `id` — caching and
+   * reference-counting it by `id`+`config.options` so repeated calls with
+   * matching config share one instance (see `release()`) — or reuses one
+   * already cached for that same id+config. `config` is required the first
+   * time a given id+config pair is constructed; throws if missing then.
+   * Returns `undefined` if no class or instance is registered for `id`.
+   */
   create(id: string, config?: StorageConfig): StorageBackend | undefined {
     const registered = this.backends.get(id);
     if (registered) return registered;
@@ -94,22 +115,31 @@ export class VaultFactoryImpl {
     await backend.close();
   }
 
+  /** List all explicitly `register()`'d backend instances. */
   list(): readonly StorageBackend[] {
     return Array.from(this.backends.values());
   }
 
+  /** IDs of all explicitly `register()`'d backend instances. */
   getIds(): readonly string[] {
     return Array.from(this.backends.keys());
   }
 
+  /** Whether `id` has an explicitly `register()`'d backend instance. */
   has(id: string): boolean {
     return this.backends.has(id);
   }
 
+  /** Remove an explicitly `register()`'d backend instance. Returns whether one was removed. */
   unregister(id: string): boolean {
     return this.backends.delete(id);
   }
 
+  /**
+   * Reset all explicitly `register()`'d instances, `create()`-cached
+   * instances, and their reference counts. Registered classes (from
+   * `registerClass()`) are untouched.
+   */
   clear(): void {
     this.backends.clear();
     this.createdInstances.clear();

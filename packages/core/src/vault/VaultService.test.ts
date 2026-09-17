@@ -46,14 +46,18 @@ describe('VaultService.search() searchCommand override (regression)', () => {
   });
 });
 
-describe('VaultService shared-backend lifecycle (regression)', () => {
+async function initGitRepo(dir: string): Promise<void> {
+  await execFileAsync('git', ['init'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.name', 'test'], { cwd: dir });
+}
+
+describe('VaultService shared-backend queue survival (regression)', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
     tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-shared-test-'));
-    await execFileAsync('git', ['init'], { cwd: tmpDir });
-    await execFileAsync('git', ['config', 'user.email', 'test@test.com'], { cwd: tmpDir });
-    await execFileAsync('git', ['config', 'user.name', 'test'], { cwd: tmpDir });
+    await initGitRepo(tmpDir);
   });
 
   afterEach(() => {
@@ -75,5 +79,87 @@ describe('VaultService shared-backend lifecycle (regression)', () => {
 
     const { stdout } = await execFileAsync('git', ['log', '--name-only', '--format='], { cwd: tmpDir });
     expect(stdout).toContain('shared.md');
+  });
+});
+
+describe('VaultService.close() idempotency (regression)', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-idempotent-test-'));
+    await initGitRepo(tmpDir);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('a second close() does not release a reference this service was never granted', async () => {
+    const serviceA = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    const serviceB = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+
+    // B has a PENDING (not yet committed) queued write before A's redundant
+    // second close() — this is what actually exposes a double-release:
+    // close() only clears the queue, so a functional write-then-drain on B
+    // would look fine either way unless something was already queued and
+    // waiting when the (wrongly) extra release evicted the shared backend.
+    await serviceB.write('still-owned-by-b.md', 'content');
+
+    await serviceA.close();
+    await serviceA.close(); // must be a no-op, not a second release
+
+    // If the second close() had released an extra reference, the shared
+    // backend would be evicted+closed here, silently clearing B's still-
+    // pending write out of the queue before it ever got committed.
+    await serviceB.drainQueue();
+
+    const { stdout } = await execFileAsync('git', ['log', '--name-only', '--format='], { cwd: tmpDir });
+    expect(stdout).toContain('still-owned-by-b.md');
+  });
+
+  it('switchBackend() throws on an already-closed service instead of acquiring a new backend', async () => {
+    const service = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    await service.close();
+
+    const otherDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-idempotent-test-other-'));
+    try {
+      await expect(service.switchBackend({ backend: 'file', options: { rootPath: otherDir } })).rejects.toThrow(
+        'closed',
+      );
+    } finally {
+      rmSync(otherDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('VaultService.create() failed-initialize reference leak (regression)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-leak-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not leave a phantom reference behind when initialize() rejects', async () => {
+    const rootPath = join(tmpDir, 'vault');
+    // A FILE sits exactly where rootPath needs to be a directory, so
+    // FileStorage.initialize()'s mkdir(rootPath, {recursive:true}) rejects.
+    writeFileSync(rootPath, 'blocking file');
+
+    await expect(VaultService.create({ backend: 'file', options: { rootPath } })).rejects.toThrow();
+
+    rmSync(rootPath); // clear the obstruction
+    const service = await VaultService.create({ backend: 'file', options: { rootPath } });
+    await service.close();
+
+    // If the failed attempt above had leaked a reference, this close() only
+    // brings the count from 2 down to 1 (not 0), so the backend never
+    // actually evicts — a fresh create() with the same config would still
+    // return that same, never-evicted instance instead of a new one.
+    const service2 = await VaultService.create({ backend: 'file', options: { rootPath } });
+    expect(service2.getBackend()).not.toBe(service.getBackend());
   });
 });

@@ -29,10 +29,12 @@ export class FileStorage implements StorageBackend {
     this.queueMaxSize = (config.options.queueMaxSize as number) ?? 100;
   }
 
+  /** Create the vault's root directory if it doesn't already exist. */
   async initialize(): Promise<void> {
     await mkdir(this.rootPath, { recursive: true });
   }
 
+  /** Write a file, queuing it for the next `commit()`. See queue notes below. */
   async write(path: string, content: string): Promise<WriteResult> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
     assert(typeof content === 'string' && content.length > 0, 'content must be non-empty string');
@@ -61,6 +63,7 @@ export class FileStorage implements StorageBackend {
     return { success: true, path: absPath };
   }
 
+  /** Read a file's contents. Returns `null` if it does not exist. */
   async read(path: string): Promise<string | null> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
     assert(!path.includes('..'), 'path must not contain ..');
@@ -78,6 +81,7 @@ export class FileStorage implements StorageBackend {
     }
   }
 
+  /** Check whether a file exists at `path`. */
   async exists(path: string): Promise<boolean> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
     assert(!path.includes('..'), 'path must not contain ..');
@@ -95,6 +99,7 @@ export class FileStorage implements StorageBackend {
     }
   }
 
+  /** Recursively list files under the vault root matching `pattern` (glob-ish; all files if omitted), capped at `limit`. */
   async list(pattern?: string, limit?: number): Promise<string[]> {
     const maxResults = Math.min(limit ?? MAX_LIST_RESULTS, MAX_LIST_RESULTS);
     const results: string[] = [];
@@ -182,6 +187,7 @@ export class FileStorage implements StorageBackend {
     return results;
   }
 
+  /** Delete a file. A no-op (not an error) if it doesn't exist. */
   async delete(path: string): Promise<void> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
     assert(!path.includes('..'), 'path must not contain ..');
@@ -192,6 +198,14 @@ export class FileStorage implements StorageBackend {
     await rm(absPath, { force: true });
   }
 
+  /**
+   * Drain the write queue: `git add` + `git commit` each queued path in
+   * order, one commit per path. Stops at the first failure, leaving the
+   * failed entry and everything behind it queued for the next call.
+   * `{ committed: true }` immediately if nothing is queued. If the root
+   * isn't a git repo, clears the queue (nothing to commit into) and returns
+   * `{ committed: false, reason: 'no-git-repo' }`.
+   */
   async commit(message: string): Promise<CommitResult> {
     // LOOP BOUND: max queueMaxSize iterations; queue guarded at enqueue time
     if (this.queue.length === 0) {
@@ -225,6 +239,7 @@ export class FileStorage implements StorageBackend {
     return reason !== undefined ? { committed, reason } : { committed };
   }
 
+  /** Recursively count files and total bytes under the vault root, plus the last git commit if the root is a git repo. */
   async stats(): Promise<BackendStats> {
     let fileCount = 0;
     let totalSizeBytes = 0;
@@ -260,12 +275,16 @@ export class FileStorage implements StorageBackend {
     return stats;
   }
 
+  /**
+   * Discard any not-yet-committed queued writes. No persistent connections
+   * to clean up for file storage, so this is the only actual cleanup work.
+   */
   close(): Promise<void> {
-    // No persistent connections to clean up for file storage
     this.queue.length = 0;
     return Promise.resolve();
   }
 
+  /** The absolute filesystem path this backend is rooted at. */
   getRootPath(): string {
     return this.rootPath;
   }

@@ -80,6 +80,10 @@ export function extractStatus(content: string): string {
  * Reads the last `limit` files from a directory, sorted by name descending.
  * Returns empty arrays if the directory does not exist.
  * Loop bound: at most Math.min(files.length, limit) iterations; limit ≤ 200.
+ * Uses listDirAll() (uncapped), not listDir(), because these governance
+ * subdirectories are append-oriented with no 1000-file invariant — sorting
+ * a pre-capped, filesystem-order subset would both undercount and pick "most
+ * recent" from an arbitrary slice rather than the true tail.
  */
 export async function readRecentItems(
   vault: VaultServiceV2,
@@ -90,7 +94,7 @@ export async function readRecentItems(
 
   let filenames: string[];
   try {
-    filenames = (await vault.listDir(subDir)).filter((f) => !f.startsWith('.')).sort().reverse();
+    filenames = (await vault.listDirAll(subDir)).filter((f) => !f.startsWith('.')).sort().reverse();
   } catch {
     return { all: [], items: [] };
   }

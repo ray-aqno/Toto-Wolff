@@ -48,6 +48,23 @@ export class VaultService {
     return result;
   }
 
+  /**
+   * Release this service's reference to its current backend, using the
+   * config that acquired it — NOT `this.backend.close()` directly. Backends
+   * obtained through VaultFactory.create() are config-keyed and may be
+   * shared by other VaultService instances against the same vault; only
+   * VaultFactory itself knows when the last reference has gone and it's
+   * actually safe to close. Called before `this.backend`/`this.config` are
+   * reassigned to the new backend, so it always releases the outgoing one.
+   */
+  private releaseBackend(): Promise<void> {
+    return VaultFactory.release(this.config.backend, {
+      id: this.config.backend,
+      name: this.config.backend,
+      options: this.config.options,
+    });
+  }
+
   /** Create a VaultService with the specified backend. */
   static async create(config: VaultConfig): Promise<VaultService> {
     const backend = VaultFactory.create(config.backend, {
@@ -85,8 +102,10 @@ export class VaultService {
 
       await newBackend.initialize();
 
-      // Close old backend
-      await this.backend.close();
+      // Release this service's reference to the old backend (see
+      // releaseBackend()) before this.config is overwritten below — it
+      // still describes the outgoing backend at this point.
+      await this.releaseBackend();
 
       this.backend = newBackend;
       Object.assign(this.config, config);
@@ -141,6 +160,12 @@ export class VaultService {
     assert(typeof dir === 'string' && dir.length > 0, 'dir must be non-empty string');
     assert(Number.isInteger(limit) && limit > 0, 'limit must be a positive integer');
     return this.enqueue(() => this.backend.listDir(dir, limit));
+  }
+
+  /** Like `listDir()`, but uncapped. See StorageBackend.listDirAll(). */
+  async listDirAll(dir: string): Promise<string[]> {
+    assert(typeof dir === 'string' && dir.length > 0, 'dir must be non-empty string');
+    return this.enqueue(() => this.backend.listDirAll(dir));
   }
 
   /** Write a file to the vault. */
@@ -237,7 +262,7 @@ export class VaultService {
 
   /** Close the vault and clean up resources. */
   async close(): Promise<void> {
-    return this.enqueue(() => this.backend.close());
+    return this.enqueue(() => this.releaseBackend());
   }
 }
 

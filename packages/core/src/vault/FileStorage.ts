@@ -154,6 +154,34 @@ export class FileStorage implements StorageBackend {
     return results;
   }
 
+  /**
+   * Like `listDir()`, but with no cap — see the StorageBackend interface
+   * doc for when this is (and isn't) the right choice over `listDir()`.
+   */
+  async listDirAll(dir: string): Promise<string[]> {
+    assert(typeof dir === 'string' && dir.length > 0, 'dir must be non-empty string');
+    assert(!dir.includes('..'), 'dir must not contain ..');
+    assert(!dir.startsWith('/'), 'dir must be relative');
+    assert(!dir.includes('\0'), 'dir must not contain null bytes');
+
+    const absDir = join(this.rootPath, dir);
+
+    let entries;
+    try {
+      entries = await readdir(absDir, { withFileTypes: true });
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'ENOENT') return [];
+      throw err;
+    }
+
+    const results: string[] = [];
+    for (const entry of entries) {
+      if (entry.isFile()) results.push(entry.name);
+    }
+    return results;
+  }
+
   async delete(path: string): Promise<void> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
     assert(!path.includes('..'), 'path must not contain ..');

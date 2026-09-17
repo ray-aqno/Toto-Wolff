@@ -25,6 +25,19 @@ export interface StorageBackend {
   /** List file entries (not subdirectories) of a single directory, non-recursively. `[]` on ENOENT. Capped at `limit`. */
   listDir(dir: string, limit?: number): Promise<string[]>;
 
+  /**
+   * Like `listDir()`, but with NO cap — every file in the directory. `[]` on
+   * ENOENT. Deliberately uncapped for callers needing an accurate total
+   * count or a correctly-ordered "N most recent" (sort full list, then
+   * truncate) over a single, bounded-by-design directory — a governance
+   * vault subdirectory, not user-supplied or attacker-controlled input.
+   * Capping before sorting silently produces a wrong count and picks the
+   * "recent N" from an arbitrary filesystem-order subset instead of the
+   * true tail; only use this where that distinction actually matters
+   * (`listDir()` is the right default everywhere else).
+   */
+  listDirAll(dir: string): Promise<string[]>;
+
   /** Delete a file */
   delete(path: string): Promise<void>;
 

@@ -56,6 +56,23 @@ export class VaultService {
   }
 
   /**
+   * Throws if this service has already been closed. After the last owner
+   * releases a shared backend, VaultFactory may evict and close it — a
+   * closed-but-still-called service must not go on reading, writing, or
+   * committing through that reference (a later, unrelated create() for the
+   * same vault would then get a fresh backend with its own queue, and the
+   * two could race against the same git working tree). Called from inside
+   * each enqueued operation, not before enqueueing, so it sees `closed` as
+   * of when the operation actually runs — correct even if a queued close()
+   * ahead of it hasn't executed yet at call time.
+   */
+  private assertOpen(): void {
+    if (this.closed) {
+      throw new Error('VaultService is closed');
+    }
+  }
+
+  /**
    * Release this service's reference to its current backend, using the
    * config that acquired it — NOT `this.backend.close()` directly. Backends
    * obtained through VaultFactory.create() are config-keyed and may be
@@ -104,9 +121,7 @@ export class VaultService {
   /** Switch to a different backend at runtime (hot-swap). */
   async switchBackend(config: VaultConfig): Promise<void> {
     return this.enqueue(async () => {
-      if (this.closed) {
-        throw new Error('Cannot switchBackend on a closed VaultService');
-      }
+      this.assertOpen();
 
       // Drain pending commits from current backend before switching
       const commitFn = this.backend.commit?.bind(this.backend);
@@ -157,11 +172,13 @@ export class VaultService {
    * known, accepted gap, not an oversight.
    */
   getBackend(): StorageBackend {
+    this.assertOpen();
     return this.backend;
   }
 
   /** Get the current backend ID. */
   getBackendId(): string {
+    this.assertOpen();
     return this.backend.id;
   }
 
@@ -171,19 +188,28 @@ export class VaultService {
    */
   async read(path: string): Promise<string | null> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
-    return this.enqueue(() => this.backend.read(path));
+    return this.enqueue(() => {
+      this.assertOpen();
+      return this.backend.read(path);
+    });
   }
 
   /** Check whether a file exists in the vault. */
   async exists(path: string): Promise<boolean> {
     assert(typeof path === 'string' && path.length > 0, 'path must be non-empty string');
-    return this.enqueue(() => this.backend.exists(path));
+    return this.enqueue(() => {
+      this.assertOpen();
+      return this.backend.exists(path);
+    });
   }
 
   /** List files matching a pattern (or all if pattern is undefined), capped at `limit`. */
   async list(pattern?: string, limit = MAX_LIST_RESULTS): Promise<string[]> {
     assert(Number.isInteger(limit) && limit > 0, 'limit must be a positive integer');
-    return this.enqueue(() => this.backend.list(pattern, limit));
+    return this.enqueue(() => {
+      this.assertOpen();
+      return this.backend.list(pattern, limit);
+    });
   }
 
   /**
@@ -194,19 +220,26 @@ export class VaultService {
   async listDir(dir: string, limit = MAX_LIST_RESULTS): Promise<string[]> {
     assert(typeof dir === 'string' && dir.length > 0, 'dir must be non-empty string');
     assert(Number.isInteger(limit) && limit > 0, 'limit must be a positive integer');
-    return this.enqueue(() => this.backend.listDir(dir, limit));
+    return this.enqueue(() => {
+      this.assertOpen();
+      return this.backend.listDir(dir, limit);
+    });
   }
 
   /** Like `listDir()`, but uncapped. See StorageBackend.listDirAll(). */
   async listDirAll(dir: string): Promise<string[]> {
     assert(typeof dir === 'string' && dir.length > 0, 'dir must be non-empty string');
-    return this.enqueue(() => this.backend.listDirAll(dir));
+    return this.enqueue(() => {
+      this.assertOpen();
+      return this.backend.listDirAll(dir);
+    });
   }
 
   /** Write a file to the vault. */
   async write(relPath: string, content: string): Promise<VaultWriteResult> {
     assert(typeof relPath === 'string' && relPath.length > 0, 'relPath must be non-empty string');
     return this.enqueue(async () => {
+      this.assertOpen();
       const result = await this.backend.write(relPath, content);
       return {
         success: result.success,
@@ -217,7 +250,10 @@ export class VaultService {
 
   /** Search the vault using ripgrep (or backend-specific search). */
   async search(query: string): Promise<SearchResult[]> {
-    return this.enqueue(() => this.searchLocked(query));
+    return this.enqueue(() => {
+      this.assertOpen();
+      return this.searchLocked(query);
+    });
   }
 
   private async searchLocked(query: string): Promise<SearchResult[]> {
@@ -280,6 +316,7 @@ export class VaultService {
   /** Drain the commit queue (for git-backed backends). */
   async drainQueue(): Promise<void> {
     return this.enqueue(async () => {
+      this.assertOpen();
       const commitFn = this.backend.commit?.bind(this.backend);
       if (commitFn) {
         await commitFn('vault: drain');
@@ -290,6 +327,7 @@ export class VaultService {
   /** Get backend statistics. */
   async stats(): Promise<BackendStats> {
     return this.enqueue(async () => {
+      this.assertOpen();
       const statsFn = this.backend.stats?.bind(this.backend);
       return statsFn ? await statsFn() : { fileCount: 0, totalSizeBytes: 0 };
     });
@@ -300,13 +338,17 @@ export class VaultService {
    * Idempotent — a second call is a no-op, since this service already gave
    * up its one reference on the first call and holds no claim to release
    * again (releasing twice would evict a backend still in use by whichever
-   * other VaultService instances share it).
+   * other VaultService instances share it). The terminal `closed` state is
+   * only set once release actually succeeds — if it rejects (a pluggable
+   * backend's close() can fail), this service is NOT marked closed, so a
+   * caller can call close() again to retry the cleanup instead of every
+   * later call silently no-op'ing over a cleanup that never happened.
    */
   async close(): Promise<void> {
     return this.enqueue(async () => {
       if (this.closed) return;
-      this.closed = true;
       await this.releaseBackend();
+      this.closed = true;
     });
   }
 }

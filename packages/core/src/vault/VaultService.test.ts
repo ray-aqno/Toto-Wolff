@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import os from 'node:os';
@@ -132,6 +132,63 @@ describe('VaultService.close() idempotency (regression)', () => {
   });
 });
 
+describe('VaultService rejects operations after close() (regression)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-closed-ops-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('rejects read/write/getBackend after close() instead of operating on a possibly-evicted backend', async () => {
+    const service = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    await service.close();
+
+    // Without this guard, a closed-but-still-called service can keep
+    // reading/writing through a backend VaultFactory already evicted, while
+    // an unrelated later create() for the same vault gets a fresh backend
+    // with its own queue — two independent queues racing the same git
+    // working tree.
+    await expect(service.read('x.md')).rejects.toThrow('closed');
+    await expect(service.write('x.md', 'y')).rejects.toThrow('closed');
+    expect(() => service.getBackend()).toThrow('closed');
+  });
+});
+
+describe('VaultService.close() retry after backend.close() failure (regression)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-close-retry-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not mark the service closed if the backend rejects, so a retry can actually retry', async () => {
+    const service = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    const closeSpy = vi.spyOn(service.getBackend(), 'close').mockRejectedValueOnce(new Error('simulated close failure'));
+
+    await expect(service.close()).rejects.toThrow('simulated close failure');
+
+    // Not marked closed — a data operation must still work, not throw
+    // "VaultService is closed".
+    await expect(service.read('anything.md')).resolves.toBeNull();
+
+    // The mocked rejection was "once"; this retry calls the real close().
+    // Asserting the resolved value alone wouldn't distinguish a genuine
+    // retry from a silent no-op (both just resolve without throwing) — the
+    // call count is what actually proves backend.close() ran a second time.
+    await expect(service.close()).resolves.toBeUndefined();
+    expect(closeSpy).toHaveBeenCalledTimes(2);
+    closeSpy.mockRestore();
+  });
+});
+
 describe('VaultService.create() failed-initialize reference leak (regression)', () => {
   let tmpDir: string;
 
@@ -153,6 +210,7 @@ describe('VaultService.create() failed-initialize reference leak (regression)', 
 
     rmSync(rootPath); // clear the obstruction
     const service = await VaultService.create({ backend: 'file', options: { rootPath } });
+    const firstBackend = service.getBackend(); // captured before close() — closed services reject getBackend()
     await service.close();
 
     // If the failed attempt above had leaked a reference, this close() only
@@ -160,6 +218,6 @@ describe('VaultService.create() failed-initialize reference leak (regression)', 
     // actually evicts — a fresh create() with the same config would still
     // return that same, never-evicted instance instead of a new one.
     const service2 = await VaultService.create({ backend: 'file', options: { rootPath } });
-    expect(service2.getBackend()).not.toBe(service.getBackend());
+    expect(service2.getBackend()).not.toBe(firstBackend);
   });
 });

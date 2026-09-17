@@ -93,9 +93,14 @@ export class VaultFactoryImpl {
   /**
    * Release one reference to a backend previously obtained from `create()`
    * with this exact id+config. Closes and evicts the backend only once its
-   * reference count reaches zero. A no-op for an explicitly `register()`'d
-   * backend (id-only, not config-cached) — its lifecycle is the registering
-   * caller's to manage, unaffected by this shared-instance accounting.
+   * reference count reaches zero AND `close()` actually succeeds — if
+   * `close()` rejects, the instance and its zeroed-out count are left in
+   * place (not evicted) so a retried `release()` finds the same instance
+   * and can retry closing it, rather than silently no-op'ing because the
+   * entry already vanished on the first, failed attempt. A no-op for an
+   * explicitly `register()`'d backend (id-only, not config-cached) — its
+   * lifecycle is the registering caller's to manage, unaffected by this
+   * shared-instance accounting.
    */
   async release(id: string, config: StorageConfig): Promise<void> {
     if (this.backends.has(id)) return;
@@ -110,9 +115,15 @@ export class VaultFactoryImpl {
       return;
     }
 
-    this.refCounts.delete(cacheKey);
-    this.createdInstances.delete(cacheKey);
+    this.refCounts.set(cacheKey, 0);
     await backend.close();
+    // Re-check rather than unconditionally deleting: a concurrent create()
+    // could have handed out a fresh reference (bumping the count back above
+    // zero) while close() was in flight.
+    if ((this.refCounts.get(cacheKey) ?? 0) <= 0) {
+      this.refCounts.delete(cacheKey);
+      this.createdInstances.delete(cacheKey);
+    }
   }
 
   /** List all explicitly `register()`'d backend instances. */

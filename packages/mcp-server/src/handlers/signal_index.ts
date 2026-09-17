@@ -63,6 +63,7 @@ export class SignalIndex {
   private records: SignalRecord[] = [];
   private vaultPromise: Promise<VaultServiceV2> | null = null;
 
+  /** Create an index rooted at `vaultPath`. Call `load()` before querying. */
   constructor(vaultPath: string) {
     assert(vaultPath.length > 0, "vaultPath must be non-empty");
     this.vaultPath = vaultPath;

@@ -189,6 +189,54 @@ describe('VaultService.close() retry after backend.close() failure (regression)'
   });
 });
 
+describe('VaultFactory concurrent create() during a slow close() (regression)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultservice-close-race-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('gets a genuinely fresh instance, never the one being torn down', async () => {
+    const service = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    const closingBackend = service.getBackend();
+
+    let closeCalled = false;
+    let resolveClose!: () => void;
+    const closeGate = new Promise<void>((resolve) => {
+      resolveClose = resolve;
+    });
+    vi.spyOn(closingBackend, 'close').mockImplementation(() => {
+      closeCalled = true;
+      return closeGate;
+    });
+
+    const closePromise = service.close(); // enqueues the close op; hasn't run yet
+
+    // service.close() only SCHEDULES its work via .then() — the actual
+    // backend.close() call happens several microtask hops later, not
+    // synchronously here. Yield until it's actually been reached, so the
+    // "concurrent create()" below is a genuine race, not a no-op because
+    // close() hadn't started (which would leave the old instance cached
+    // and make this assertion pass for the wrong reason).
+    while (!closeCalled) {
+      await Promise.resolve();
+    }
+
+    // Now that close() is genuinely in flight, a fresh create() for the
+    // SAME config must not receive the instance that's mid-teardown — it
+    // should build (and get) a genuinely new one.
+    const freshService = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    expect(freshService.getBackend()).not.toBe(closingBackend);
+
+    resolveClose();
+    await closePromise;
+  });
+});
+
 describe('VaultService.create() failed-initialize reference leak (regression)', () => {
   let tmpDir: string;
 

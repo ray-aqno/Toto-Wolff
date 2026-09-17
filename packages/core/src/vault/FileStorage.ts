@@ -40,14 +40,24 @@ export class FileStorage implements StorageBackend {
     assert(!path.startsWith('/'), 'path must be relative');
     assert(!path.includes('\0'), 'path must not contain null bytes');
 
+    // Checked before writing: a full-queue rejection must never leave the
+    // file changed on disk with no record of that change ever queued.
+    if (this.queue.length >= this.queueMaxSize) {
+      throw new Error('queue full — drain backlogged');
+    }
+
     const absPath = join(this.rootPath, path);
     await mkdir(dirname(absPath), { recursive: true });
     await writeFile(absPath, content, 'utf8');
 
-    if (this.queue.length >= this.queueMaxSize) {
-      throw new Error('queue full — drain backlogged');
+    // Deduplicated: `git add` + `git commit` at drain time always picks up
+    // whatever content is currently on disk for a path, so a second entry
+    // for the same path can never commit anything beyond what the first
+    // entry's commit already captured — it can only fail as an empty commit
+    // and wedge the queue at that entry forever (nothing after it drains).
+    if (!this.queue.includes(absPath)) {
+      this.queue.push(absPath);
     }
-    this.queue.push(absPath);
     return { success: true, path: absPath };
   }
 

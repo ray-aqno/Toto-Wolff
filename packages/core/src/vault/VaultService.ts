@@ -163,8 +163,9 @@ export class VaultService {
   private async searchLocked(query: string): Promise<SearchResult[]> {
     const timeoutMs = this.config.searchTimeoutMs ?? RG_TIMEOUT_MS;
 
-    if (this.config.searchCommand === undefined && this.backend.id === 'file') {
-      // Use the original rg-based search for file backend
+    if (this.backend.id === 'file') {
+      // Use the original rg-based search for file backend, honoring
+      // searchCommand as an executable override rather than an on/off flag.
       return this.searchWithRg(query, timeoutMs);
     }
 
@@ -202,16 +203,17 @@ export class VaultService {
       throw new VaultSearchError('Cannot determine vault root path for rg search');
     }
 
+    const rgCommand = this.config.searchCommand ?? 'rg';
     try {
       const { stdout } = await execFileAsync(
-        'rg', ['--json', query, rootPath],
+        rgCommand, ['--json', query, rootPath],
         { timeout: timeoutMs },
       );
       return parseRgOutput(stdout);
     } catch (err) {
       const code = (err as ExecFileException).code;
       if (code === 1) return [];
-      throw new VaultSearchError(`rg failed with code ${String(code)}`);
+      throw new VaultSearchError(`${rgCommand} failed with code ${String(code)}`);
     }
   }
 

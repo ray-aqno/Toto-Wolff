@@ -82,11 +82,11 @@ export class VaultService {
    * reassigned to the new backend, so it always releases the outgoing one.
    */
   private releaseBackend(): Promise<void> {
-    return VaultFactory.release(this.config.backend, {
-      id: this.config.backend,
-      name: this.config.backend,
-      options: this.config.options,
-    });
+    return VaultFactory.release(
+      this.config.backend,
+      { id: this.config.backend, name: this.config.backend, options: this.config.options },
+      this.backend,
+    );
   }
 
   /** Create a VaultService with the specified backend. */
@@ -108,11 +108,11 @@ export class VaultService {
     try {
       await backend.initialize();
     } catch (err) {
-      await VaultFactory.release(config.backend, {
-        id: config.backend,
-        name: config.backend,
-        options: config.options,
-      });
+      await VaultFactory.release(
+        config.backend,
+        { id: config.backend, name: config.backend, options: config.options },
+        backend,
+      );
       throw err;
     }
     return new VaultService(config, backend);
@@ -144,11 +144,11 @@ export class VaultService {
       try {
         await newBackend.initialize();
       } catch (err) {
-        await VaultFactory.release(config.backend, {
-          id: config.backend,
-          name: config.backend,
-          options: config.options,
-        });
+        await VaultFactory.release(
+          config.backend,
+          { id: config.backend, name: config.backend, options: config.options },
+          newBackend,
+        );
         throw err;
       }
 

@@ -28,16 +28,19 @@ export class VaultFactoryImpl {
   private refCounts = new Map<string, number>();
   /**
    * Instances whose reference count has reached zero and are being (or
-   * failed to be) closed. Kept separate from `createdInstances` so
-   * `create()` never hands one of these back out to a new caller while
-   * teardown is in progress or stuck — a concurrent `create()` for the same
-   * id+config builds a genuinely fresh instance instead of receiving one
-   * that's mid-close or already closed. `release()` checks here first so a
-   * retried close (after a prior failure) finds and retries the SAME
-   * instance, rather than silently no-op'ing because nothing is left to
-   * close in `createdInstances`.
+   * failed to be) closed, keyed by cacheKey. A `Set` rather than one
+   * instance per key: a fresh `create()` can hand out a new instance under
+   * the same key while an older one from that same key is still parked here
+   * failing to close, so more than one instance can be mid-close under one
+   * key at once — a single-slot map would let a second instance's own
+   * teardown overwrite (and so lose track of) the first's parked, retryable
+   * state. Kept separate from `createdInstances` so `create()` never hands
+   * one of these back out to a new caller while teardown is in progress or
+   * stuck. `release()` checks here first, matching by the specific instance
+   * (not just the key), so a retried close after a prior failure finds and
+   * retries that same instance rather than silently no-op'ing.
    */
-  private closingInstances = new Map<string, StorageBackend>();
+  private closingInstances = new Map<string, Set<StorageBackend>>();
 
   constructor() {
     this.registerClass('file', FileStorage);
@@ -106,33 +109,43 @@ export class VaultFactoryImpl {
   }
 
   /**
-   * Release one reference to a backend previously obtained from `create()`
-   * with this exact id+config. Once the reference count reaches zero, the
-   * instance is moved out of `createdInstances` (so no concurrent `create()`
-   * can hand it back out — see `closingInstances`) and `close()` is
-   * awaited. If `close()` rejects, the instance stays parked in
-   * `closingInstances` rather than being discarded, so a retried
-   * `release()` finds it there and retries closing that SAME instance
-   * instead of silently no-op'ing. A no-op for an explicitly `register()`'d
-   * backend (id-only, not config-cached) — its lifecycle is the registering
-   * caller's to manage, unaffected by this shared-instance accounting.
+   * Release one reference to `backend`, previously obtained from `create()`
+   * with this exact id+config. `backend` must be the caller's own instance
+   * (not just the id+config it was obtained with) — a cache key alone isn't
+   * enough to identify which call this is, since a failed-to-close instance
+   * can stay parked (see `closingInstances`) while a concurrent `create()`
+   * hands a *different*, fresh instance under the same key to someone else;
+   * matching by instance keeps a release of the fresh one from being
+   * misattributed as a retry of the stale one's close (or vice versa). If
+   * `backend` isn't the currently-live or currently-parked instance for
+   * this key, this is a no-op — it's already been superseded or evicted.
+   *
+   * Once the reference count reaches zero, the instance is moved out of
+   * `createdInstances` (so no concurrent `create()` can hand it back out)
+   * and `close()` is awaited. If `close()` rejects, the instance stays
+   * parked in `closingInstances` rather than being discarded, so a retried
+   * `release()` with that same instance finds it there and retries closing
+   * it instead of silently no-op'ing. A no-op for an explicitly
+   * `register()`'d backend (id-only, not config-cached) — its lifecycle is
+   * the registering caller's to manage, unaffected by this accounting.
    */
-  async release(id: string, config: StorageConfig): Promise<void> {
+  async release(id: string, config: StorageConfig, backend: StorageBackend): Promise<void> {
     if (this.backends.has(id)) return;
 
     const cacheKey = `${id}:${JSON.stringify(config.options)}`;
 
-    // A retry of a previously-failed close finds its instance here, not in
-    // createdInstances (already moved out on the first attempt).
-    const retrying = this.closingInstances.get(cacheKey);
-    if (retrying) {
-      await retrying.close();
-      this.closingInstances.delete(cacheKey);
+    // Retry: this exact instance is one already parked as failed-to-close.
+    const parked = this.closingInstances.get(cacheKey);
+    if (parked?.has(backend)) {
+      await backend.close();
+      parked.delete(backend);
+      if (parked.size === 0) this.closingInstances.delete(cacheKey);
       return;
     }
 
-    const backend = this.createdInstances.get(cacheKey);
-    if (!backend) return;
+    // Not the currently-live instance for this key either — already
+    // superseded by a fresher create() or otherwise evicted. Nothing to do.
+    if (this.createdInstances.get(cacheKey) !== backend) return;
 
     const remaining = (this.refCounts.get(cacheKey) ?? 1) - 1;
     if (remaining > 0) {
@@ -143,12 +156,17 @@ export class VaultFactoryImpl {
     // Moved to closingInstances (not just decremented in place) before
     // awaiting close() — a concurrent create() for this same id+config must
     // never receive an instance that's being torn down; it gets a fresh one
-    // instead (create() only ever reads createdInstances).
+    // instead (create() only ever reads createdInstances). Added to the
+    // existing set, if any, rather than overwriting it — an older instance
+    // under this same key may already be parked there, itself mid-retry.
     this.refCounts.delete(cacheKey);
     this.createdInstances.delete(cacheKey);
-    this.closingInstances.set(cacheKey, backend);
+    const closing = this.closingInstances.get(cacheKey) ?? new Set<StorageBackend>();
+    closing.add(backend);
+    this.closingInstances.set(cacheKey, closing);
     await backend.close();
-    this.closingInstances.delete(cacheKey);
+    closing.delete(backend);
+    if (closing.size === 0) this.closingInstances.delete(cacheKey);
   }
 
   /** List all explicitly `register()`'d backend instances. */

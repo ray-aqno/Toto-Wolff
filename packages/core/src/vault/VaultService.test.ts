@@ -237,6 +237,46 @@ describe('VaultFactory concurrent create() during a slow close() (regression)', 
   });
 });
 
+describe('VaultFactory.release() ties retries to a specific instance (regression)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(os.tmpdir(), 'toto-wolff-vaultfactory-retry-identity-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not misattribute a fresh instance\'s release as a retry of a different, still-parked instance', async () => {
+    const serviceA = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    const backendX = serviceA.getBackend();
+    const closeXSpy = vi.spyOn(backendX, 'close').mockRejectedValueOnce(new Error('X failed to close'));
+
+    await expect(serviceA.close()).rejects.toThrow('X failed to close');
+    expect(closeXSpy).toHaveBeenCalledTimes(1);
+    // X is now parked as a failed-to-close instance, retryable by cache key.
+
+    const serviceB = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
+    const backendY = serviceB.getBackend();
+    expect(backendY).not.toBe(backendX); // B genuinely got a fresh instance
+
+    const closeYSpy = vi.spyOn(backendY, 'close');
+
+    // Without matching by instance (not just cache key), this would find X
+    // parked under the same key and "retry" closing X instead of ever
+    // touching Y — Y's own reference count would never decrement.
+    await serviceB.close();
+    expect(closeYSpy).toHaveBeenCalledTimes(1);
+    expect(closeXSpy).toHaveBeenCalledTimes(1); // still just the one failed attempt
+
+    // A's own retry must still find X (untouched by B's close()) and
+    // actually retry it — proving B's close() didn't consume A's retry.
+    await expect(serviceA.close()).resolves.toBeUndefined();
+    expect(closeXSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('VaultService.create() failed-initialize reference leak (regression)', () => {
   let tmpDir: string;
 

@@ -9,10 +9,16 @@ import { VaultService } from '../VaultService.js';
 
 const DEFAULT_MAX_CHAIN_LENGTH = 5;
 
+/**
+ * Runs registered HookExecutors in priority order (lowest first) and stops at
+ * the first one that blocks. The chain length is capped so a misconfigured
+ * registration can't trigger unbounded work.
+ */
 export class HookSystem {
   private executors = new Map<string, HookExecutor>();
   private readonly maxChainLength: number;
 
+  /** Creates a hook system; `config.maxChainLength` (default 5) caps how many executors one `execute()` will run. */
   constructor(config?: Partial<HookSystemConfig>) {
     this.maxChainLength = config?.maxChainLength ?? DEFAULT_MAX_CHAIN_LENGTH;
   }
@@ -40,7 +46,13 @@ export class HookSystem {
     return Array.from(this.executors.values()).sort((a, b) => a.priority - b.priority);
   }
 
-  /** Execute the hook chain for a given context. */
+  /**
+   * Execute the hook chain for a given context. The first executor to block
+   * wins outright. If every executor allows, the first one that accepted an
+   * override is returned as-is, so callers can tell an override-allow from an
+   * ordinary allow (`override` / `overrideReason` are part of the HookResult
+   * contract); otherwise a plain `{ allowed: true }`.
+   */
   async execute(context: HookContext): Promise<HookResult> {
     const executors = this.list();
     if (executors.length === 0) {
@@ -51,14 +63,18 @@ export class HookSystem {
       throw new Error(`Hook chain length (${executors.length}) exceeds maximum (${this.maxChainLength})`);
     }
 
+    let acceptedOverride: HookResult | undefined;
     for (const executor of executors) {
       const result = await executor.execute(context);
       if (!result.allowed) {
         return result;
       }
+      if (result.override === true && acceptedOverride === undefined) {
+        acceptedOverride = result;
+      }
     }
 
-    return { allowed: true };
+    return acceptedOverride ?? { allowed: true };
   }
 
   /**

@@ -121,6 +121,13 @@ drs_halt() {
   exit 2
 }
 
+# The python3 fallbacks below receive the file path and field name as argv,
+# never interpolated into the python source. Splicing "$file" into a
+# single-quoted python string breaks on any project path containing an
+# apostrophe (e.g. /home/o'brien/repo): the script becomes invalid python,
+# stderr is suppressed, the helper prints nothing, and every rule that reads
+# config treats that as "no restriction configured" — silently failing open.
+
 # Reads a JSON array field from a file, tolerant of jq absence (python3
 # fallback) and of a missing/malformed file (prints nothing). Used by Rules
 # 2, 4, and 5's config-driven checks so jq's absence never silently no-ops
@@ -130,14 +137,14 @@ read_json_array() {
   if command -v jq &>/dev/null; then
     jq -r ".${field}[]? // empty" "$file" 2>/dev/null || echo ""
   else
-    python3 -c "
-import json
+    python3 - "$file" "$field" 2>/dev/null <<'PY' || echo ""
+import json, sys
 try:
-    d = json.load(open('$file'))
-    print('\n'.join(d.get('$field', []) if isinstance(d, dict) else []))
+    d = json.load(open(sys.argv[1]))
+    print('\n'.join(d.get(sys.argv[2], []) if isinstance(d, dict) else []))
 except Exception:
     pass
-" 2>/dev/null || echo ""
+PY
   fi
 }
 
@@ -147,14 +154,32 @@ read_json_string() {
   if command -v jq &>/dev/null; then
     jq -r ".${field} // empty" "$file" 2>/dev/null || echo ""
   else
-    python3 -c "
-import json
+    python3 - "$file" "$field" 2>/dev/null <<'PY' || echo ""
+import json, sys
 try:
-    d = json.load(open('$file'))
-    print(d.get('$field', ''))
+    d = json.load(open(sys.argv[1]))
+    print(d.get(sys.argv[2], ''))
 except Exception:
     pass
-" 2>/dev/null || echo ""
+PY
+  fi
+}
+
+# Prints "true" only when the field is the JSON boolean true; "false" for
+# anything else (false, absent, non-boolean, unreadable file).
+read_json_bool() {
+  local file="$1" field="$2"
+  if command -v jq &>/dev/null; then
+    jq -r "if .${field} == true then \"true\" else \"false\" end" "$file" 2>/dev/null || echo "false"
+  else
+    python3 - "$file" "$field" 2>/dev/null <<'PY' || echo "false"
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('true' if isinstance(d, dict) and d.get(sys.argv[2]) is True else 'false')
+except Exception:
+    print('false')
+PY
   fi
 }
 
@@ -167,15 +192,15 @@ read_frozen_paths() {
   if command -v jq &>/dev/null; then
     jq -r 'if type == "array" then .[] else (.frozen // [])[] end' "$file" 2>/dev/null || echo ""
   else
-    python3 -c "
-import json
+    python3 - "$file" 2>/dev/null <<'PY' || echo ""
+import json, sys
 try:
-    d = json.load(open('$file'))
+    d = json.load(open(sys.argv[1]))
     paths = d.get('frozen', []) if isinstance(d, dict) else (d if isinstance(d, list) else [])
     print('\n'.join(paths))
 except Exception:
     pass
-" 2>/dev/null || echo ""
+PY
   fi
 }
 
@@ -204,7 +229,13 @@ check_rule2() {
   [ ! -f "$DRS_CONFIG" ] && return
   local allowed_paths
   allowed_paths="$(read_json_array "$DRS_CONFIG" allowed_paths)"
-  [ -z "$allowed_paths" ] && return
+  if [ -z "$allowed_paths" ]; then
+    # Fail closed, matching DRSService.rule2_scope(): an empty (or unreadable)
+    # allowed_paths means "nothing allowed", not "no restriction", unless the
+    # config explicitly opts out with permissive: true.
+    [ "$(read_json_bool "$DRS_CONFIG" permissive)" = "true" ] && return
+    drs_halt 2 "Write target outside declared project scope (allowed_paths is empty and permissive mode is not enabled)" "$target"
+  fi
   local matched=0
   while IFS= read -r allowed; do
     [ -z "$allowed" ] && continue

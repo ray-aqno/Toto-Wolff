@@ -36,6 +36,21 @@ EOF
   mkdir -p "${TEST_DIR}/.claude/skills/drs/bin"
   cp "${DRS_SCRIPT_SRC}" "${TEST_DIR}/.claude/skills/drs/bin/drs-check.sh"
   chmod +x "${TEST_DIR}/.claude/skills/drs/bin/drs-check.sh"
+  # Root the no-jq helper resolves the hook script and vault under. Defaults
+  # to the fixture root; the apostrophe-path test points it at a copy instead.
+  HOOK_ROOT="${TEST_DIR}"
+}
+
+# Rewrites the fixture config with an EMPTY allowed_paths. $1 is extra JSON
+# fields appended to the object (e.g. ', "permissive": true'), or empty.
+write_empty_scope_config() {
+  cat > "${TEST_DIR}/.toto/drs-config.json" <<EOF
+{
+  "allowed_paths": [],
+  "tenant_namespaces": ["acme-corp"],
+  "current_tenant": "acme-corp"$1
+}
+EOF
 }
 
 teardown() {
@@ -123,7 +138,7 @@ run_bash_check_no_jq() {
   else
     payload="{\"tool_name\":\"${tool}\",\"tool_input\":{\"file_path\":\"${target_or_cmd}\"}}"
   fi
-  echo "$payload" | PATH="$fakebin" TOTO_VAULT_PATH="${TEST_DIR}/vault" "${TEST_DIR}/.claude/skills/drs/bin/drs-check.sh"
+  echo "$payload" | PATH="$fakebin" TOTO_VAULT_PATH="${HOOK_ROOT}/vault" "${HOOK_ROOT}/.claude/skills/drs/bin/drs-check.sh"
   local result=$?
   rm -rf "$fakebin"
   return "$result"
@@ -145,6 +160,63 @@ run_bash_check_no_jq() {
 }
 
 @test "in-scope path still allowed via python3 fallback with jq masked off PATH" {
+  run run_bash_check_no_jq Write "workspaces/acme-corp/data.json"
+  [ "$status" -eq 0 ]
+}
+
+# Rule 2 must fail closed on an empty allowed_paths in the bash hook too, not
+# just in DRSService.ts. The hook is the live enforcement path; before this
+# the two disagreed (hook allowed everything, TS denied everything), and the
+# suite only ever ran against a non-empty scope so it never noticed.
+@test "bash and TS agree: empty allowed_paths blocks writes unless permissive (Rule 2 fails closed)" {
+  write_empty_scope_config ""
+  run run_bash_check Write "anything/file.ts"
+  [ "$status" -eq 2 ]
+
+  ts_output="$(run_ts_check Write "anything/file.ts")"
+  [[ "$ts_output" == *'"allowed":false'* ]]
+  [[ "$ts_output" == *'"ruleFired":2'* ]]
+}
+
+@test "bash and TS agree: empty allowed_paths with permissive: true allows writes" {
+  write_empty_scope_config ', "permissive": true'
+  run run_bash_check Write "anything/file.ts"
+  [ "$status" -eq 0 ]
+
+  ts_output="$(run_ts_check Write "anything/file.ts")"
+  [[ "$ts_output" == *'"allowed":true'* ]]
+}
+
+@test "empty allowed_paths fails closed via python3 fallback with jq masked off PATH" {
+  write_empty_scope_config ""
+  run run_bash_check_no_jq Write "anything/file.ts"
+  [ "$status" -eq 2 ]
+}
+
+@test "empty allowed_paths with permissive: true allows via python3 fallback with jq masked off PATH" {
+  write_empty_scope_config ', "permissive": true'
+  run run_bash_check_no_jq Write "anything/file.ts"
+  [ "$status" -eq 0 ]
+}
+
+# A project path containing an apostrophe used to make the python3 fallbacks
+# emit invalid python (the path was spliced into a single-quoted string), which
+# was swallowed and read as "no restriction configured": Rules 1, 2, and 4 all
+# failed open. Only the python fallback is affected (jq takes the path as an
+# argument), so this uses the jq-masked helper.
+@test "python3 fallback still enforces when the project path contains an apostrophe" {
+  local apos="${TEST_DIR}/o'brien-checkout"
+  mkdir -p "${apos}/.toto" "${apos}/.claude/skills/drs/bin"
+  cp "${TEST_DIR}/.toto/drs-config.json" "${TEST_DIR}/.toto/freeze.json" "${apos}/.toto/"
+  cp "${DRS_SCRIPT_SRC}" "${apos}/.claude/skills/drs/bin/drs-check.sh"
+  HOOK_ROOT="${apos}"
+
+  run run_bash_check_no_jq Write secrets/keys.json
+  [ "$status" -eq 2 ]
+
+  run run_bash_check_no_jq Write "outside/file.ts"
+  [ "$status" -eq 2 ]
+
   run run_bash_check_no_jq Write "workspaces/acme-corp/data.json"
   [ "$status" -eq 0 ]
 }

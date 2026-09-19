@@ -71,6 +71,11 @@ function parseFreezeConfig(raw: unknown): FreezeParseResult {
   return { paths: [], keyPresent: false };
 }
 
+/**
+ * Deterministic boundary enforcement (Rules 1-5) for tool calls, usable as a
+ * HookExecutor. Mirrors the bash PreToolUse hook's rules so both enforcement
+ * paths give the same answer; tests/drs-conformance.bats asserts that they do.
+ */
 export class DRSService implements HookExecutor {
   readonly id = 'drs';
   readonly name = 'Drag Reduction System';
@@ -86,6 +91,13 @@ export class DRSService implements HookExecutor {
    * construction sites always inject a real instance. */
   private readonly vault: VaultService | undefined;
 
+  /**
+   * Resolves the active config (explicit path, then TOTO_DRS_CONFIG, then the
+   * cwd-relative .toto/drs-config.json). Never throws on a resolution failure:
+   * it falls back to deny-all and reports that through `configSource`, so a
+   * bad working directory is a visible signal rather than a silent allow-all.
+   * `vault` receives an audit record for each accepted override.
+   */
   constructor(configPath?: string, vault?: VaultService) {
     const resolved = this.resolveDrsConfig(configPath);
     this.config = resolved.config;
@@ -146,6 +158,14 @@ export class DRSService implements HookExecutor {
     }
   }
 
+  /**
+   * Evaluates a tool call against the DRS rules; the first rule that fires
+   * wins. Rules 1 (frozen path) and 5 (destructive pattern) run first and can
+   * never be overridden. An "override drs: <reason>" message then bypasses
+   * Rules 2/3/4 and writes an audit record to the vault; without one, Rules 2
+   * (scope), 3 (auth surface) and 4 (tenant) apply. Returns `{ allowed: true }`
+   * when no rule fires.
+   */
   async check(input: DRSCheckInput): Promise<DRSResult> {
     assert(input !== undefined && input !== null, 'input required');
     assert(typeof input.tool === 'string', 'tool required');

@@ -1,5 +1,7 @@
 export { VaultService } from './VaultService.js';
+export { VaultService as VaultServiceV2, VaultFactory, FileStorage, type VaultConfig, type StorageBackend, type StorageConfig } from './vault/index.js';
 export { createAnthropicClient } from './utils/anthropic.js';
+export { readClaudeJsonEnv } from './utils/claudeJsonCredentials.js';
 export { withLLMTimeout } from './utils/timeout.js';
 export { CouncilService } from './CouncilService.js';
 export type { CouncilResult } from './CouncilService.js';

@@ -1,9 +1,27 @@
 import { join, isAbsolute } from 'node:path';
-import { readdir, readFile, stat } from 'node:fs/promises';
 import assert from 'node:assert';
+import { VaultServiceV2 } from '@toto-wolff/core';
 import type { DashboardItem, DashboardResult } from './dashboard_html.js';
 
 export type { DashboardItem, DashboardResult };
+
+let vaultPromise: Promise<VaultServiceV2> | null = null;
+
+/**
+ * Lazily construct (and memoize) the V2 vault facade for this vaultPath.
+ * On construction failure the memo is cleared so the next call retries.
+ */
+function getVault(vaultPath: string): Promise<VaultServiceV2> {
+  if (vaultPromise === null) {
+    vaultPromise = VaultServiceV2.create({ backend: 'file', options: { rootPath: vaultPath } }).catch(
+      (err: unknown) => {
+        vaultPromise = null;
+        throw err;
+      },
+    );
+  }
+  return vaultPromise;
+}
 
 /** Live stats payload streamed over SSE. */
 export interface DashboardStats {
@@ -62,20 +80,21 @@ export function extractStatus(content: string): string {
  * Reads the last `limit` files from a directory, sorted by name descending.
  * Returns empty arrays if the directory does not exist.
  * Loop bound: at most Math.min(files.length, limit) iterations; limit ≤ 200.
+ * Uses listDirAll() (uncapped), not listDir(), because these governance
+ * subdirectories are append-oriented with no 1000-file invariant — sorting
+ * a pre-capped, filesystem-order subset would both undercount and pick "most
+ * recent" from an arbitrary slice rather than the true tail.
  */
 export async function readRecentItems(
-  vaultPath: string,
+  vault: VaultServiceV2,
   subDir: string,
   limit: number,
 ): Promise<{ all: string[]; items: DashboardItem[] }> {
-  assert(isAbsolute(vaultPath), 'readRecentItems: vaultPath must be absolute');
   assert(limit > 0 && limit <= 200, 'readRecentItems: limit must be in [1, 200]');
 
-  const dir = join(vaultPath, subDir);
   let filenames: string[];
   try {
-    await stat(dir);
-    filenames = (await readdir(dir)).filter((f) => !f.startsWith('.')).sort().reverse();
+    filenames = (await vault.listDirAll(subDir)).filter((f) => !f.startsWith('.')).sort().reverse();
   } catch {
     return { all: [], items: [] };
   }
@@ -85,10 +104,10 @@ export async function readRecentItems(
   const items: DashboardItem[] = [];
 
   for (const filename of recent) {
-    const filepath = join(dir, filename);
+    const relPath = join(subDir, filename);
     let content = '';
     try {
-      content = await readFile(filepath, 'utf8');
+      content = (await vault.read(relPath)) ?? '';
     } catch {
       // unreadable file — skip gracefully
     }
@@ -108,6 +127,7 @@ export async function readRecentItems(
  */
 export async function handleDashboardStatus(vaultPath: string): Promise<DashboardResult> {
   assert(isAbsolute(vaultPath), 'handleDashboardStatus: vaultPath must be absolute');
+  const vault = await getVault(vaultPath);
 
   const [
     councilData,
@@ -118,13 +138,13 @@ export async function handleDashboardStatus(vaultPath: string): Promise<Dashboar
     drsData,
     subagentData,
   ] = await Promise.all([
-    readRecentItems(vaultPath, 'Council/Congressional-Records', 5),
-    readRecentItems(vaultPath, 'P10-Plans', 5),
-    readRecentItems(vaultPath, 'Cabinet', 5),
-    readRecentItems(vaultPath, 'SafetyCar', 5),
-    readRecentItems(vaultPath, 'Karpathy', 5),
-    readRecentItems(vaultPath, 'DRS', 5),
-    readRecentItems(vaultPath, 'Subagent', 5),
+    readRecentItems(vault, 'Council/Congressional-Records', 5),
+    readRecentItems(vault, 'P10-Plans', 5),
+    readRecentItems(vault, 'Cabinet', 5),
+    readRecentItems(vault, 'SafetyCar', 5),
+    readRecentItems(vault, 'Karpathy', 5),
+    readRecentItems(vault, 'DRS', 5),
+    readRecentItems(vault, 'Subagent', 5),
   ]);
 
   const blockedItems: DashboardResult['blockedItems'] = [

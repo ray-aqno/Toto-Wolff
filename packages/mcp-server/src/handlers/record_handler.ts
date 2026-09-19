@@ -1,9 +1,28 @@
-import { join, isAbsolute, sep, resolve } from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { join, isAbsolute, sep, resolve, relative } from 'node:path';
 import assert from 'node:assert';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { VaultServiceV2 } from '@toto-wolff/core';
 
 const MAX_CONTENT_BYTES = 100_000;
+
+let vaultPromise: Promise<VaultServiceV2> | null = null;
+
+/**
+ * Lazily construct (and memoize) the V2 vault facade for this vaultPath.
+ * On construction failure the memo is cleared so the next call retries —
+ * a transient init error must not permanently wedge every future request.
+ */
+function getVault(vaultPath: string): Promise<VaultServiceV2> {
+  if (vaultPromise === null) {
+    vaultPromise = VaultServiceV2.create({ backend: 'file', options: { rootPath: vaultPath } }).catch(
+      (err: unknown) => {
+        vaultPromise = null;
+        throw err;
+      },
+    );
+  }
+  return vaultPromise;
+}
 
 const TYPE_TO_DIR: Record<string, string> = {
   council: join('Council', 'Congressional-Records'),
@@ -45,20 +64,23 @@ function resolveRecordPath(
  * Reads a vault record file and streams it to the response.
  * ENOENT → 404. Content > MAX_CONTENT_BYTES → 413. Other errors → 500.
  */
-async function sendRecord(res: ServerResponse, filePath: string): Promise<void> {
-  assert(isAbsolute(filePath), 'sendRecord: filePath must be absolute');
+async function sendRecord(res: ServerResponse, vaultPath: string, relPath: string): Promise<void> {
+  assert(!isAbsolute(relPath), 'sendRecord: relPath must be relative to the vault root');
   assert(!res.destroyed, 'sendRecord: response already destroyed');
 
-  let content: string;
+  let content: string | null;
   try {
-    content = await readFile(filePath, 'utf8');
-  } catch (err) {
+    const vault = await getVault(vaultPath);
+    content = await vault.read(relPath);
+  } catch {
     if (res.destroyed) return;
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') {
+    res.writeHead(500, { 'Content-Type': 'text/plain' }).end('Internal error.');
+    return;
+  }
+
+  if (content === null) {
+    if (!res.destroyed) {
       res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Record not found.');
-    } else {
-      res.writeHead(500, { 'Content-Type': 'text/plain' }).end('Internal error.');
     }
     return;
   }
@@ -111,5 +133,6 @@ export async function handleRecordRequest(
     return;
   }
 
-  await sendRecord(res, filePath);
+  const relPath = relative(vaultPath, filePath);
+  await sendRecord(res, vaultPath, relPath);
 }

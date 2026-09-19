@@ -68,10 +68,14 @@ if [ -n "$RAW_OVERRIDE_REASON" ]; then
   OVERRIDE_REASON="$(validate_override_reason "$RAW_OVERRIDE_REASON" || echo "")"
 fi
 if [ -n "$OVERRIDE_REASON" ]; then
+  # Returns non-zero if the record could not be durably written, so drs_halt
+  # can refuse to honor the override. Every step is checked explicitly: this
+  # runs inside an `if`, where `set -e` does not abort on a failed command.
   write_override_record() {
     local rule="$1" target="$2"
-    mkdir -p "$DRS_VAULT_DIR"
+    mkdir -p "$DRS_VAULT_DIR" || return 1
     local slug; slug="$(date +%Y%m%d-%H%M%S)-r${rule}-override"
+    local record="$DRS_VAULT_DIR/$slug.md"
     {
       echo "---"
       echo "date: $(date +%Y-%m-%d)"
@@ -86,20 +90,16 @@ if [ -n "$OVERRIDE_REASON" ]; then
       echo "DRS Rule $rule override accepted."
       echo "Target: $target"
       echo "Reason: $OVERRIDE_REASON"
-    } > "$DRS_VAULT_DIR/$slug.md"
+    } > "$record" || return 1
+    [ -s "$record" ] || return 1
   }
 fi
 
-drs_halt() {
-  local rule="$1" reason="$2" target="$3"
-  # If override is set, log and allow
-  if [ -n "$OVERRIDE_REASON" ]; then
-    write_override_record "$rule" "$target"
-    exit 0
-  fi
-  # Write DRS vault record
-  mkdir -p "$DRS_VAULT_DIR"
-  local slug; slug="$(date +%Y%m%d-%H%M%S)-r${rule}-blocked"
+# Writes the BLOCKED record. Returns non-zero if it could not be written; the
+# caller must still block regardless (see drs_halt).
+write_block_record() {
+  local rule="$1" reason="$2" target="$3" record="$4"
+  mkdir -p "$DRS_VAULT_DIR" || return 1
   {
     echo "---"
     echo "date: $(date +%Y-%m-%d)"
@@ -115,9 +115,32 @@ drs_halt() {
     echo "Reason: $reason"
     echo "Target: $target"
     echo "To override: set DRS_OVERRIDE_REASON='your reason' in the environment (this hook has no message-based override — that mechanism exists separately on the TS/MCP drs_check tool path, and only bypasses Rules 2/3/4)."
-  } > "$DRS_VAULT_DIR/$slug.md"
+  } > "$record" || return 1
+}
+
+drs_halt() {
+  local rule="$1" reason="$2" target="$3"
+  # An override is honored only if its audit record is durably written. If it
+  # can't be, fail closed: report why and treat the rule as an ordinary block.
+  if [ -n "$OVERRIDE_REASON" ]; then
+    if write_override_record "$rule" "$target" 2>/dev/null; then
+      exit 0
+    fi
+    echo "DRS: override NOT honored for Rule $rule; its audit record could not be written to $DRS_VAULT_DIR" >&2
+  fi
+  # The block record is best-effort. Enforcement must never depend on it: this
+  # used to write the record unchecked under `set -e`, so an unwritable vault
+  # aborted the script with exit 1 — which this harness treats as a
+  # non-blocking error — and a rule that fired did not actually block.
+  local slug record
+  slug="$(date +%Y%m%d-%H%M%S)-r${rule}-blocked"
+  record="$DRS_VAULT_DIR/$slug.md"
   echo "DRS BLOCKED: Rule $rule — $reason (target: $target)" >&2
-  echo "Record written to: $DRS_VAULT_DIR/$slug.md" >&2
+  if write_block_record "$rule" "$reason" "$target" "$record" 2>/dev/null; then
+    echo "Record written to: $record" >&2
+  else
+    echo "Record NOT written (could not write to $DRS_VAULT_DIR); the block is still enforced." >&2
+  fi
   exit 2
 }
 

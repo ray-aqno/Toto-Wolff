@@ -86,9 +86,9 @@ export class DRSService implements HookExecutor {
    * callers (and tests) can tell a resolution failure apart from a genuinely
    * empty-but-resolved config — see resolveDrsConfig(). */
   readonly configSource: ConfigSource;
-  /** Optional audit-trail sink for overrides. Undefined is tolerated (e.g.
-   * test construction that never exercises an override path); both live
-   * construction sites always inject a real instance. */
+  /** Audit-trail sink for overrides. Undefined is tolerated for construction
+   * that never exercises an override, but without a vault no override is ever
+   * honored (see check()); both live construction sites inject a real one. */
   private readonly vault: VaultService | undefined;
 
   /**
@@ -162,9 +162,10 @@ export class DRSService implements HookExecutor {
    * Evaluates a tool call against the DRS rules; the first rule that fires
    * wins. Rules 1 (frozen path) and 5 (destructive pattern) run first and can
    * never be overridden. An "override drs: <reason>" message then bypasses
-   * Rules 2/3/4 and writes an audit record to the vault; without one, Rules 2
-   * (scope), 3 (auth surface) and 4 (tenant) apply. Returns `{ allowed: true }`
-   * when no rule fires.
+   * Rules 2/3/4, but only if its audit record is written to the vault first;
+   * an override that can't be audited is ignored and the call is judged as if
+   * none was given. Without an override, Rules 2 (scope), 3 (auth surface)
+   * and 4 (tenant) apply. Returns `{ allowed: true }` when no rule fires.
    */
   async check(input: DRSCheckInput): Promise<DRSResult> {
     assert(input !== undefined && input !== null, 'input required');
@@ -191,23 +192,25 @@ export class DRSService implements HookExecutor {
     const rule5 = this.rule5_destructive(input);
     if (rule5) return rule5;
 
+    // An override is honored only if its audit record was durably written.
+    // If it can't be (no vault, or the write failed) it is ignored and the
+    // call is judged as if no override had been given, so a bypass never
+    // takes effect without the record that is supposed to accompany it.
+    let unauditedOverride = false;
     const overrideResult = this.checkOverride(input);
     if (overrideResult) {
-      await this.writeOverrideAuditRecord(input, overrideResult);
-      return overrideResult;
+      if (await this.writeOverrideAuditRecord(input, overrideResult)) return overrideResult;
+      unauditedOverride = true;
     }
 
-    // Rule 2: Out of scope
-    const rule2 = this.rule2_scope(input);
-    if (rule2) return rule2;
-
-    // Rule 3: Auth/permission surface
-    const rule3 = this.rule3_auth(input);
-    if (rule3) return rule3;
-
-    // Rule 4: Cross-tenant
-    const rule4 = this.rule4_tenant(input);
-    if (rule4) return rule4;
+    // Rule 2 (out of scope), then Rule 3 (auth/permission surface), then
+    // Rule 4 (cross-tenant); first to fire wins.
+    const blocked = this.rule2_scope(input) ?? this.rule3_auth(input) ?? this.rule4_tenant(input);
+    if (blocked) {
+      return unauditedOverride
+        ? { ...blocked, reason: `${blocked.reason ?? ''} (override not honored: its audit record could not be written)` }
+        : blocked;
+    }
 
     return { allowed: true };
   }
@@ -216,13 +219,14 @@ export class DRSService implements HookExecutor {
    * Writes a durable audit record for an accepted override, mirroring bash's
    * write_override_record() shape. check() is the sole choke point for this —
    * not the MCP handler — since execute() calls check() directly too,
-   * bypassing the MCP handler entirely. A write failure is surfaced (stderr)
-   * but does not revoke an already-accepted override: this stream's job is
-   * closing the fabricated-audit-trail gap, not making a transient vault
-   * write hiccup crash the governance workflow it's meant to protect.
+   * bypassing the MCP handler entirely. Returns whether the record was
+   * written: false when no vault is configured or the write fails (the
+   * failure is also reported on stderr). check() treats false as "override
+   * not honored" — fail closed, so an override never takes effect without
+   * its audit trail (the bash hook does the same).
    */
-  private async writeOverrideAuditRecord(input: DRSCheckInput, result: DRSResult): Promise<void> {
-    if (this.vault === undefined) return;
+  private async writeOverrideAuditRecord(input: DRSCheckInput, result: DRSResult): Promise<boolean> {
+    if (this.vault === undefined) return false;
     const target = input.tool === 'Bash' ? (input.command ?? '') : (input.targetPath ?? '');
     const now = new Date();
     const slug = `${now.toISOString().replace(/[:.]/g, '-')}-drs-override`;
@@ -243,8 +247,10 @@ export class DRSService implements HookExecutor {
     ].join('\n');
     try {
       await this.vault.write(`DRS/${slug}.md`, body);
+      return true;
     } catch (err) {
-      process.stderr.write(`DRSService: failed to write override audit record — ${String(err)}\n`);
+      process.stderr.write(`DRSService: failed to write override audit record, override not honored — ${String(err)}\n`);
+      return false;
     }
   }
 

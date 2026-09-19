@@ -221,6 +221,30 @@ run_bash_check_no_jq() {
   [ "$status" -eq 0 ]
 }
 
+# The vault is where audit records go, and neither enforcement nor an override
+# may depend on it being writable in the fail-open direction. A regular FILE
+# placed where the vault directory must be makes mkdir/write under it fail for
+# any user (a chmod would not, when CI runs as root).
+@test "a fired rule still blocks (exit 2) when the vault directory is unwritable" {
+  : > "${TEST_DIR}/vault"
+  run run_bash_check Write "outside/file.ts"
+  [ "$status" -eq 2 ]
+}
+
+@test "an override is NOT honored (exit 2) when its audit record cannot be written" {
+  : > "${TEST_DIR}/vault"
+  export DRS_OVERRIDE_REASON="approved by owner"
+  run run_bash_check Write "outside/file.ts"
+  [ "$status" -eq 2 ]
+}
+
+@test "an override is honored (exit 0) and audited when the vault is writable" {
+  export DRS_OVERRIDE_REASON="approved by owner"
+  run run_bash_check Write "outside/file.ts"
+  [ "$status" -eq 0 ]
+  [ -n "$(ls "${TEST_DIR}"/vault/DRS/*-override.md 2>/dev/null)" ]
+}
+
 # R3 (Council-1 Condition 4): a cwd that isn't the repo root must deny-all,
 # not silently fall back to a permissive shape. Mirrors DRSService.test.ts's
 # TS-side coverage of the same scenario.

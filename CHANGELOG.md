@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - **DRS `permissive` config flag** — Explicit opt-out for Rule 2 (out-of-scope write). By default, an empty `allowed_paths` now means "nothing allowed" (fail-closed), not "no restriction." Set `permissive: true` in `.toto/config.yml`'s `drs:` block to restore the old no-restriction behavior for an empty scope list.
 - **DRS `configSource` diagnostic** — `DRSService` now publicly exposes where its active config actually came from (`cwd-relative`, `env:TOTO_DRS_CONFIG`, or `deny-all-fallback`), so a resolution failure from an unexpected working directory is a visible signal instead of an indistinguishable "everything is blocked" state.
-- **DRS override audit trail (TS/MCP path)** — `checkOverride()`'s accepted overrides now write a durable vault record (mirroring the bash hook's existing `write_override_record()`), closing the fabricated-audit-trail gap named in audit finding L2-003.
+- **DRS override audit trail (TS/MCP path)** — `checkOverride()`'s accepted overrides now write a durable vault record (mirroring the bash hook's existing `write_override_record()`), closing the fabricated-audit-trail gap named in audit finding L2-003. An override is honored only if that record is written: if the vault write fails (or no vault is configured) the override is ignored and the call is judged as if none was given. The bash hook behaves the same way, exiting 2 instead of proceeding unaudited.
 - **`DRSService.test.ts`** — New contract-test suite (Rules 1/2/4 on known-bad fixtures, permissive opt-out, cwd-relative resolution failure/`TOTO_DRS_CONFIG` override, override-anchoring, and rule-precedence pinning).
 
 ### Changed
@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **DRS hook exit code** — `drs_halt()` now exits 2, not 1. This harness's PreToolUse contract only blocks on exit code 2, so every rule that fired via the bash hook was previously non-blocking regardless of whether it detected a real violation.
 - **`PROJECT_ROOT` miscalculation in `drs-check.sh`** — Was resolving to `.claude/` (3 `..` from `.claude/skills/drs/bin`), not the repo root, so the hook could never actually find `.toto/drs-config.json` or `.toto/freeze.json`. Now resolves correctly (4 `..`).
 - **Rules 2, 4, and the custom-`halt_patterns` half of Rule 5 silently no-op'd when `jq` was absent** (no `else` branch existed at all) — all three now have real python3 fallbacks, verified end-to-end on a machine without `jq` installed.
+- **A fired rule no longer fails open when the vault is unwritable** — `drs_halt()` wrote its block record unchecked under `set -e`, so an unwritable vault aborted the hook with exit 1 (non-blocking here) before it reached `exit 2`. The record is now best-effort and the block is always enforced.
+- **Rule 2 in the bash hook now fails closed on an empty `allowed_paths`**, matching `DRSService` (blocks unless `permissive: true`). It previously allowed every write, so the live hook and the TS service disagreed.
+- **The python3 fallbacks no longer fail open on project paths containing an apostrophe** — the path was spliced into a single-quoted python string, producing invalid python that was silently read as "no restriction configured" (Rules 1, 2 and 4). Path and field are now passed as arguments.
+- **`HookSystem.execute()` no longer discards `override` / `overrideReason`** from an executor that accepted an override.
 - **`DRS_OVERRIDE_REASON` validation gate (L2-004)** — Previously any non-empty value was accepted with no further checks. Now rejects whitespace-only and common placeholder values (`reason`, `todo`, `n/a`, etc.) via a new `validate_override_reason()` helper.
 
 ## [1.4.1] - 2025-08-05

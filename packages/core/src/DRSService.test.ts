@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -216,6 +216,53 @@ describe('DRSService — Stage 5: override still bypasses Rules 2/3/4, with an a
   });
 });
 
+// An override is only honored if its audit record is written; otherwise it
+// must be ignored, not silently allowed through without the trail.
+describe('DRSService: an override fails closed when it cannot be audited', () => {
+  const outOfScope = { tool: 'Write', targetPath: 'outside/file.ts', messageBefore: 'override drs: needed' } as const;
+
+  async function useScopedConfig(): Promise<void> {
+    await writeFixtureConfig(testDir, { allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] });
+    process.chdir(testDir);
+  }
+
+  it('does not honor an override when the audit write fails, so Rule 2 still blocks', async () => {
+    await useScopedConfig();
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const failingVault = { write: () => Promise.reject(new Error('disk full')) } as unknown as VaultService;
+      const result = await new DRSService(undefined, failingVault).check(outOfScope);
+
+      expect(result.allowed).toBe(false);
+      expect(result.ruleFired).toBe(2);
+      expect(result.override).toBeUndefined();
+      expect(result.reason).toContain('override not honored');
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('does not honor an override when no vault is configured', async () => {
+    await useScopedConfig();
+    const result = await new DRSService().check(outOfScope);
+
+    expect(result.allowed).toBe(false);
+    expect(result.ruleFired).toBe(2);
+    expect(result.override).toBeUndefined();
+  });
+
+  it('treats an unauditable override on a call no rule blocks as a plain allow', async () => {
+    await useScopedConfig();
+    const result = await new DRSService().check({
+      tool: 'Write',
+      targetPath: 'src/ok.ts',
+      messageBefore: 'override drs: not needed',
+    });
+
+    expect(result).toEqual({ allowed: true });
+  });
+});
+
 // Stage 5 part (b)/(a) continued: audit-trail choke-point coverage and the
 // Rule-5-before-Rule-3 precedence pin (round-3 non-blocking note).
 describe('DRSService — Stage 5: audit-trail choke point and rule precedence', () => {
@@ -241,13 +288,12 @@ describe('DRSService — Stage 5: audit-trail choke point and rule precedence', 
       };
       const result = await hooks.execute(context);
 
-      // Note: HookSystem.execute()'s own aggregation loop discards
-      // override/overrideReason on the allowed path (a separate, pre-existing
-      // bug outside this plan's scope — see Karpathy record) — so only
-      // `allowed` is asserted here. The audit write below is DRSService's own
-      // side effect inside check(), unaffected by that aggregation bug, and
-      // is the actual thing Stage 5 requires this test to prove.
+      // HookSystem.execute() must carry the accepted override through rather
+      // than collapsing it into a plain allow, and the audit write below is
+      // DRSService's own side effect inside check().
       expect(result.allowed).toBe(true);
+      expect(result.override).toBe(true);
+      expect(result.overrideReason).toBe('via hook system');
 
       const drsDir = join(vaultDir, 'DRS');
       const files = await readdir(drsDir);

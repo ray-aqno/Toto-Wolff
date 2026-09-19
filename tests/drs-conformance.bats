@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Bash-vs-TS conformance suite for DRS (Stage 6, drs-enforcement-remediation).
 # Asserts drs-check.sh and DRSService.ts agree on known inputs, run against
-# an isolated fixture config — never the real repo's .toto/*.json. This is
+# an isolated fixture config, never the real repo's .toto/*.json. This is
 # the mechanism the council named as the only thing that would have caught
 # the freeze.json schema drift and the jq-no-else drift, since data
 # externalization alone doesn't catch logic defects that diverge between
@@ -30,7 +30,7 @@ EOF
 { "frozen": ["secrets/keys.json"] }
 EOF
   # drs-check.sh's PROJECT_ROOT is derived from its own script location, not
-  # cwd — copy it into a fixture-rooted path so it resolves .toto/*.json from
+  # cwd, so copy it into a fixture-rooted path so it resolves .toto/*.json from
   # TEST_DIR, isolated from this repo's real config, matching how the TS
   # side is isolated via cwd.
   mkdir -p "${TEST_DIR}/.claude/skills/drs/bin"
@@ -118,7 +118,7 @@ run_ts_check() {
 }
 
 # Prepends a minimal PATH containing every binary drs-check.sh needs EXCEPT
-# jq, so `command -v jq` genuinely fails — proving the python3 fallback is
+# jq, so `command -v jq` genuinely fails, proving the python3 fallback is
 # what's actually running, not just present-but-untested. This is the exact
 # mechanism the council's ruling required: a CI variant with jq masked off
 # PATH, to catch "works here, dead on a jq-less machine" drift before it

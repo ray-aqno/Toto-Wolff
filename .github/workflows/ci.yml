@@ -248,7 +248,7 @@ jobs:
         # branch is exercised directly here; the suite's own
         # run_bash_check_no_jq tests separately mask jq off PATH per-check
         # (scoped to just the drs-check.sh subprocess, not this whole bats
-        # process) — that's the "works here, dead on a jq-less machine"
+        # process). That's the "works here, dead on a jq-less machine"
         # coverage the council's ruling required, without the fragility of
         # masking PATH for bats-core's own internals, which weren't verified
         # to tolerate it.

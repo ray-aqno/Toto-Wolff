@@ -31,7 +31,7 @@ function main() {
     tenant_namespaces: drs.tenant_namespaces || [],
     current_tenant: drs.current_tenant || '',
     halt_patterns: drs.halt_patterns || [],
-    // Only emit permissive when explicitly set — DRSService.ts's loadConfig()
+    // Only emit permissive when explicitly set: DRSService.ts's loadConfig()
     // treats its absence as false (fail-closed default), and this must
     // reach the generated runtime config for the config.yml documentation
     // comment on this field to have any actual effect.

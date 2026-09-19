@@ -30,7 +30,7 @@ const DESTRUCTIVE_PATTERNS = [
   'DELETE FROM',
 ];
 
-/** Where a resolved DRSConfig actually came from — surfaced so a resolution
+/** Where a resolved DRSConfig actually came from, surfaced so a resolution
  * failure (deny-all) is a visible signal, not an indistinguishable "everything
  * is blocked" state. */
 type ConfigSource = 'cwd-relative' | 'env:TOTO_DRS_CONFIG' | 'deny-all-fallback';
@@ -53,7 +53,7 @@ interface LoadedConfig {
 /**
  * Extracts a freeze-paths array from a parsed JSON value, tolerant of a bare
  * array or a `freeze_paths`/`freeze`/`frozen` key on an object. Distinguishes
- * "key present but empty" from "key absent" via `keyPresent` — a bare `[]`
+ * "key present but empty" from "key absent" via `keyPresent`: a bare `[]`
  * result alone can't tell those apart, and callers need to.
  */
 function parseFreezeConfig(raw: unknown): FreezeParseResult {
@@ -84,7 +84,7 @@ export class DRSService implements HookExecutor {
   private readonly config: DRSConfig;
   /** Diagnostic: where this instance's config actually came from. Public so
    * callers (and tests) can tell a resolution failure apart from a genuinely
-   * empty-but-resolved config — see resolveDrsConfig(). */
+   * empty-but-resolved config; see resolveDrsConfig(). */
   readonly configSource: ConfigSource;
   /** Audit-trail sink for overrides. Undefined is tolerated for construction
    * that never exercises an override, but without a vault no override is ever
@@ -116,7 +116,7 @@ export class DRSService implements HookExecutor {
    * outright; otherwise TOTO_DRS_CONFIG (env escape hatch) is tried; otherwise
    * `.toto/drs-config.json` relative to process.cwd(). A genuine resolution
    * failure at any of these falls back to DEFAULT_CONFIG's shape tagged
-   * 'deny-all-fallback' — never DEFAULT_CONFIG silently mislabeled as if it
+   * 'deny-all-fallback', never DEFAULT_CONFIG silently mislabeled as if it
    * were a real, permissive configuration.
    */
   private resolveDrsConfig(configPath: string | undefined): { config: DRSConfig; source: ConfigSource } {
@@ -143,14 +143,14 @@ export class DRSService implements HookExecutor {
   /**
    * Surfaces (via stderr, non-throwing) the case where resolution genuinely
    * failed and `permissive` isn't set to explicitly opt into the old
-   * no-restriction behavior — construction must never throw here (a resolution
+   * no-restriction behavior. Construction must never throw here (a resolution
    * failure from an unexpected cwd is a real, named scenario, not a bug to
    * crash on), so this only logs, it does not assert() in the throwing sense.
    */
   private validateNonPermissive(config: DRSConfig, source: ConfigSource): void {
     if (source === 'deny-all-fallback' && config.permissive !== true) {
       process.stderr.write(
-        'DRSService: configuration resolution failed — falling back to deny-all ' +
+        'DRSService: configuration resolution failed, falling back to deny-all ' +
         '(every Rule 2 check will block until this is fixed). Set permissive: true ' +
         'in your DRS config to opt into unrestricted mode instead, or ensure ' +
         '.toto/drs-config.json / TOTO_DRS_CONFIG resolves correctly.\n',
@@ -217,12 +217,12 @@ export class DRSService implements HookExecutor {
 
   /**
    * Writes a durable audit record for an accepted override, mirroring bash's
-   * write_override_record() shape. check() is the sole choke point for this —
-   * not the MCP handler — since execute() calls check() directly too,
+   * write_override_record() shape. check() is the sole choke point for this,
+   * not the MCP handler, since execute() calls check() directly too,
    * bypassing the MCP handler entirely. Returns whether the record was
    * written: false when no vault is configured or the write fails (the
    * failure is also reported on stderr). check() treats false as "override
-   * not honored" — fail closed, so an override never takes effect without
+   * not honored": fail closed, so an override never takes effect without
    * its audit trail (the bash hook does the same).
    */
   private async writeOverrideAuditRecord(input: DRSCheckInput, result: DRSResult): Promise<boolean> {
@@ -249,12 +249,12 @@ export class DRSService implements HookExecutor {
       await this.vault.write(`DRS/${slug}.md`, body);
       return true;
     } catch (err) {
-      process.stderr.write(`DRSService: failed to write override audit record, override not honored — ${String(err)}\n`);
+      process.stderr.write(`DRSService: failed to write override audit record, override not honored: ${String(err)}\n`);
       return false;
     }
   }
 
-  /** HookExecutor implementation — converts HookContext to DRSCheckInput and runs check. */
+  /** HookExecutor implementation: converts HookContext to DRSCheckInput and runs check. */
   async execute(context: HookContext): Promise<HookResult> {
     const input: DRSCheckInput = {
       tool: context.tool as import('./types.js').DRSTool,

@@ -41,7 +41,7 @@ esac
 # Validates an override reason: non-empty after trimming whitespace, and not
 # a placeholder value. Prints the trimmed reason and returns 0 on success;
 # prints nothing and returns 1 on failure. Closes the "any non-empty reason
-# accepted, no validation gate" gap (L2-004) — a fabricated audit trail is a
+# accepted, no validation gate" gap (L2-004). A fabricated audit trail is a
 # record claiming a validated override when no real validation occurred.
 validate_override_reason() {
   local raw="$1"
@@ -59,7 +59,7 @@ validate_override_reason() {
   return 0
 }
 
-# Check for override in the environment (DRS_OVERRIDE_REASON only — the bash
+# Check for override in the environment (DRS_OVERRIDE_REASON only; the bash
 # hook has no message field; the message-based override exists on the
 # separate TS/MCP drs_check path, see DRSService.checkOverride())
 RAW_OVERRIDE_REASON="${DRS_OVERRIDE_REASON:-}"
@@ -114,7 +114,7 @@ write_block_record() {
     echo "DRS BLOCK — Rule $rule"
     echo "Reason: $reason"
     echo "Target: $target"
-    echo "To override: set DRS_OVERRIDE_REASON='your reason' in the environment (this hook has no message-based override — that mechanism exists separately on the TS/MCP drs_check tool path, and only bypasses Rules 2/3/4)."
+    echo "To override: set DRS_OVERRIDE_REASON='your reason' in the environment (this hook has no message-based override; that mechanism exists separately on the TS/MCP drs_check tool path, and only bypasses Rules 2/3/4)."
   } > "$record" || return 1
 }
 
@@ -130,8 +130,8 @@ drs_halt() {
   fi
   # The block record is best-effort. Enforcement must never depend on it: this
   # used to write the record unchecked under `set -e`, so an unwritable vault
-  # aborted the script with exit 1 — which this harness treats as a
-  # non-blocking error — and a rule that fired did not actually block.
+  # aborted the script with exit 1, which this harness treats as a
+  # non-blocking error, and a rule that fired did not actually block.
   local slug record
   slug="$(date +%Y%m%d-%H%M%S)-r${rule}-blocked"
   record="$DRS_VAULT_DIR/$slug.md"
@@ -149,12 +149,12 @@ drs_halt() {
 # single-quoted python string breaks on any project path containing an
 # apostrophe (e.g. /home/o'brien/repo): the script becomes invalid python,
 # stderr is suppressed, the helper prints nothing, and every rule that reads
-# config treats that as "no restriction configured" — silently failing open.
+# config treats that as "no restriction configured", silently failing open.
 
 # Reads a JSON array field from a file, tolerant of jq absence (python3
 # fallback) and of a missing/malformed file (prints nothing). Used by Rules
 # 2, 4, and 5's config-driven checks so jq's absence never silently no-ops
-# a rule — every rule gets a real fallback, not just a jq branch with no else.
+# a rule: every rule gets a real fallback, not just a jq branch with no else.
 read_json_array() {
   local file="$1" field="$2"
   if command -v jq &>/dev/null; then

@@ -1,5 +1,5 @@
 /**
- * HookSystem — manages hook registration and execution chain.
+ * HookSystem: manages hook registration and execution chain.
  * Enforces max chain length (5) to prevent unbounded execution.
  */
 
@@ -79,7 +79,7 @@ export class HookSystem {
 
   /**
    * Load hooks from configuration. `vault` is threaded through to DRSService
-   * for its override audit-trail write — reuse the same VaultService instance
+   * for its override audit-trail write. Reuse the same VaultService instance
    * the caller already constructed elsewhere, rather than building a second
    * one, so audit records stay consolidated in one vault-write path.
    */

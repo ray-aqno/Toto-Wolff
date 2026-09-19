@@ -1,5 +1,5 @@
-// Constructs DRSService (TS side) exactly as production does — zero-arg,
-// cwd-relative resolution — and prints its check() result as JSON.
+// Constructs DRSService (TS side) exactly as production does: zero-arg,
+// cwd-relative resolution, then prints its check() result as JSON.
 // Used by tests/drs-conformance.bats to assert the bash hook and the TS
 // implementation agree on known inputs. Requires `pnpm build` to have run
 // (imports the built dist, not the TS source, matching what production

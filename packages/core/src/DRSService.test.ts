@@ -34,7 +34,7 @@ async function writeFixtureFreeze(dir: string, frozen: string[]): Promise<void> 
 // Council's standing rule: any service that can return allowed/pass/clear
 // must have a test constructing it the way production does (zero-arg),
 // proving a known-bad input is caught.
-describe('DRSService — zero-arg construction, production shape', () => {
+describe('DRSService: zero-arg construction, production shape', () => {
   it('Rule 1 fires on a frozen-path write', async () => {
     await writeFixtureFreeze(testDir, ['secrets/keys.json']);
     await writeFixtureConfig(testDir, { allowed_paths: ['secrets/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] });
@@ -75,7 +75,7 @@ describe('DRSService — zero-arg construction, production shape', () => {
   });
 });
 
-describe('DRSService — Rule 2 fail-closed default vs. permissive opt-out', () => {
+describe('DRSService: Rule 2 fail-closed default vs. permissive opt-out', () => {
   it('denies all writes when allowedPaths is empty and permissive is not set', async () => {
     await writeFixtureConfig(testDir, { allowed_paths: [], tenant_namespaces: [], current_tenant: '', halt_patterns: [] });
     process.chdir(testDir);
@@ -99,11 +99,11 @@ describe('DRSService — Rule 2 fail-closed default vs. permissive opt-out', () 
 });
 
 // R3 (Council-1 Condition 4): cwd-relative resolution is a named failure
-// mode, not a hypothetical — a caller whose cwd isn't the repo root must
+// mode, not a hypothetical: a caller whose cwd isn't the repo root must
 // neither throw nor silently fall back to a permissive shape.
-describe('DRSService — R3: resolution diagnostics from a non-standard cwd', () => {
+describe('DRSService, R3: resolution diagnostics from a non-standard cwd', () => {
   it('does not throw, does not fall back to a permissive DEFAULT_CONFIG shape, and denies-all with configSource showing the fallback fired', async () => {
-    // testDir has no .toto/ at all — deliberately unresolvable.
+    // testDir has no .toto/ at all, deliberately unresolvable.
     process.chdir(testDir);
 
     expect(() => new DRSService()).not.toThrow();
@@ -128,7 +128,7 @@ describe('DRSService — R3: resolution diagnostics from a non-standard cwd', ()
       }), 'utf8');
 
       process.env['TOTO_DRS_CONFIG'] = fixtureConfigPath;
-      process.chdir(testDir); // cwd itself still has no .toto/ — env var must win
+      process.chdir(testDir); // cwd itself still has no .toto/, so the env var must win
 
       const drs = new DRSService();
       expect(drs.configSource).toBe('env:TOTO_DRS_CONFIG');
@@ -146,9 +146,9 @@ describe('DRSService — R3: resolution diagnostics from a non-standard cwd', ()
 });
 
 // Stage 5 (R1 v3, keep-and-harden): checkOverride() bypasses Rules 2/3/4
-// only — Rule 1's curated freeze list and Rule 5's own narrower
+// only: Rule 1's curated freeze list and Rule 5's own narrower
 // --force-confirmed override are both exempt from the message-based bypass.
-describe('DRSService — Stage 5: override anchoring (Rules 1/5 exempt, 2/3/4 bypassable)', () => {
+describe('DRSService, Stage 5: override anchoring (Rules 1/5 exempt, 2/3/4 bypassable)', () => {
   it('does NOT bypass Rule 1 via message_before override', async () => {
     await writeFixtureFreeze(testDir, ['secrets/keys.json']);
     await writeFixtureConfig(testDir, { allowed_paths: ['secrets/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] });
@@ -183,7 +183,7 @@ describe('DRSService — Stage 5: override anchoring (Rules 1/5 exempt, 2/3/4 by
   });
 });
 
-describe('DRSService — Stage 5: override still bypasses Rules 2/3/4, with an audit trail', () => {
+describe('DRSService, Stage 5: override still bypasses Rules 2/3/4, with an audit trail', () => {
   it('DOES bypass Rule 2 via message_before override, and writes an audit record', async () => {
     const vaultDir = await mkdtemp(join(tmpdir(), 'toto-drs-vault-'));
     try {
@@ -265,8 +265,8 @@ describe('DRSService: an override fails closed when it cannot be audited', () =>
 
 // Stage 5 part (b)/(a) continued: audit-trail choke-point coverage and the
 // Rule-5-before-Rule-3 precedence pin (round-3 non-blocking note).
-describe('DRSService — Stage 5: audit-trail choke point and rule precedence', () => {
-  it('writes an audit record via the execute()/HookSystem path too — check() is the choke point, not the MCP handler', async () => {
+describe('DRSService, Stage 5: audit-trail choke point and rule precedence', () => {
+  it('writes an audit record via the execute()/HookSystem path too: check() is the choke point, not the MCP handler', async () => {
     const vaultDir = await mkdtemp(join(tmpdir(), 'toto-drs-vault-'));
     try {
       await writeFixtureConfig(testDir, { allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] });
@@ -309,7 +309,7 @@ describe('DRSService — Stage 5: audit-trail choke point and rule precedence', 
 
     const drs = new DRSService();
     // "chmod" matches Rule 3's shell-permission-command check; "rm -rf" matches Rule 5.
-    // Rule 5 now runs before Rule 3 (both run before checkOverride) — this is
+    // Rule 5 now runs before Rule 3 (both run before checkOverride); this is
     // the intentional, plan-acknowledged precedence change from Stage 5's (a).
     const result = await drs.check({ tool: 'Bash', command: 'chmod 777 /tmp && rm -rf /tmp/x' });
 

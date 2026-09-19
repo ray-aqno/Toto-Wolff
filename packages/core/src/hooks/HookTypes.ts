@@ -1,5 +1,5 @@
 /**
- * Hook system types — defines the interface for hook execution and context.
+ * Hook system types: defines the interface for hook execution and context.
  */
 
 export interface HookContext {

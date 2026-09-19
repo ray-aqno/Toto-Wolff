@@ -1,5 +1,5 @@
 /**
- * Hooks module — pluggable hook system for governance enforcement.
+ * Hooks module: pluggable hook system for governance enforcement.
  * Exports: HookExecutor, HookContext, HookResult, HookConfig, HookSystemConfig, HookSystem
  */
 

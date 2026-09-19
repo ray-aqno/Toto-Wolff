@@ -80,11 +80,11 @@ Unless the command includes the literal string `--force-confirmed` anywhere in i
 
 ## Override
 
-There are two distinct override mechanisms, with different scopes. Neither can bypass Rule 1 (frozen path) or Rule 5 (destructive pattern) — Rule 1's freeze list is a small, deliberately curated set that an override shouldn't defeat, and Rule 5 already has its own narrower `--force-confirmed` override on the command itself.
+There are two distinct override mechanisms, with different scopes. Neither can bypass Rule 1 (frozen path) or Rule 5 (destructive pattern). Rule 1's freeze list is a small, deliberately curated set that an override shouldn't defeat, and Rule 5 already has its own narrower `--force-confirmed` override on the command itself.
 
-**TS/MCP path (`drs_check` tool):** pass `message_before: "override drs: <reason>"` as an argument to the `drs_check` tool call. This bypasses Rules 2/3/4 only (out-of-scope, auth-surface, cross-tenant). The reason is mandatory and is validated (non-empty after trimming, not a placeholder value) before being accepted. Every accepted override writes an audit record to the vault — the override does not suppress the vault write, it adds an `override: true` field and the reason text.
+**TS/MCP path (`drs_check` tool):** pass `message_before: "override drs: <reason>"` as an argument to the `drs_check` tool call. This bypasses Rules 2/3/4 only (out-of-scope, auth-surface, cross-tenant). The reason is mandatory and is validated (non-empty after trimming, not a placeholder value) before being accepted. Every accepted override writes an audit record to the vault. The override does not suppress the vault write; it adds an `override: true` field and the reason text. If the record can't be written, the override is not honored.
 
-**Bash-hook path (`drs-check.sh`):** set `DRS_OVERRIDE_REASON=<reason>` in the environment. This hook has no message field — the phrase-in-your-message trigger above only exists on the TS/MCP path, not here. The bash path's override applies to any rule it evaluates (it doesn't distinguish Rule 1/5 the way the TS path does), and is subject to the same non-empty/non-placeholder validation.
+**Bash-hook path (`drs-check.sh`):** set `DRS_OVERRIDE_REASON=<reason>` in the environment. This hook has no message field, so the phrase-in-your-message trigger above only exists on the TS/MCP path, not here. The bash path's override applies to any rule it evaluates (it doesn't distinguish Rule 1/5 the way the TS path does), and is subject to the same non-empty/non-placeholder validation. If the audit record can't be written, the override is not honored and the rule blocks (exit 2).
 
 Use overrides for genuine exceptions. Do not use them to unblock yourself from rules you disagree with — use `/council` for that.
 

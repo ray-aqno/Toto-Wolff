@@ -113,7 +113,7 @@ An optional Claude Code skill package built by Garry Tan that provides the `/cou
 - A **DRS event log** in `~/.toto/vault/DRS/` whenever the boundary hook fires — every block and every override is recorded with the rule, target, and reason
 - A **signal store** in `~/.toto/vault/Signals/` that feeds past rulings forward into future plans — `toto backfill` seeds it from existing ADRs and P10 plans
 - A **live dashboard** at `http://127.0.0.1:3099/dashboard` showing session counts, blocked plans, and vault records with SSE-backed live stats
-- A **`toto` CLI** with 10 commands for vault search, audit, doctor, interactive pit-wall chat via `toto radio`, and in-place upgrades via `toto upgrade`
+- A **`toto` CLI** with 12 commands for vault search, audit, doctor, interactive pit-wall chat via `toto radio`, and in-place upgrades via `toto upgrade`
 
 ---
 
@@ -158,6 +158,8 @@ An optional Claude Code skill package built by Garry Tan that provides the `/cou
 | `toto dashboard` | Open `http://127.0.0.1:3099/dashboard` in browser | `toto dashboard` |
 | `toto radio` | Interactive pit-wall chat; streams via the Anthropic API | `toto radio` |
 | `toto backfill` | Ingest ADR/ and P10-Plans/ into Signals/ — idempotent, safe to re-run | `toto backfill` |
+| `toto report` | Scan Council/Congressional-Records frontmatter and print an aggregate summary | `toto report` |
+| `toto synthesize` | Scan 5 vault directories, run parallel Haiku scouts, synthesize cross-cutting patterns with Sonnet, write a Synthesis/ record | `toto synthesize` |
 | `toto upgrade` | Pull latest release from GitHub, rebuild, re-run setup — vault and credentials untouched | `toto upgrade` |
 
 ---
@@ -172,6 +174,11 @@ Register the MCP server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Th
 | `vault_search` | Full-text search across vault records |
 | `council_run` | Run a multi-agent council session; writes Congressional Record to vault |
 | `p10_plan` | Generate a P10 pre-execution plan; Opus arbiter gates approval |
+| `cabinet_run` | Run a cabinet release gate: three Opus seats, any veto blocks the ship |
+| `safety_car_run` | Run adversarial Safety Car review on an approved P10 plan; CLEAR/DEPLOYED verdict |
+| `karpathy_check` | Check an implementation diff against the 4 Karpathy execution rules |
+| `drs_check` | Check a tool call against DRS boundary rules (frozen path, scope, auth surface, tenant, destructive pattern) |
+| `subagent_list` | List available subagents (user, project, or both scopes) |
 | `dashboard_status` | Return vault stats (`councilCount`, `p10Count`, `blockedCount`) |
 | `score_confidence` | Deterministic HIGH/LOW confidence tier for plan provenance — not model reasoning |
 
@@ -207,7 +214,7 @@ The server exposes these read-only HTTP endpoints (loopback only — never acces
 
 ## How it works
 
-Five packages in a pnpm workspace. `packages/core` owns shared types, error classes, and the three services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), and `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate). `packages/mcp-server` exposes 6 MCP tools and 8 HTTP endpoints on `127.0.0.1:3099` — loopback only, no LAN exposure. `packages/cli` is the `toto` binary (10 commands including `toto upgrade` for in-place updates). `packages/dashboard` generates server-rendered HTML; no React, no build step at runtime. `packages/personas` holds the engineering persona for `./setup --role engineering` persona swaps.
+Three packages in a pnpm workspace. `packages/core` owns shared types, error classes, and 8 distinct services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate), `CabinetService`, `SafetyCarService`, `KarpathyService`, `DRSService`, and `SubagentService`. A second `VaultService.ts` also exists under `packages/core/src/vault/`, exported as `VaultServiceV2`, an in-progress consolidation (not a 9th distinct service) from the `vault-read-api-design` stream: newer CLI commands (`toto report`, `toto synthesize`) use `VaultServiceV2`, while the original `VaultService` remains the primary implementation used by the governance services above. `packages/mcp-server` exposes 11 MCP tools and 5 HTTP endpoints on `127.0.0.1:3099`: loopback only, no LAN exposure, and renders the governance dashboard as server-rendered HTML (no React, no build step at runtime). `packages/cli` is the `toto` binary (12 commands including `toto upgrade` for in-place updates, and `toto dashboard --terminal` for the terminal blocked-items rollup).
 
 The skill stack in `.claude/skills/` governs the full engineering workflow: `/council` for deliberation, `/p10` for pre-execution planning, `/safety-car` for adversarial stress testing of approved plans (CLEAR/DEPLOYED verdicts, single Sonnet agent), `/karpathy` for execution-time quality rules, and `/drs` as a deterministic PreToolUse hook that fires automatically on every Write/Edit/Bash call to enforce frozen paths, auth surfaces, and destructive shell pattern rules. `/cabinet` closes the loop at tagged releases.
 

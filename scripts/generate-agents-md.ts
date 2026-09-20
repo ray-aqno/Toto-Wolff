@@ -258,7 +258,7 @@ ${(drs.halt_patterns || []).map((p: string) => `    - ${p}`).join('\n')}
 4. **cross_tenant** — target contains tenant ≠ current_tenant
 5. **destructive_pattern** — Bash has \`rm -rf\`|\`DROP TABLE\`|\`DELETE FROM\` (no WHERE) unless \`--force-confirmed\`
 
-**Override:** \`"override drs: [reason]"\` in message before tool call → allowed with audit log
+**Override:** TS/MCP path: \`message_before: "override drs: <reason>"\` on the \`drs_check\` tool, bypasses Rules 2/3/4 only, audited via a vault write. Bash-hook path: \`DRS_OVERRIDE_REASON\` env var, applies to any rule (Rules 1 and 5 included), no message field exists on this path; it is the audited route to a frozen path. An override whose audit record cannot be written is not honored.
 
 ---
 

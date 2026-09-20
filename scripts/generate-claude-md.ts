@@ -45,8 +45,7 @@ Engineering governance stack for AI-assisted development. Implements council/p10
 packages/
 ├── core/           # @toto-wolff/core — governance services (Vault, Council, P10, Cabinet, SafetyCar, Karpathy, DRS, Subagent)
 ├── cli/            # @toto-wolff/cli — toto CLI (council, p10, cabinet, safety-car, karpathy, drs, vault, subagent, report, synthesize, radio)
-├── mcp-server/     # @toto-wolff/mcp-server — MCP stdio/HTTP server exposing 11 tools + dashboard
-└── dashboard/      # @toto-wolff/dashboard — terminal governance dashboard
+└── mcp-server/     # @toto-wolff/mcp-server: MCP stdio/HTTP server exposing 11 tools + dashboard
 \`\`\`
 
 ## Governance Stack (MCP Tools)
@@ -80,14 +79,15 @@ pnpm lint && pnpm typecheck
 # Start MCP server (stdio for Claude Code)
 pnpm -C packages/mcp-server start
 
-# Run governance commands via CLI
-pnpm -C packages/cli toto council "should we migrate to gRPC?"
-pnpm -C packages/cli toto p10 "implement gRPC migration"
-pnpm -C packages/cli toto cabinet "gRPC migration" v1.2.0
-pnpm -C packages/cli toto safety-car P10-Plans/2025-08-05-gRPC.md
-pnpm -C packages/cli toto karpathy P10-Plans/2025-08-05-gRPC.md "Stage 1" "<git diff>"
-pnpm -C packages/cli toto drs-check '{"tool":"Write","target_path":"packages/core/src/auth.ts"}'
-pnpm -C packages/cli toto subagent-list
+# Run governance commands: Claude Code slash-commands (typed as chat
+# messages) or MCP tool calls, not shell commands:
+#   /council "should we migrate to gRPC?"
+#   /p10 "implement gRPC migration"
+#   /cabinet "gRPC migration" v1.2.0
+#   /safety-car P10-Plans/2025-08-05-gRPC.md
+#   /karpathy P10-Plans/2025-08-05-gRPC.md "Stage 1" "<git diff>"
+#   drs_check {"tool":"Write","target_path":"packages/core/src/auth.ts"}  (MCP tool)
+#   subagent_list                                                         (MCP tool)
 \`\`\`
 
 ---
@@ -98,15 +98,16 @@ pnpm -C packages/cli toto subagent-list
 # Build
 pnpm build                    # All packages
 pnpm -C packages/core build   # Core only
+#   src/vault/: FileStorage, StorageBackend, VaultFactory, VaultService
+#   src/hooks/: HookSystem, HookTypes
 
 # Test
 pnpm test                     # All tests (vitest)
-pnpm -C packages/core test    # Core tests
 pnpm -C packages/mcp-server test
 
 # Lint + Typecheck
 pnpm lint                     # ESLint (zero warnings)
-pnpm typecheck                # tsc --strict --noEmit
+pnpm typecheck                # tsc -b
 
 # Generate docs from config
 pnpm generate:agents-md       # Generates AGENTS.md from .toto/config.yml
@@ -166,9 +167,9 @@ ${(drs.halt_patterns || []).map((p: string) => `    - ${p}`).join('\n')}
 4. Cross-tenant → BLOCK
 5. Destructive pattern → BLOCK
 
-**Override:** \`"override drs: [reason]"\` in message before tool call
+**Override:** TS/MCP path: pass \`message_before: "override drs: <reason>"\` to the \`drs_check\` tool (bypasses Rules 2/3/4 only; audited via a vault write). Bash-hook path: set \`DRS_OVERRIDE_REASON=<reason>\` in the environment (no message-based trigger exists on this path; applies to any rule, Rules 1 and 5 included, and is the audited route to a frozen path). An override whose audit record cannot be written is not honored.
 
-**Hook installed at:** \`.pi/hooks.json\`
+**Hook installed at:** \`.claude/settings.json\` (PreToolUse, committed; portable via \`\${CLAUDE_PROJECT_DIR}\`, ships to every contributor who clones the repo)
 
 ---
 
@@ -242,7 +243,7 @@ pnpm generate:claude-md
 | \`.toto/drs-config.json\` | DRS runtime config (auto-synced from config.yml) |
 | \`.toto/freeze.json\` | Frozen paths for DRS Rule 1 |
 | \`.toto/sensitive-patterns.json\` | Pre-commit hook patterns |
-| \`.pi/hooks.json\` | DRS PreToolUse hook registration |
+| \`.claude/settings.json\` | DRS PreToolUse hook registration (committed) |
 | \`P10-Plans/*.md\` | Approved P10 plans |
 | \`session/governance/*\` | Session memory records |
 

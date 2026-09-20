@@ -381,7 +381,20 @@ Complete this before requesting review. Copy it into your PR description.
 - [ ] No raw error internals exposed in any HTTP response path I touched
 - [ ] `grep -r "listen\b" packages/mcp-server/src/index.ts` still shows 127.0.0.1
 - [ ] If I changed dashboard_html.ts, every vault-sourced string is wrapped in escHtml()
+- [ ] No new ESLint violations introduced (checked by CI's lint-baseline job; the pre-existing baselined errors are a separate, tracked cleanup)
 ```
+
+### Regenerating `.eslint-baseline.json`
+
+The baseline is keyed on `file:line:ruleId`, which is brittle to line-number
+shifts: editing code above a pre-existing violation can make it look "new."
+Never regenerate the baseline and commit the output without review: a human
+reviewer must inspect the diff of added/removed entries and confirm no real
+violation was papered over before it's committed. Run `pnpm build` first (the
+type-aware rules need built packages; an unbuilt tree reports about 300 extra
+violations, so the script and the CI gate both refuse to run on one), then
+`pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/generate-eslint-baseline.ts`,
+then review `git diff .eslint-baseline.json` line by line.
 
 ---
 

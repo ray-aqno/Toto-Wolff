@@ -3,7 +3,6 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/mcp-server" },
-    { "path": "./packages/dashboard" },
     { "path": "./packages/cli" }
   ],
   "files": []

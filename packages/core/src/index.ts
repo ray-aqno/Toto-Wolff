@@ -1,5 +1,7 @@
 export { VaultService } from './VaultService.js';
+export { VaultService as VaultServiceV2, VaultFactory, FileStorage, type VaultConfig, type StorageBackend, type StorageConfig } from './vault/index.js';
 export { createAnthropicClient } from './utils/anthropic.js';
+export { readClaudeJsonEnv } from './utils/claudeJsonCredentials.js';
 export { withLLMTimeout } from './utils/timeout.js';
 export { CouncilService } from './CouncilService.js';
 export type { CouncilResult } from './CouncilService.js';
@@ -8,6 +10,7 @@ export { CabinetService } from './CabinetService.js';
 export { SafetyCarService } from './SafetyCarService.js';
 export { KarpathyService } from './KarpathyService.js';
 export { DRSService } from './DRSService.js';
+export { HookSystem, HookSystemInstance, type HookExecutor, type HookContext, type HookResult, type HookConfig, type HookSystemConfig } from './hooks/index.js';
 export { SubagentService } from './SubagentService.js';
 export * from './types.js';
 export { jaccardSimilarity, JACCARD_MATCH_THRESHOLD } from './utils/jaccard.js';

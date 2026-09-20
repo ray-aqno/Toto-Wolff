@@ -170,6 +170,8 @@ export interface DRSConfig {
   tenantNamespaces: string[];
   currentTenant: string;
   haltPatterns: string[];
+  /** Explicit opt-out: when true, an empty allowedPaths means "no restriction" instead of deny-all. */
+  permissive?: boolean;
 }
 
 // ============================================================================

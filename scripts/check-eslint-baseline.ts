@@ -67,6 +67,8 @@ function violationKey(v: Violation): string {
 
 const DEFAULT_ESLINT_BIN = join(REPO_ROOT, 'node_modules', '.bin', 'eslint');
 const DEFAULT_ESLINT_ARGS = ['packages', '-f', 'json'];
+/** Ceiling on ESLint's captured JSON output; the whole-repo report is large and spawnSync would otherwise cut it off. */
+const ESLINT_OUTPUT_MAX_BYTES = 50 * 1024 * 1024;
 const BUILT_MARKER = join(REPO_ROOT, 'packages', 'core', 'dist', 'index.d.ts');
 
 /**
@@ -98,7 +100,7 @@ export function runEslint(
   const result = spawnSync(cmd, args, {
     cwd: REPO_ROOT,
     encoding: 'utf-8',
-    maxBuffer: 50 * 1024 * 1024,
+    maxBuffer: ESLINT_OUTPUT_MAX_BYTES,
   });
   return { stdout: result.stdout ?? '', status: result.status, spawnError: result.error ?? null };
 }
@@ -131,7 +133,9 @@ export function diffViolations(
   return { newViolations, fixedOrBroken };
 }
 
+/** Below this many baseline entries the percentage check is skipped: too noisy to tell a broken run from a cleanup. */
 const FLOOR_INVARIANT_ABSOLUTE_MINIMUM = 20;
+/** More than this fraction of the baseline vanishing in one run is treated as a broken run, not a cleanup. */
 const FLOOR_INVARIANT_MAX_FIXED_FRACTION = 0.5;
 
 /** Pure: decides whether the fixedOrBroken count is suspicious relative to baseline size, and names both counts in the message. */

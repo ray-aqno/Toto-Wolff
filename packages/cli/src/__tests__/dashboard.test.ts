@@ -76,7 +76,9 @@ describe('runDashboard --terminal', () => {
       await rm(vault, { recursive: true, force: true });
     }
   });
+});
 
+describe('runDashboard --terminal with an unreadable vault entry', () => {
   it('renders the readable session and surfaces an unreadable-file warning for a partially-corrupted directory', async () => {
     const vault = await mkdtemp(join(tmpdir(), 'toto-dash-'));
     try {
@@ -84,7 +86,7 @@ describe('runDashboard --terminal', () => {
       await mkdir(councilDir, { recursive: true });
       await writeFile(join(councilDir, '2026-01-01-good.md'), '---\nstatus: blocked\n---\nReadable blocked reason.');
       // A directory sharing the .md-looking name but which is itself a directory,
-      // not a file — readFile() on it throws EISDIR, exercising the per-file
+      // not a file, so readFile() on it throws EISDIR, exercising the per-file
       // catch path without needing filesystem permission tricks.
       await mkdir(join(councilDir, '2026-01-02-bad.md'), { recursive: true });
 

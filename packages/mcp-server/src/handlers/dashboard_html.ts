@@ -111,7 +111,7 @@ function injectPanelScript(): string {
         .catch(function (status) {
           if (spinner) { spinner.className = ''; }
           body.style.display = '';
-          body.textContent = status === 404 ? 'Record not found.' : 'Could not load record — check your connection and try again.';
+          body.textContent = status === 404 ? 'Record not found.' : 'Could not load record. Check your connection and try again.';
         });
     });
   });
@@ -194,7 +194,7 @@ function sessionBarChart(items: DashboardItem[]): string {
 
 /**
  * Groups items into monthly (YYYY-MM) buckets and returns bucket counts in
- * chronological order — a real per-period signal for sparklines to plot,
+ * chronological order: a real per-period signal for sparklines to plot,
  * replacing the previous synthetic always-rising index sequence
  * (`items.map((_, i) => i + 1)`). Mirrors sessionBarChart's own bucketing
  * strategy. Non-empty input always yields a non-empty output, mirroring

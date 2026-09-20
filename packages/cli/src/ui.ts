@@ -97,13 +97,13 @@ export async function printLandingUI(): Promise<void> {
   const vaultConnected = councilCount !== null && p10Count !== null;
   const statsLine = vaultConnected
     ? `${TEAL}${councilCount}${RESET} council sessions  ${TEAL}${p10Count}${RESET} P10 plans`
-    : `${DIM}vault not connected — run ${TEAL}toto doctor${RESET}`;
+    : `${DIM}vault not connected: run ${TEAL}toto doctor${RESET}`;
 
   const pitStatus = !vaultConnected
     ? ""
     : blockedCount > 0
-      ? `\n  ${"\x1b[31m"}⚠  ${blockedCount} BLOCKED${RESET}${DIM} — execution halted on ${blockedCount} plan${blockedCount > 1 ? "s" : ""}. Run ${RESET}${TEAL}toto audit${RESET}${DIM} for details.${RESET}`
-      : `\n  ${GREEN}●${RESET}${DIM}  pit lane clear — no blocked plans${RESET}`;
+      ? `\n  ${"\x1b[31m"}⚠  ${blockedCount} BLOCKED${RESET}${DIM}: execution halted on ${blockedCount} plan${blockedCount > 1 ? "s" : ""}. Run ${RESET}${TEAL}toto audit${RESET}${DIM} for details.${RESET}`
+      : `\n  ${GREEN}●${RESET}${DIM}  pit lane clear: no blocked plans${RESET}`;
 
   const cmds: Array<[string, string]> = [
     ["init",      "Register MCP server in Claude Code"],

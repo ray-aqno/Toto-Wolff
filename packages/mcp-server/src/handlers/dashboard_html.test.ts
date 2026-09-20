@@ -102,7 +102,9 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('GENERATED &nbsp;<span class="val">2026-07-08T00:00:00Z &amp; &lt;tag&gt;</span>');
     expect(html).toContain('BRACKLEY · 2026-07-08T00:00:00Z &amp; &lt;tag&gt;');
   });
+});
 
+describe('renderDashboardHtml: blocked items and sparklines', () => {
   // L6-001: a blocked item alone must not be swallowed by the empty-state
   // short-circuit, which previously keyed only off council/p10 counts.
   it('renders the blocked-items section, not the empty state, when only blockedItems is non-empty', () => {
@@ -111,7 +113,7 @@ describe('renderDashboardHtml', () => {
       blockedItems: [{ type: 'council', date: '2026-07-08', excerpt: 'Blocked with zero sessions/plans' }],
     };
     const html = renderDashboardHtml(blockedOnly);
-    // Not a bare .not.toContain('PIT LANE CLEAR') — that string also appears,
+    // Not a bare .not.toContain('PIT LANE CLEAR'): that string also appears,
     // correctly, as inert client-side JS source inside buildBlockedPanel()'s
     // own (different, per-panel) empty-state branch, which never executes for
     // this fixture's non-empty blockedItems but is always present as source.
@@ -151,7 +153,9 @@ describe('renderDashboardHtml', () => {
     const pointCount = html.slice(start, end).trim().split(/\s+/).length;
     expect(pointCount).toBe(2); // 2 monthly buckets (2026-05, 2026-06), not 4 (one per item)
   });
+});
 
+describe('renderDashboardHtml: contrast token and record panel', () => {
   // L6-004: .card-label's contrast against --card (#181818) previously failed
   // WCAG AA via var(--dim) (#555, ~2.38:1). Repointed to a new --label token.
   it('repoints .card-label off var(--dim) to the new --label contrast token', () => {
@@ -165,6 +169,6 @@ describe('renderDashboardHtml', () => {
   // found." for every failure, including network errors and non-404 statuses.
   it('branches the record-panel fetch failure message on 404 vs. any other status', () => {
     const html = renderDashboardHtml(emptyResult);
-    expect(html).toContain("status === 404 ? 'Record not found.' : 'Could not load record — check your connection and try again.'");
+    expect(html).toContain("status === 404 ? 'Record not found.' : 'Could not load record. Check your connection and try again.'");
   });
 });

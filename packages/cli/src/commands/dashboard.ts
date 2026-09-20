@@ -27,7 +27,7 @@ interface ScanResult {
   unreadable: string[];
 }
 
-/** Resolves the vault path — TOTO_VAULT_PATH, then legacy VAULT_PATH, then default. Matches last.ts:75 verbatim. */
+/** Resolves the vault path: TOTO_VAULT_PATH, then legacy VAULT_PATH, then default. Matches last.ts:75 verbatim. */
 function resolveVaultPath(): string {
   return process.env["TOTO_VAULT_PATH"] ?? process.env["VAULT_PATH"] ?? DEFAULT_VAULT_PATH;
 }
@@ -68,10 +68,10 @@ function parseFileContent(content: string): { status: string | null; excerpt: st
 /**
  * Reads all markdown files from a vault subdirectory, sorted newest-first,
  * capped at MAX_FILES. Returns null if the directory does not exist
- * (distinct from an empty directory, which returns `{ sessions: [], ... }`)
- * — matches report.ts's listRecordFiles null/[] convention. A per-file read
+ * (distinct from an empty directory, which returns `{ sessions: [], ... }`),
+ * matching report.ts's listRecordFiles null/[] convention. A per-file read
  * failure is NOT silently swallowed (the packages/dashboard port source's
- * bug) — it's collected into `unreadable` so a partially-corrupted
+ * bug); it's collected into `unreadable` so a partially-corrupted
  * directory is visibly different from a fully-clean one.
  */
 async function scanVaultDir(dir: string): Promise<ScanResult | null> {
@@ -108,7 +108,7 @@ async function scanVaultDir(dir: string): Promise<ScanResult | null> {
 /**
  * Scans Council/Congressional-Records and P10-Plans for blocked items.
  * Returns `items: null` only when BOTH subdirectories are missing (the
- * vault itself isn't there) — a missing single subdirectory contributes
+ * vault itself isn't there); a missing single subdirectory contributes
  * zero items rather than treating a partially-initialized vault as absent.
  */
 async function collectBlockedItems(vaultPath: string): Promise<{ items: BlockedItem[] | null; unreadable: string[] }> {
@@ -147,7 +147,7 @@ function renderTerminalDashboard(items: BlockedItem[] | null, unreadable: string
   }
 
   if (items.length === 0) {
-    process.stdout.write("ALL CLEAR — no blocked items\n");
+    process.stdout.write("ALL CLEAR: no blocked items\n");
   } else {
     for (const item of items) {
       process.stdout.write(`  ⚠ ${item.type}  ${item.date}  ${item.excerpt}\n`);

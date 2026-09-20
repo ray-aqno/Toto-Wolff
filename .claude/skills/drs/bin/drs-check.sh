@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # DRS check script — reads tool call JSON from stdin, evaluates 5 boundary rules.
-# Exit 0 = allow. Exit 1 = block.
+# Exit 0 = allow. Exit 2 = block.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 FREEZE_FILE="$PROJECT_ROOT/.toto/freeze.json"
 DRS_CONFIG="$PROJECT_ROOT/.toto/drs-config.json"
 
@@ -38,13 +38,44 @@ case "$TOOL_NAME" in
   *) exit 0 ;;
 esac
 
-# Check for override in the environment (set by the hook runner from the user message)
-OVERRIDE_REASON="${DRS_OVERRIDE_REASON:-}"
+# Validates an override reason: non-empty after trimming whitespace, and not
+# a placeholder value. Prints the trimmed reason and returns 0 on success;
+# prints nothing and returns 1 on failure. Closes the "any non-empty reason
+# accepted, no validation gate" gap (L2-004). A fabricated audit trail is a
+# record claiming a validated override when no real validation occurred.
+validate_override_reason() {
+  local raw="$1"
+  local trimmed
+  trimmed="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  [ -z "$trimmed" ] && return 1
+  local lower
+  lower="$(echo "$trimmed" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    reason|todo|tbd|n/a|na|xxx|test|asdf|.|placeholder)
+      return 1
+      ;;
+  esac
+  echo "$trimmed"
+  return 0
+}
+
+# Check for override in the environment (DRS_OVERRIDE_REASON only; the bash
+# hook has no message field; the message-based override exists on the
+# separate TS/MCP drs_check path, see DRSService.checkOverride())
+RAW_OVERRIDE_REASON="${DRS_OVERRIDE_REASON:-}"
+OVERRIDE_REASON=""
+if [ -n "$RAW_OVERRIDE_REASON" ]; then
+  OVERRIDE_REASON="$(validate_override_reason "$RAW_OVERRIDE_REASON" || echo "")"
+fi
 if [ -n "$OVERRIDE_REASON" ]; then
+  # Returns non-zero if the record could not be durably written, so drs_halt
+  # can refuse to honor the override. Every step is checked explicitly: this
+  # runs inside an `if`, where `set -e` does not abort on a failed command.
   write_override_record() {
     local rule="$1" target="$2"
-    mkdir -p "$DRS_VAULT_DIR"
+    mkdir -p "$DRS_VAULT_DIR" || return 1
     local slug; slug="$(date +%Y%m%d-%H%M%S)-r${rule}-override"
+    local record="$DRS_VAULT_DIR/$slug.md"
     {
       echo "---"
       echo "date: $(date +%Y-%m-%d)"
@@ -59,20 +90,16 @@ if [ -n "$OVERRIDE_REASON" ]; then
       echo "DRS Rule $rule override accepted."
       echo "Target: $target"
       echo "Reason: $OVERRIDE_REASON"
-    } > "$DRS_VAULT_DIR/$slug.md"
+    } > "$record" || return 1
+    [ -s "$record" ] || return 1
   }
 fi
 
-drs_halt() {
-  local rule="$1" reason="$2" target="$3"
-  # If override is set, log and allow
-  if [ -n "$OVERRIDE_REASON" ]; then
-    write_override_record "$rule" "$target"
-    exit 0
-  fi
-  # Write DRS vault record
-  mkdir -p "$DRS_VAULT_DIR"
-  local slug; slug="$(date +%Y%m%d-%H%M%S)-r${rule}-blocked"
+# Writes the BLOCKED record. Returns non-zero if it could not be written; the
+# caller must still block regardless (see drs_halt).
+write_block_record() {
+  local rule="$1" reason="$2" target="$3" record="$4"
+  mkdir -p "$DRS_VAULT_DIR" || return 1
   {
     echo "---"
     echo "date: $(date +%Y-%m-%d)"
@@ -87,11 +114,117 @@ drs_halt() {
     echo "DRS BLOCK — Rule $rule"
     echo "Reason: $reason"
     echo "Target: $target"
-    echo "To override: set DRS_OVERRIDE_REASON='your reason' in the environment, or include 'override drs: [reason]' in your message."
-  } > "$DRS_VAULT_DIR/$slug.md"
+    echo "To override: set DRS_OVERRIDE_REASON='your reason' in the environment (this hook has no message-based override; that mechanism exists separately on the TS/MCP drs_check tool path, and only bypasses Rules 2/3/4)."
+  } > "$record" || return 1
+}
+
+drs_halt() {
+  local rule="$1" reason="$2" target="$3"
+  # An override is honored only if its audit record is durably written. If it
+  # can't be, fail closed: report why and treat the rule as an ordinary block.
+  if [ -n "$OVERRIDE_REASON" ]; then
+    if write_override_record "$rule" "$target" 2>/dev/null; then
+      exit 0
+    fi
+    echo "DRS: override NOT honored for Rule $rule; its audit record could not be written to $DRS_VAULT_DIR" >&2
+  fi
+  # The block record is best-effort. Enforcement must never depend on it: this
+  # used to write the record unchecked under `set -e`, so an unwritable vault
+  # aborted the script with exit 1, which this harness treats as a
+  # non-blocking error, and a rule that fired did not actually block.
+  local slug record
+  slug="$(date +%Y%m%d-%H%M%S)-r${rule}-blocked"
+  record="$DRS_VAULT_DIR/$slug.md"
   echo "DRS BLOCKED: Rule $rule — $reason (target: $target)" >&2
-  echo "Record written to: $DRS_VAULT_DIR/$slug.md" >&2
-  exit 1
+  if write_block_record "$rule" "$reason" "$target" "$record" 2>/dev/null; then
+    echo "Record written to: $record" >&2
+  else
+    echo "Record NOT written (could not write to $DRS_VAULT_DIR); the block is still enforced." >&2
+  fi
+  exit 2
+}
+
+# The python3 fallbacks below receive the file path and field name as argv,
+# never interpolated into the python source. Splicing "$file" into a
+# single-quoted python string breaks on any project path containing an
+# apostrophe (e.g. /home/o'brien/repo): the script becomes invalid python,
+# stderr is suppressed, the helper prints nothing, and every rule that reads
+# config treats that as "no restriction configured", silently failing open.
+
+# Reads a JSON array field from a file, tolerant of jq absence (python3
+# fallback) and of a missing/malformed file (prints nothing). Used by Rules
+# 2, 4, and 5's config-driven checks so jq's absence never silently no-ops
+# a rule: every rule gets a real fallback, not just a jq branch with no else.
+read_json_array() {
+  local file="$1" field="$2"
+  if command -v jq &>/dev/null; then
+    jq -r ".${field}[]? // empty" "$file" 2>/dev/null || echo ""
+  else
+    python3 - "$file" "$field" 2>/dev/null <<'PY' || echo ""
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('\n'.join(d.get(sys.argv[2], []) if isinstance(d, dict) else []))
+except Exception:
+    pass
+PY
+  fi
+}
+
+# Reads a JSON string field from a file, tolerant of jq absence.
+read_json_string() {
+  local file="$1" field="$2"
+  if command -v jq &>/dev/null; then
+    jq -r ".${field} // empty" "$file" 2>/dev/null || echo ""
+  else
+    python3 - "$file" "$field" 2>/dev/null <<'PY' || echo ""
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get(sys.argv[2], ''))
+except Exception:
+    pass
+PY
+  fi
+}
+
+# Prints "true" only when the field is the JSON boolean true; "false" for
+# anything else (false, absent, non-boolean, unreadable file).
+read_json_bool() {
+  local file="$1" field="$2"
+  if command -v jq &>/dev/null; then
+    jq -r "if .${field} == true then \"true\" else \"false\" end" "$file" 2>/dev/null || echo "false"
+  else
+    python3 - "$file" "$field" 2>/dev/null <<'PY' || echo "false"
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('true' if isinstance(d, dict) and d.get(sys.argv[2]) is True else 'false')
+except Exception:
+    print('false')
+PY
+  fi
+}
+
+# Reads frozen paths from FREEZE_FILE, tolerant of both the current
+# {"frozen": [...]} shape and a legacy bare-array shape (transition window
+# for a freeze.json generated before the schema fix), mirroring
+# DRSService.ts's tolerant multi-key parse.
+read_frozen_paths() {
+  local file="$1"
+  if command -v jq &>/dev/null; then
+    jq -r 'if type == "array" then .[] else (.frozen // [])[] end' "$file" 2>/dev/null || echo ""
+  else
+    python3 - "$file" 2>/dev/null <<'PY' || echo ""
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    paths = d.get('frozen', []) if isinstance(d, dict) else (d if isinstance(d, list) else [])
+    print('\n'.join(paths))
+except Exception:
+    pass
+PY
+  fi
 }
 
 # Rule 1 — Frozen path
@@ -99,29 +232,17 @@ check_rule1() {
   local target="$1"
   [ -z "$target" ] && return
   [ ! -f "$FREEZE_FILE" ] && return
-  # Read frozen paths and check if target matches
-  if command -v jq &>/dev/null; then
-    local frozen_paths
-    frozen_paths="$(jq -r '.frozen[]? // empty' "$FREEZE_FILE" 2>/dev/null || echo "")"
-    while IFS= read -r frozen_path; do
-      [ -z "$frozen_path" ] && continue
-      # Normalize: remove trailing slash from frozen_path
-      frozen_path="${frozen_path%/}"
-      # Check prefix match (handles both exact and glob-prefix)
-      if [[ "$target" == "$frozen_path" ]] || [[ "$target" == "$frozen_path"/* ]] || [[ "$target" == *"$frozen_path"* ]]; then
-        drs_halt 1 "Path is frozen: $frozen_path" "$target"
-      fi
-    done <<< "$frozen_paths"
-  else
-    local frozen_paths
-    frozen_paths="$(python3 -c "import json; d=json.load(open('$FREEZE_FILE')); print('\n'.join(d.get('frozen',[])))" 2>/dev/null || echo "")"
-    while IFS= read -r frozen_path; do
-      [ -z "$frozen_path" ] && continue
-      if [[ "$target" == *"$frozen_path"* ]]; then
-        drs_halt 1 "Path is frozen: $frozen_path" "$target"
-      fi
-    done <<< "$frozen_paths"
-  fi
+  local frozen_paths
+  frozen_paths="$(read_frozen_paths "$FREEZE_FILE")"
+  while IFS= read -r frozen_path; do
+    [ -z "$frozen_path" ] && continue
+    # Normalize: remove trailing slash from frozen_path
+    frozen_path="${frozen_path%/}"
+    # Check prefix match (handles both exact and glob-prefix)
+    if [[ "$target" == "$frozen_path" ]] || [[ "$target" == "$frozen_path"/* ]] || [[ "$target" == *"$frozen_path"* ]]; then
+      drs_halt 1 "Path is frozen: $frozen_path" "$target"
+    fi
+  done <<< "$frozen_paths"
 }
 
 # Rule 2 — Out-of-scope write
@@ -129,21 +250,25 @@ check_rule2() {
   local target="$1"
   [ -z "$target" ] && return
   [ ! -f "$DRS_CONFIG" ] && return
-  if command -v jq &>/dev/null; then
-    local allowed_paths
-    allowed_paths="$(jq -r '.allowed_paths[]? // empty' "$DRS_CONFIG" 2>/dev/null || echo "")"
-    [ -z "$allowed_paths" ] && return
-    local matched=0
-    while IFS= read -r allowed; do
-      [ -z "$allowed" ] && continue
-      if [[ "$target" == "$allowed"* ]] || [[ "$target" == *"/$allowed"* ]]; then
-        matched=1
-        break
-      fi
-    done <<< "$allowed_paths"
-    if [ "$matched" -eq 0 ]; then
-      drs_halt 2 "Write target outside declared project scope" "$target"
+  local allowed_paths
+  allowed_paths="$(read_json_array "$DRS_CONFIG" allowed_paths)"
+  if [ -z "$allowed_paths" ]; then
+    # Fail closed, matching DRSService.rule2_scope(): an empty (or unreadable)
+    # allowed_paths means "nothing allowed", not "no restriction", unless the
+    # config explicitly opts out with permissive: true.
+    [ "$(read_json_bool "$DRS_CONFIG" permissive)" = "true" ] && return
+    drs_halt 2 "Write target outside declared project scope (allowed_paths is empty and permissive mode is not enabled)" "$target"
+  fi
+  local matched=0
+  while IFS= read -r allowed; do
+    [ -z "$allowed" ] && continue
+    if [[ "$target" == "$allowed"* ]] || [[ "$target" == *"/$allowed"* ]]; then
+      matched=1
+      break
     fi
+  done <<< "$allowed_paths"
+  if [ "$matched" -eq 0 ]; then
+    drs_halt 2 "Write target outside declared project scope" "$target"
   fi
 }
 
@@ -171,19 +296,17 @@ check_rule4() {
   local target="$1"
   [ -z "$target" ] && return
   [ ! -f "$DRS_CONFIG" ] && return
-  if command -v jq &>/dev/null; then
-    local current_tenant tenant_namespaces
-    current_tenant="$(jq -r '.current_tenant // empty' "$DRS_CONFIG" 2>/dev/null || echo "")"
-    tenant_namespaces="$(jq -r '.tenant_namespaces[]? // empty' "$DRS_CONFIG" 2>/dev/null || echo "")"
-    [ -z "$current_tenant" ] && return
-    while IFS= read -r ns; do
-      [ -z "$ns" ] && continue
-      [ "$ns" = "$current_tenant" ] && continue
-      if [[ "$target" == *"$ns"* ]]; then
-        drs_halt 4 "Write targets a different tenant's namespace: $ns (current: $current_tenant)" "$target"
-      fi
-    done <<< "$tenant_namespaces"
-  fi
+  local current_tenant tenant_namespaces
+  current_tenant="$(read_json_string "$DRS_CONFIG" current_tenant)"
+  tenant_namespaces="$(read_json_array "$DRS_CONFIG" tenant_namespaces)"
+  [ -z "$current_tenant" ] && return
+  while IFS= read -r ns; do
+    [ -z "$ns" ] && continue
+    [ "$ns" = "$current_tenant" ] && continue
+    if [[ "$target" == *"$ns"* ]]; then
+      drs_halt 4 "Write targets a different tenant's namespace: $ns (current: $current_tenant)" "$target"
+    fi
+  done <<< "$tenant_namespaces"
 }
 
 # Rule 5 — Destructive shell pattern
@@ -208,9 +331,9 @@ check_rule5() {
     fi
   fi
   # Custom halt patterns from config
-  if [ -f "$DRS_CONFIG" ] && command -v jq &>/dev/null; then
+  if [ -f "$DRS_CONFIG" ]; then
     local custom_patterns
-    custom_patterns="$(jq -r '.halt_patterns[]? // empty' "$DRS_CONFIG" 2>/dev/null || echo "")"
+    custom_patterns="$(read_json_array "$DRS_CONFIG" halt_patterns)"
     while IFS= read -r pattern; do
       [ -z "$pattern" ] && continue
       if echo "$cmd" | grep -qF "$pattern"; then

@@ -39,7 +39,7 @@ const p10 = new P10Service(vault);
 const cabinet = new CabinetService(vault);
 const safetyCar = new SafetyCarService(vault);
 const karpathy = new KarpathyService(vault);
-const drs = new DRSService();
+const drs = new DRSService(undefined, vault);
 const subagent = new SubagentService();
 
 const TOOLS: Record<string, (body: unknown) => Promise<unknown> | unknown> = {

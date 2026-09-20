@@ -101,6 +101,27 @@ describe('runDashboard --terminal with an unreadable vault entry', () => {
       await rm(vault, { recursive: true, force: true });
     }
   });
+
+  it('does not claim ALL CLEAR when a record could not be read and no readable record is blocked', async () => {
+    const vault = await mkdtemp(join(tmpdir(), 'toto-dash-'));
+    try {
+      const councilDir = join(vault, 'Council', 'Congressional-Records');
+      await mkdir(councilDir, { recursive: true });
+      await writeFile(join(councilDir, '2026-01-01-ok.md'), '---\nstatus: approved\n---\nFine.');
+      // A directory with a .md name: readFile() throws EISDIR, so this record is unreadable.
+      await mkdir(join(councilDir, '2026-01-02-bad.md'), { recursive: true });
+
+      process.env['TOTO_VAULT_PATH'] = vault;
+      process.argv = [...originalArgv, '--terminal'];
+      captureOutput();
+      await runDashboard();
+
+      expect(capturedStdout).not.toContain('ALL CLEAR');
+      expect(capturedStderr).toContain('could not be read');
+    } finally {
+      await rm(vault, { recursive: true, force: true });
+    }
+  });
 });
 
 // commands/dashboard.ts reads the newest 500 records per directory (MAX_FILES), so

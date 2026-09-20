@@ -162,8 +162,9 @@ function renderTerminalDashboard(items: BlockedItem[] | null, unreadable: string
   }
 
   if (items.length === 0) {
-    // A partial scan that found nothing is not "all clear".
-    process.stdout.write(truncated.length > 0 ? "No blocked items in the records scanned\n" : "ALL CLEAR: no blocked items\n");
+    // A partial scan (unreadable or truncated records) that found nothing is not "all clear".
+    const incomplete = unreadable.length > 0 || truncated.length > 0;
+    process.stdout.write(incomplete ? "No blocked items in the records scanned\n" : "ALL CLEAR: no blocked items\n");
   } else {
     for (const item of items) {
       process.stdout.write(`  ⚠ ${item.type}  ${item.date}  ${item.excerpt}\n`);

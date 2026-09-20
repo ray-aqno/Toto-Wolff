@@ -152,7 +152,7 @@ Four panels, four empty states. Write and wire these strings into `dashboard_htm
 | Role adoption | "No personas active — run `toto setup` to configure your role." |
 
 This is a ~30-minute code change in `packages/mcp-server/src/dashboard_html.ts` and
-`packages/dashboard/` *(historical — `packages/dashboard/` was removed 2026-09-10;
+`packages/dashboard/` *(historical: `packages/dashboard/` was removed 2026-09-10;
 the terminal path is now `toto dashboard --terminal` in `packages/cli`)*. Not
 blocking but a real UX defect on fresh install.
 

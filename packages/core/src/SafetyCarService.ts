@@ -114,6 +114,7 @@ PLAN PATH: ${planPath}`;
     return block?.type === 'text' ? block.text : '';
   }
 
+  /** Thin delegator to the standalone parseSafetyCarRisks(), so run() needs no change. */
   private parseRisks(raw: string, planPath: string): SafetyCarRisk[] {
     return parseSafetyCarRisks(raw, planPath);
   }
@@ -180,7 +181,7 @@ PLAN PATH: ${planPath}`;
  * Preserves the existing strategy verbatim: JSON.parse, then map each
  * entry's fields (coercing to the expected shape), falling back to
  * `planPath` for a missing `planRef`. Returns `[]` on any parse failure
- * or when `risks` isn't an array — not a bug to fix, matching this
+ * or when `risks` isn't an array. That is not a bug to fix, matching this
  * service's existing fail-to-empty behavior.
  */
 export function parseSafetyCarRisks(raw: string, planPath: string): SafetyCarRisk[] {

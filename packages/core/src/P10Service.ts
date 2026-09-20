@@ -326,7 +326,7 @@ required-changes: [if revision-required, list the specific changes needed]`;
 /**
  * Parses the Arbiter's ruling text into a structured P10Ruling.
  * Extracts two fields: `status` (regex-matched against the three known
- * values, case-insensitive, defaults to `'blocked'` on no match — fail
+ * values, case-insensitive, defaults to `'blocked'` on no match: fail
  * closed, not fail open) and an optional `requiredChanges` (only present
  * when a `required-changes:` line is found). `summary` is the raw ruling
  * text, truncated to 500 chars.

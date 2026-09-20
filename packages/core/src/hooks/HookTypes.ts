@@ -18,11 +18,23 @@ export interface HookResult {
   overrideReason?: string;
 }
 
+/**
+ * A pluggable check that HookSystem runs before a governed tool call proceeds,
+ * so enforcement (the built-in DRS hook is one) plugs in without HookSystem
+ * knowing any rule logic. Executors run in ascending `priority` order.
+ */
 export interface HookExecutor {
   readonly id: string;
   readonly name: string;
   readonly priority: number; // Lower = runs first
 
+  /**
+   * Decides whether the tool call described by `context` may proceed. Return
+   * `allowed: false` to stop the chain; HookSystem returns that result as-is.
+   * Return `allowed: true` with `override: true` (and `overrideReason`) for a
+   * call a rule would otherwise have blocked, and HookSystem surfaces it so
+   * callers can tell an override-allow from an ordinary allow.
+   */
   execute(context: HookContext): HookResult | Promise<HookResult>;
 }
 

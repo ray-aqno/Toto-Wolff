@@ -19,5 +19,13 @@
     "@typescript-eslint/explicit-function-return-type": "error",
     "max-lines-per-function": ["error", 60],
     "no-console": ["error", { "allow": ["error", "warn"] }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", 150]
+      }
+    }
+  ]
 }

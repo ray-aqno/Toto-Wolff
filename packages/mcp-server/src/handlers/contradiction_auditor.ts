@@ -1,6 +1,6 @@
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import assert from "node:assert";
+import { VaultServiceV2 } from "@toto-wolff/core";
 
 const MAX_PLANS = 500; // P10 Rule 2 — upper bound on P10-Plans/ scan
 const MAX_SIGNALS = 500; // P10 Rule 2 — upper bound on Signals/ scan
@@ -55,26 +55,23 @@ function extractValidUntil(content: string): string | undefined {
  * Loads a map of signal id → valid_until from VAULT_PATH/Signals/.
  * Missing or unreadable files are skipped. Capped at MAX_SIGNALS.
  */
-async function loadSignalIndex(signalsDir: string): Promise<Map<string, string>> {
+async function loadSignalIndex(vault: VaultServiceV2, signalsDir: string): Promise<Map<string, string>> {
   const index = new Map<string, string>();
-  let entries: string[];
-  try {
-    entries = (await readdir(signalsDir)).filter((e) => e.endsWith(".md")).slice(0, MAX_SIGNALS);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return index;
-    throw err;
-  }
+  // listDir() already returns [] for a missing directory; other errors propagate.
+  const entries = (await vault.listDir(signalsDir)).filter((e) => e.endsWith(".md")).slice(0, MAX_SIGNALS);
   for (let i = 0; i < entries.length; i++) { // P10 Rule 2: bounded by entries.length <= MAX_SIGNALS
     const entry = entries[i];
     if (entry == null) continue;
-    let raw: string;
+    let raw: string | null;
     try {
-      const bytes = await readFile(join(signalsDir, entry));
-      if (bytes.byteLength > MAX_FILE_BYTES) continue;
-      raw = bytes.toString("utf8");
+      raw = await vault.read(join(signalsDir, entry));
     } catch {
       continue;
     }
+    if (raw === null) continue;
+    // MAX_FILE_BYTES is a byte-size cap; re-derive UTF-8 byte length from
+    // the decoded string rather than truncating on character count.
+    if (Buffer.byteLength(raw, "utf8") > MAX_FILE_BYTES) continue;
     // id is the filename slug
     const id = entry.endsWith(".md") ? entry.slice(0, -3) : entry;
     const validUntil = extractValidUntil(raw);
@@ -94,21 +91,15 @@ async function loadSignalIndex(signalsDir: string): Promise<Map<string, string>>
 export async function auditContradictions(vaultPath: string): Promise<AuditReport> {
   assert(vaultPath.length > 0, "vaultPath must be non-empty");
 
-  const signalsDir = join(vaultPath, "Signals");
-  const plansDir = join(vaultPath, "P10-Plans");
+  const signalsDir = "Signals";
+  const plansDir = "P10-Plans";
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-  const signalIndex = await loadSignalIndex(signalsDir);
+  const vault = await VaultServiceV2.create({ backend: "file", options: { rootPath: vaultPath } });
+  const signalIndex = await loadSignalIndex(vault, signalsDir);
 
-  let entries: string[];
-  try {
-    entries = (await readdir(plansDir)).filter((e) => e.endsWith(".md")).slice(0, MAX_PLANS);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return { checked: 0, contradictions: [], generated_at: today };
-    }
-    throw err;
-  }
+  // listDir() already returns [] for a missing directory; other errors propagate.
+  const entries = (await vault.listDir(plansDir)).filter((e) => e.endsWith(".md")).slice(0, MAX_PLANS);
 
   let checked = 0;
   const contradictions: ContradictionEntry[] = [];
@@ -116,14 +107,16 @@ export async function auditContradictions(vaultPath: string): Promise<AuditRepor
   for (let i = 0; i < entries.length; i++) { // P10 Rule 2: bounded by entries.length <= MAX_PLANS
     const entry = entries[i];
     if (entry == null) continue;
-    let raw: string;
+    let raw: string | null;
     try {
-      const bytes = await readFile(join(plansDir, entry));
-      if (bytes.byteLength > MAX_FILE_BYTES) continue;
-      raw = bytes.toString("utf8");
+      raw = await vault.read(join(plansDir, entry));
     } catch {
       continue;
     }
+    if (raw === null) continue;
+    // MAX_FILE_BYTES is a byte-size cap; re-derive UTF-8 byte length from
+    // the decoded string rather than truncating on character count.
+    if (Buffer.byteLength(raw, "utf8") > MAX_FILE_BYTES) continue;
     const citedIds = extractSessionVerdicts(raw);
     if (citedIds.length === 0) continue;
     checked++;

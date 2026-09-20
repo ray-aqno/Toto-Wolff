@@ -102,3 +102,51 @@ describe('runDashboard --terminal with an unreadable vault entry', () => {
     }
   });
 });
+
+// commands/dashboard.ts reads the newest 500 records per directory (MAX_FILES), so
+// with 501 records the oldest is never read. Record 0 is the oldest, and the only
+// blocked one.
+async function writeCouncilRecords(vault: string, count: number): Promise<void> {
+  const dir = join(vault, 'Council', 'Congressional-Records');
+  await mkdir(dir, { recursive: true });
+  await Promise.all(Array.from({ length: count }, (_, i) => {
+    const status = i === 0 ? 'blocked' : 'approved';
+    return writeFile(join(dir, `rec-${String(i).padStart(4, '0')}.md`), `---\nstatus: ${status}\n---\nrecord ${i}`);
+  }));
+}
+
+describe('runDashboard --terminal scan cap', () => {
+  it('does not claim ALL CLEAR when the oldest record fell outside the scan window', async () => {
+    const vault = await mkdtemp(join(tmpdir(), 'toto-dash-'));
+    try {
+      await writeCouncilRecords(vault, 501);
+
+      process.env['TOTO_VAULT_PATH'] = vault;
+      process.argv = [...originalArgv, '--terminal'];
+      captureOutput();
+      await runDashboard();
+
+      expect(capturedStdout).not.toContain('ALL CLEAR');
+      expect(capturedStderr).toContain('older records were not checked');
+    } finally {
+      await rm(vault, { recursive: true, force: true });
+    }
+  });
+
+  it('reads every record and finds the oldest blocked one at exactly the cap', async () => {
+    const vault = await mkdtemp(join(tmpdir(), 'toto-dash-'));
+    try {
+      await writeCouncilRecords(vault, 500);
+
+      process.env['TOTO_VAULT_PATH'] = vault;
+      process.argv = [...originalArgv, '--terminal'];
+      captureOutput();
+      await runDashboard();
+
+      expect(capturedStdout).toContain('record 0');
+      expect(capturedStderr).not.toContain('older records were not checked');
+    } finally {
+      await rm(vault, { recursive: true, force: true });
+    }
+  });
+});

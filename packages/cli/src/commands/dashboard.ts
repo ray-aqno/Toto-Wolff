@@ -29,6 +29,8 @@ interface BlockedItem {
 interface ScanResult {
   sessions: Session[];
   unreadable: string[];
+  /** True when more than MAX_FILES records existed and the oldest were not read. */
+  truncated: boolean;
 }
 
 /** Resolves the vault path: TOTO_VAULT_PATH, then legacy VAULT_PATH, then default. Matches last.ts:75 verbatim. */
@@ -73,7 +75,9 @@ function parseFileContent(content: string): { status: string | null; excerpt: st
 
 /**
  * Reads all markdown files from a vault subdirectory, sorted newest-first,
- * capped at MAX_FILES. Returns null if the directory does not exist
+ * capped at MAX_FILES (`truncated` reports when older files were left unread,
+ * so callers never claim a scan more complete than it was). Returns null if
+ * the directory does not exist
  * (distinct from an empty directory, which returns `{ sessions: [], ... }`),
  * matching report.ts's listRecordFiles null/[] convention. A per-file read
  * failure is NOT silently swallowed (the packages/dashboard port source's
@@ -90,7 +94,8 @@ async function scanVaultDir(dir: string): Promise<ScanResult | null> {
     throw err;
   }
 
-  const mdFiles = entries.filter((f) => f.endsWith(".md")).sort().reverse().slice(0, MAX_FILES);
+  const allMdFiles = entries.filter((f) => f.endsWith(".md")).sort().reverse();
+  const mdFiles = allMdFiles.slice(0, MAX_FILES);
   const sessions: Session[] = [];
   const unreadable: string[] = [];
 
@@ -108,7 +113,7 @@ async function scanVaultDir(dir: string): Promise<ScanResult | null> {
     sessions.push({ date, status, excerpt, filename });
   }
 
-  return { sessions, unreadable };
+  return { sessions, unreadable, truncated: allMdFiles.length > MAX_FILES };
 }
 
 /**
@@ -116,8 +121,9 @@ async function scanVaultDir(dir: string): Promise<ScanResult | null> {
  * Returns `items: null` only when BOTH subdirectories are missing (the
  * vault itself isn't there); a missing single subdirectory contributes
  * zero items rather than treating a partially-initialized vault as absent.
+ * `truncated` names the subdirectories whose oldest records went unscanned.
  */
-async function collectBlockedItems(vaultPath: string): Promise<{ items: BlockedItem[] | null; unreadable: string[] }> {
+async function collectBlockedItems(vaultPath: string): Promise<{ items: BlockedItem[] | null; unreadable: string[]; truncated: string[] }> {
   const councilDir = join(vaultPath, "Council", "Congressional-Records");
   const p10Dir = join(vaultPath, "P10-Plans");
 
@@ -127,11 +133,14 @@ async function collectBlockedItems(vaultPath: string): Promise<{ items: BlockedI
   ]);
 
   if (councilResult === null && p10Result === null) {
-    return { items: null, unreadable: [] };
+    return { items: null, unreadable: [], truncated: [] };
   }
 
   const unreadable: string[] = [...(councilResult?.unreadable ?? []), ...(p10Result?.unreadable ?? [])];
   assert(Array.isArray(unreadable), "unreadable must always be an array");
+  const truncated: string[] = [];
+  if (councilResult?.truncated) truncated.push("Council/Congressional-Records");
+  if (p10Result?.truncated) truncated.push("P10-Plans");
 
   const items: BlockedItem[] = [
     ...(councilResult?.sessions ?? [])
@@ -142,18 +151,19 @@ async function collectBlockedItems(vaultPath: string): Promise<{ items: BlockedI
       .map((s) => ({ type: "p10" as const, date: s.date, excerpt: s.excerpt, filename: s.filename })),
   ];
 
-  return { items, unreadable };
+  return { items, unreadable, truncated };
 }
 
-/** Renders the blocked-items rollup to stdout; a per-file read failure warning goes to stderr. */
-function renderTerminalDashboard(items: BlockedItem[] | null, unreadable: string[], vaultPath: string): void {
+/** Renders the blocked-items rollup to stdout; scan-completeness warnings (unreadable or truncated) go to stderr. */
+function renderTerminalDashboard(items: BlockedItem[] | null, unreadable: string[], truncated: string[], vaultPath: string): void {
   if (items === null) {
     process.stdout.write(`vault not found at ${vaultPath}\n`);
     return;
   }
 
   if (items.length === 0) {
-    process.stdout.write("ALL CLEAR: no blocked items\n");
+    // A partial scan that found nothing is not "all clear".
+    process.stdout.write(truncated.length > 0 ? "No blocked items in the records scanned\n" : "ALL CLEAR: no blocked items\n");
   } else {
     for (const item of items) {
       process.stdout.write(`  ⚠ ${item.type}  ${item.date}  ${item.excerpt}\n`);
@@ -163,14 +173,18 @@ function renderTerminalDashboard(items: BlockedItem[] | null, unreadable: string
   if (unreadable.length > 0) {
     process.stderr.write(`toto dashboard: ${unreadable.length} file(s) could not be read and were skipped\n`);
   }
+
+  if (truncated.length > 0) {
+    process.stderr.write(`toto dashboard: only the newest ${MAX_FILES} records in ${truncated.join(" and ")} were scanned; older records were not checked\n`);
+  }
 }
 
 /** `toto dashboard --terminal`: prints the blocked-items rollup directly, no browser. */
 async function runTerminalDashboard(): Promise<void> {
   const vaultPath = resolveVaultPath();
   assert(typeof vaultPath === "string" && vaultPath.length > 0, "resolved vault path must be non-empty"); // R5 assertion
-  const { items, unreadable } = await collectBlockedItems(vaultPath);
-  renderTerminalDashboard(items, unreadable, vaultPath);
+  const { items, unreadable, truncated } = await collectBlockedItems(vaultPath);
+  renderTerminalDashboard(items, unreadable, truncated, vaultPath);
 }
 
 /**

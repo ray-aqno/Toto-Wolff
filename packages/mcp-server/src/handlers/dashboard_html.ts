@@ -157,13 +157,20 @@ function arcGauge(pct: number, color: string, label: string, id: string): string
   </svg>`;
 }
 
-function sparkline(values: number[], color: string, id: string): string {
-  if (values.length < 2) return `<svg viewBox="0 0 160 40" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:160px;height:40px"><text x="80" y="24" text-anchor="middle" fill="#444" font-size="10">no data</text></svg>`;
+/**
+ * Renders a small trend line for per-period counts. No counts means no data.
+ * A single count (every record falls in one period) still has data but no
+ * trend, so it is drawn as a flat line rather than reported as "no data".
+ */
+function sparkline(counts: number[], color: string, id: string): string {
+  if (counts.length === 0) return `<svg viewBox="0 0 160 40" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:160px;height:40px"><text x="80" y="24" text-anchor="middle" fill="#444" font-size="10">no data</text></svg>`;
+  const values = counts.length === 1 ? [counts[0]!, counts[0]!] : counts;
   const max = Math.max(...values); const min = Math.min(...values); const range = max - min || 1;
   const w = 160; const h = 40; const pad = 4;
   const pts = values.map((v, i) => {
     const x = pad + (i / (values.length - 1)) * (w - pad * 2);
-    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    // A flat series has no range to scale by; sit it mid-height, since the baseline would read as zero.
+    const y = max === min ? h / 2 : h - pad - ((v - min) / range) * (h - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
   const lastPt = pts[pts.length - 1]!.split(',');
@@ -197,8 +204,8 @@ function sessionBarChart(items: DashboardItem[]): string {
  * chronological order: a real per-period signal for sparklines to plot,
  * replacing the previous synthetic always-rising index sequence
  * (`items.map((_, i) => i + 1)`). Mirrors sessionBarChart's own bucketing
- * strategy. Non-empty input always yields a non-empty output, mirroring
- * sparkline()'s own length>=2 "no data" guard at its input boundary.
+ * strategy. Non-empty input always yields a non-empty output, so sparkline()
+ * only reports "no data" when there are no items at all.
  */
 function bucketByPeriod(items: DashboardItem[]): number[] {
   if (items.length === 0) return [];

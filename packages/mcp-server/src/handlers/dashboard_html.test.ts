@@ -172,3 +172,30 @@ describe('renderDashboardHtml: contrast token and record panel', () => {
     expect(html).toContain("status === 404 ? 'Record not found.' : 'Could not load record. Check your connection and try again.'");
   });
 });
+
+describe('renderDashboardHtml: sparkline with one period', () => {
+  it('draws a flat mid-height line, not "no data", when every recent record is from one month', () => {
+    const sameMonth: DashboardResult = {
+      ...emptyResult,
+      councilSessions: {
+        count: 3,
+        recent: [
+          { date: '2026-07-01', excerpt: 'a', status: 'approved' },
+          { date: '2026-07-02', excerpt: 'b', status: 'approved' },
+          { date: '2026-07-03', excerpt: 'c', status: 'approved' },
+        ],
+      },
+    };
+    const html = renderDashboardHtml(sameMonth);
+    expect(html).toContain('id="spark-council" points="4.0,20.0 156.0,20.0"');
+  });
+
+  it('still reports "no data" when a category has a count but no readable recent records', () => {
+    // A non-zero count keeps the cards rendering (an all-empty vault shows the empty
+    // state instead); with no recent records there is nothing to plot.
+    const noRecent: DashboardResult = { ...emptyResult, councilSessions: { count: 5, recent: [] } };
+    const html = renderDashboardHtml(noRecent);
+    expect(html).not.toContain('id="spark-council"');
+    expect(html).toContain('>no data</text>');
+  });
+});

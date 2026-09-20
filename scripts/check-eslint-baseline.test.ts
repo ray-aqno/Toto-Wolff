@@ -28,6 +28,28 @@ describe('diffViolations', () => {
   it('treats a different rule on the same line as new', () => {
     expect(diffViolations([v('a.ts', 1, 'no-undef')], [v('a.ts', 1)]).newViolations).toEqual([v('a.ts', 1, 'no-undef')]);
   });
+
+  it('counts multiplicity: a further finding on an already-baselined line is new', () => {
+    const baseline = [v('a.ts', 1), v('a.ts', 1)];
+
+    expect(diffViolations([v('a.ts', 1), v('a.ts', 1), v('a.ts', 1)], baseline)).toEqual({
+      newViolations: [v('a.ts', 1)],
+      fixedOrBroken: [],
+    });
+  });
+
+  it('counts a dropped duplicate as fixed, not as new', () => {
+    expect(diffViolations([v('a.ts', 1)], [v('a.ts', 1), v('a.ts', 1)])).toEqual({
+      newViolations: [],
+      fixedOrBroken: [v('a.ts', 1)],
+    });
+  });
+
+  it('reports nothing when the multiplicities match exactly', () => {
+    const same = [v('a.ts', 1), v('a.ts', 1), v('b.ts', 2)];
+
+    expect(diffViolations(same, same)).toEqual({ newViolations: [], fixedOrBroken: [] });
+  });
 });
 
 describe('checkFloorInvariant', () => {

@@ -121,15 +121,43 @@ export function parseResults(json: string): Violation[] {
   return violations;
 }
 
-/** Pure diff: returns violations present now but absent from the baseline (`new`), and vice versa (`fixedOrBroken`). */
+/**
+ * Pure diff, compared as multisets: returns the violations present now beyond
+ * what the baseline allows (`newViolations`), and the baseline entries with no
+ * matching current violation (`fixedOrBroken`). Multiplicity matters: a second
+ * finding of the same rule on an already-baselined line is new, not absorbed by
+ * the existing entry (the committed baseline itself holds such duplicates).
+ */
 export function diffViolations(
   current: Violation[],
   baseline: Violation[],
 ): { newViolations: Violation[]; fixedOrBroken: Violation[] } {
-  const currentKeys = new Set(current.map(violationKey));
-  const baselineKeys = new Set(baseline.map(violationKey));
-  const newViolations = current.filter((v) => !baselineKeys.has(violationKey(v)));
-  const fixedOrBroken = baseline.filter((v) => !currentKeys.has(violationKey(v)));
+  const unmatchedBaseline = new Map<string, number>();
+  for (const v of baseline) {
+    const key = violationKey(v);
+    unmatchedBaseline.set(key, (unmatchedBaseline.get(key) ?? 0) + 1);
+  }
+
+  const newViolations: Violation[] = [];
+  for (const v of current) {
+    const key = violationKey(v);
+    const remaining = unmatchedBaseline.get(key) ?? 0;
+    if (remaining > 0) {
+      unmatchedBaseline.set(key, remaining - 1);
+    } else {
+      newViolations.push(v);
+    }
+  }
+
+  const fixedOrBroken: Violation[] = [];
+  for (const v of baseline) {
+    const key = violationKey(v);
+    const left = unmatchedBaseline.get(key) ?? 0;
+    if (left > 0) {
+      fixedOrBroken.push(v);
+      unmatchedBaseline.set(key, left - 1);
+    }
+  }
   return { newViolations, fixedOrBroken };
 }
 

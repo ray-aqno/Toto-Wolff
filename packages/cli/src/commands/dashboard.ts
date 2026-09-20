@@ -6,7 +6,11 @@ import * as os from "node:os";
 import assert from "node:assert";
 
 const DEFAULT_VAULT_PATH = join(os.homedir(), ".toto", "vault");
+/** Upper bound on markdown files read per vault subdirectory (the P10 Rule 2 loop bound in scanVaultDir). */
 const MAX_FILES = 500;
+/** Longest excerpt shown per record; longer text is cut so the result, ending in the ellipsis, is exactly this long. */
+const EXCERPT_MAX_CHARS = 80;
+const ELLIPSIS = "...";
 
 interface Session {
   date: string;
@@ -56,7 +60,9 @@ function parseFileContent(content: string): { status: string | null; excerpt: st
     if (!excerpt) {
       const trimmed = line.trim();
       if (trimmed && !trimmed.startsWith("#") && trimmed !== "---" && !statusMatch) {
-        excerpt = trimmed.length > 80 ? trimmed.slice(0, 77) + "..." : trimmed;
+        excerpt = trimmed.length > EXCERPT_MAX_CHARS
+          ? trimmed.slice(0, EXCERPT_MAX_CHARS - ELLIPSIS.length) + ELLIPSIS
+          : trimmed;
       }
     }
     if (status && excerpt) break;

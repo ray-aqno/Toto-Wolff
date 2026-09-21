@@ -127,7 +127,7 @@ run_bash_check_no_jq() {
   local tool="$1" target_or_cmd="$2"
   local fakebin
   fakebin="$(mktemp -d)"
-  for cmd in bash cat grep date mkdir python3 basename tr dirname; do
+  for cmd in bash cat grep date mkdir python3 basename tr dirname sed; do
     local real
     real="$(command -v "$cmd" 2>/dev/null || true)"
     [ -n "$real" ] && ln -s "$real" "${fakebin}/${cmd}"
@@ -243,6 +243,59 @@ run_bash_check_no_jq() {
   run run_bash_check Write "outside/file.ts"
   [ "$status" -eq 0 ]
   [ -n "$(ls "${TEST_DIR}"/vault/DRS/*-override.md 2>/dev/null)" ]
+}
+
+# SKILL.md documents the bash-hook override as applying to any rule the hook
+# evaluates, Rules 1 and 5 included, and as the audited route to a frozen path.
+# Its Override section once claimed the opposite. Only tested behavior settles a
+# contradiction between the docs and the hook, so pin it here.
+@test "an override is honored (exit 0) and audited for a frozen path (Rule 1)" {
+  export DRS_OVERRIDE_REASON="approved by owner"
+  run run_bash_check Write secrets/keys.json
+  [ "$status" -eq 0 ]
+  grep -q '^rule_fired: 1$' "${TEST_DIR}"/vault/DRS/*-override.md
+  grep -q '^override: true$' "${TEST_DIR}"/vault/DRS/*-override.md
+}
+
+@test "an override for a frozen path also works via the python3 fallback with jq masked off PATH" {
+  export DRS_OVERRIDE_REASON="approved by owner"
+  run run_bash_check_no_jq Write secrets/keys.json
+  [ "$status" -eq 0 ]
+  grep -q '^rule_fired: 1$' "${TEST_DIR}"/vault/DRS/*-override.md
+}
+
+@test "an override is honored (exit 0) and audited for a destructive pattern (Rule 5)" {
+  export DRS_OVERRIDE_REASON="approved by owner"
+  run run_bash_check Bash "TRUNCATE TABLE users"
+  [ "$status" -eq 0 ]
+  grep -q '^rule_fired: 5$' "${TEST_DIR}"/vault/DRS/*-override.md
+}
+
+# KNOWN GAPS, documented in SKILL.md under Rule 1 and tracked for the v1.5.1
+# patch. These pin today's behavior so the docs cannot drift from it: when the
+# patch closes a gap, flip the test and update SKILL.md in the same change.
+@test "KNOWN GAP: a Bash command onto a frozen path is not checked against Rule 1 and leaves no record" {
+  run run_bash_check Bash "mv staged secrets/keys.json"
+  [ "$status" -eq 0 ]
+  [ -z "$(ls "${TEST_DIR}"/vault/DRS 2>/dev/null)" ]
+
+  # Control: the same path is blocked when the write goes through the Write tool.
+  run run_bash_check Write secrets/keys.json
+  [ "$status" -eq 2 ]
+}
+
+@test "KNOWN GAP: a missing or unparseable freeze.json lets a write to a formerly frozen path through" {
+  printf '%s\n' '{ "frozen": ["workspaces/acme-corp/locked.json"] }' > "${TEST_DIR}/.toto/freeze.json"
+  run run_bash_check Write "workspaces/acme-corp/locked.json"
+  [ "$status" -eq 2 ]   # control: with a valid list the path is frozen
+
+  printf '%s' '{not valid json' > "${TEST_DIR}/.toto/freeze.json"
+  run run_bash_check Write "workspaces/acme-corp/locked.json"
+  [ "$status" -eq 0 ]
+
+  rm "${TEST_DIR}/.toto/freeze.json"
+  run run_bash_check Write "workspaces/acme-corp/locked.json"
+  [ "$status" -eq 0 ]
 }
 
 # R3 (Council-1 Condition 4): a cwd that isn't the repo root must deny-all,

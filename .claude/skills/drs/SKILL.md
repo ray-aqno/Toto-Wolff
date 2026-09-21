@@ -14,9 +14,9 @@ version: 1.0.0
 
 ## What DRS does
 
-DRS evaluates every Write, Edit, NotebookEdit, and Bash tool call against 5 boundary rules before the call executes. If a rule fires, the tool call is blocked before any file is touched. The block is logged to the vault.
+DRS runs as a PreToolUse hook registered for Write, Edit, NotebookEdit, and Bash. Write, Edit, and NotebookEdit calls are checked against Rules 1 to 4; Bash commands are checked against Rules 3 and 5 only. If a rule fires, the tool call is blocked before any file is touched and the block is logged to the vault. Allowed calls leave no record.
 
-DRS does NOT evaluate Read, Glob, Grep, or any read-only tool. Only destructive/mutating tools are checked.
+DRS does NOT evaluate Read, Glob, Grep, or any read-only tool. Of the mutating tools, only the four above are checked; others (for example MCP file writers) never reach the hook.
 
 ---
 
@@ -26,7 +26,18 @@ DRS does NOT evaluate Read, Glob, Grep, or any read-only tool. Only destructive/
 
 **Condition:** The write target matches any path listed in `.toto/freeze.json`.
 
-**Action:** HALT. The path is frozen. Unfreezing requires `/council` or an explicit `toto unfreeze` command.
+**Action:** HALT. The path is frozen. There is no `toto unfreeze` command. A frozen path changes only through an audited route, with authority:
+
+- **Council ruling, then the unfreeze cycle.** Get a `/council` ruling. Then, on the machine that holds the real `.toto/config.yml` (it is git-ignored, and the tracked `.toto/config.yml.example` has no `drs:` block, so generating from the example would write an empty freeze list), remove the path from `drs.freeze_paths`, run `pnpm generate:drs-config`, make the change, and restore the path and regenerate in the same commit so the tracked `.toto/freeze.json` ends unchanged (unless the ruling unfreezes the path for good). Cite the ruling in the commit or PR.
+- **Audited override.** Set `DRS_OVERRIDE_REASON` (see Override below). The write is allowed and an `OVERRIDDEN` record goes to the vault.
+
+An Arbiter-approved P10 plan alone is enough only for the narrow removal-only class in council ruling `2026-09-20-types-ts-freeze-amendment`, and that delegation stays inert until a merge-base CI check for frozen paths exists.
+
+Whichever route you take, write an audit note to the vault `DRS/` log naming the file, the authority, and the route; the unfreeze cycle leaves no DRS record of its own.
+
+Do not reach a frozen file with a Bash command (`cp`, `mv`, a redirect). The hook does not evaluate Rule 1 for Bash commands, so nothing is blocked or recorded, and the ruling above names that route a process defect.
+
+**Known gaps (tracked for the v1.5.1 patch):** the hook is registered for Write, Edit, NotebookEdit, and Bash only, so other tools (for example MCP file writers) never reach it; a missing or unparseable `.toto/freeze.json` currently allows the write instead of blocking it; and the freeze list's source, `.toto/config.yml`, is git-ignored, so an unfreeze step never appears in a commit or PR, and `pnpm generate:drs-config` without a `drs:` block writes empty lists.
 
 **Rationale:** Frozen modules are locked by design decision. Writing to them without deliberation re-opens a closed question.
 
@@ -80,7 +91,7 @@ Unless the command includes the literal string `--force-confirmed` anywhere in i
 
 ## Override
 
-There are two distinct override mechanisms, with different scopes. Neither can bypass Rule 1 (frozen path) or Rule 5 (destructive pattern). Rule 1's freeze list is a small, deliberately curated set that an override shouldn't defeat, and Rule 5 already has its own narrower `--force-confirmed` override on the command itself.
+There are two distinct override mechanisms, with different scopes. The TS/MCP override cannot bypass Rule 1 (frozen path) or Rule 5 (destructive pattern); the bash-hook override applies to any rule that hook evaluates, Rules 1 and 5 included. Rule 1's freeze list is a small, deliberately curated set that the TS/MCP override shouldn't defeat, and Rule 5 already has its own narrower `--force-confirmed` override on the command itself. The bash-hook override is the audited route to a frozen path (see Rule 1), because every honored use is recorded in the vault.
 
 **TS/MCP path (`drs_check` tool):** pass `message_before: "override drs: <reason>"` as an argument to the `drs_check` tool call. This bypasses Rules 2/3/4 only (out-of-scope, auth-surface, cross-tenant). The reason is mandatory and is validated (non-empty after trimming, not a placeholder value) before being accepted. Every accepted override writes an audit record to the vault. The override does not suppress the vault write; it adds an `override: true` field and the reason text. If the record can't be written, the override is not honored.
 
@@ -197,7 +208,7 @@ The actual rule evaluation runs in `.claude/skills/drs/bin/drs-check.sh`. That s
 
 - Reads the tool call from stdin as JSON
 - Extracts `tool_name` and `tool_input` fields
-- Evaluates rules 1–5 in order
+- Evaluates the rules that apply to that tool (see What DRS does)
 - If any rule fires: writes a DRS vault record, prints the block reason to stderr, exits 2
 - If no rule fires: exits 0 (allow)
 

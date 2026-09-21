@@ -1,0 +1,577 @@
+[
+  {
+    "file": "packages/cli/src/__tests__/backfill.test.ts",
+    "ruleId": "@typescript-eslint/explicit-function-return-type",
+    "line": 16
+  },
+  {
+    "file": "packages/cli/src/commands/backfill.ts",
+    "ruleId": "max-lines-per-function",
+    "line": 138
+  },
+  {
+    "file": "packages/cli/src/commands/doctor.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 41
+  },
+  {
+    "file": "packages/cli/src/commands/radio.ts",
+    "ruleId": "max-lines-per-function",
+    "line": 71
+  },
+  {
+    "file": "packages/cli/src/commands/radio.ts",
+    "ruleId": "max-lines-per-function",
+    "line": 90
+  },
+  {
+    "file": "packages/cli/src/commands/radio.ts",
+    "ruleId": "@typescript-eslint/await-thenable",
+    "line": 179
+  },
+  {
+    "file": "packages/cli/src/commands/radio.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 210
+  },
+  {
+    "file": "packages/cli/src/commands/radio.ts",
+    "ruleId": "max-lines-per-function",
+    "line": 210
+  },
+  {
+    "file": "packages/cli/src/commands/radio.ts",
+    "ruleId": "@typescript-eslint/no-misused-promises",
+    "line": 247
+  },
+  {
+    "file": "packages/cli/src/commands/search.ts",
+    "ruleId": "@typescript-eslint/no-base-to-string",
+    "line": 60
+  },
+  {
+    "file": "packages/cli/src/commands/search.ts",
+    "ruleId": "@typescript-eslint/prefer-promise-reject-errors",
+    "line": 62
+  },
+  {
+    "file": "packages/cli/src/keychain.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 8
+  },
+  {
+    "file": "packages/cli/src/keychain.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 19
+  },
+  {
+    "file": "packages/cli/src/keychain.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 31
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 137
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-argument",
+    "line": 140
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 140
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 140
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 141
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 141
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 142
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 142
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 143
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 146
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 146
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 147
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 147
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 148
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 148
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 149
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 149
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 149
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 150
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 150
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 150
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 151
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 151
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 199
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-argument",
+    "line": 202
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 202
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 202
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 203
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 204
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 205
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 206
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 206
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 208
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 209
+  },
+  {
+    "file": "packages/core/src/CabinetService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-return",
+    "line": 212
+  },
+  {
+    "file": "packages/core/src/CouncilService.test.ts",
+    "ruleId": "@typescript-eslint/explicit-function-return-type",
+    "line": 4
+  },
+  {
+    "file": "packages/core/src/CouncilService.test.ts",
+    "ruleId": "@typescript-eslint/explicit-function-return-type",
+    "line": 6
+  },
+  {
+    "file": "packages/core/src/CouncilService.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 16
+  },
+  {
+    "file": "packages/core/src/CouncilService.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 26
+  },
+  {
+    "file": "packages/core/src/CouncilService.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 36
+  },
+  {
+    "file": "packages/core/src/CouncilService.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 46
+  },
+  {
+    "file": "packages/core/src/DRSService.ts",
+    "ruleId": "@typescript-eslint/no-unused-vars",
+    "line": 27
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unused-vars",
+    "line": 59
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 144
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 145
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-call",
+    "line": 146
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-call",
+    "line": 146
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 146
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-return",
+    "line": 146
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 148
+  },
+  {
+    "file": "packages/core/src/KarpathyService.ts",
+    "ruleId": "@typescript-eslint/no-unused-vars",
+    "line": 171
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-unused-vars",
+    "line": 47
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 189
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 190
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-call",
+    "line": 191
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 191
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-return",
+    "line": 191
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-base-to-string",
+    "line": 196
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-base-to-string",
+    "line": 197
+  },
+  {
+    "file": "packages/core/src/SafetyCarService.ts",
+    "ruleId": "@typescript-eslint/no-base-to-string",
+    "line": 198
+  },
+  {
+    "file": "packages/core/src/SubagentService.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 22
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/council_run.test.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 20
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/council_run.test.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 44
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/council_run.test.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 80
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/council_run.test.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 115
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 10
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 24
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 31
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 39
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 47
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 57
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 64
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 72
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/scoreConfidence.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 78
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/signal_loop.integration.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 56
+  },
+  {
+    "file": "packages/mcp-server/src/__tests__/signal_loop.integration.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 89
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unused-vars",
+    "line": 40
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/explicit-function-return-type",
+    "line": 53
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 216
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-assignment",
+    "line": 236
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 237
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 238
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unsafe-member-access",
+    "line": 239
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_events.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 288
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_html.ts",
+    "ruleId": "no-useless-escape",
+    "line": 70
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_html.ts",
+    "ruleId": "no-useless-escape",
+    "line": 119
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_html.ts",
+    "ruleId": "@typescript-eslint/explicit-function-return-type",
+    "line": 141
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_record.test.ts",
+    "ruleId": "@typescript-eslint/no-unused-vars",
+    "line": 32
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_record.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 140
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_record.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 151
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_record.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 165
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_record.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 177
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_record.test.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 192
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/dashboard_status.ts",
+    "ruleId": "max-lines-per-function",
+    "line": 128
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/drs_check.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 33
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/drs_check.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 35
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/drs_check.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 41
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/score_confidence_tool.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 58
+  },
+  {
+    "file": "packages/mcp-server/src/handlers/signal_index.ts",
+    "ruleId": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 121
+  },
+  {
+    "file": "packages/mcp-server/src/index.ts",
+    "ruleId": "@typescript-eslint/no-redundant-type-constituents",
+    "line": 45
+  },
+  {
+    "file": "packages/mcp-server/src/index.ts",
+    "ruleId": "@typescript-eslint/require-await",
+    "line": 158
+  }
+]

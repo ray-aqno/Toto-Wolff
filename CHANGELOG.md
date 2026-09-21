@@ -4,21 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.5.0] - 2026-09-10
+## [1.5.0] - 2026-09-21
+
+This release ships six streams: DRS live enforcement, the vault read API, credential and config-migration fixes, CLI and dashboard consolidation, repo hygiene, and documentation truth with an ESLint baseline gate. The credential and config stream ships Stages 1, 2 and 5 only (the credential-file reader, the config migration and a dead-export cleanup).
 
 ### Added
 - **DRS `permissive` config flag**: Explicit opt-out for Rule 2 (out-of-scope write). By default, an empty `allowed_paths` now means "nothing allowed" (fail-closed), not "no restriction." Set `permissive: true` in `.toto/config.yml`'s `drs:` block to restore the old no-restriction behavior for an empty scope list.
 - **DRS `configSource` diagnostic**: `DRSService` now publicly exposes where its active config actually came from (`cwd-relative`, `env:TOTO_DRS_CONFIG`, or `deny-all-fallback`), so a resolution failure from an unexpected working directory is a visible signal instead of an indistinguishable "everything is blocked" state.
 - **DRS override audit trail (TS/MCP path)**: `checkOverride()`'s accepted overrides now write a durable vault record (mirroring the bash hook's existing `write_override_record()`), closing the fabricated-audit-trail gap named in audit finding L2-003. An override is honored only if that record is written: if the vault write fails (or no vault is configured) the override is ignored and the call is judged as if none was given. The bash hook behaves the same way, exiting 2 instead of proceeding unaudited.
 - **`DRSService.test.ts`**: New contract-test suite (Rules 1/2/4 on known-bad fixtures, permissive opt-out, cwd-relative resolution failure/`TOTO_DRS_CONFIG` override, override-anchoring, and rule-precedence pinning).
+- **DRS conformance suite**: `tests/drs-conformance.bats` (23 tests) checks that the bash hook and `DRSService` agree on the same inputs. It covers the python3 fallback with `jq` absent, override honoring and its audit record for Rules 1 and 5, and two documented known gaps. It runs in CI as the `drs-conformance-test` job.
+- **Vault read API (`VaultServiceV2`)**: A pluggable storage abstraction under `packages/core/src/vault/`: `StorageBackend`, the filesystem-backed `FileStorage`, and `VaultFactory`, which constructs backends and caches them with reference counting. It is exported as `VaultServiceV2` beside the existing `VaultService`, so current callers keep working. The mcp-server handlers that read the vault directly (`vault_reversed`, `record_handler`, `signal_index`, `contradiction_auditor`, `dashboard_status`) now go through it.
+- **Shared `~/.claude.json` credential reader** (`claudeJsonCredentials.ts`): used by the legacy Anthropic client path (`anthropicLegacy.ts`) and by `toto doctor`, replacing two duplicated implementations with one synchronous helper that never throws.
+- **`pnpm migrate-config`** (`scripts/migrate-config.ts`): An idempotent, dry-run-by-default migration of `.toto/config.yml`'s old format. It writes atomically (temp file plus rename) and takes a backup before every write, so a crash mid-migration cannot corrupt the live config.
+- **`toto dashboard --terminal`**: Scans the vault directly and prints blocked Council and P10 items. It tells "vault not found", "ALL CLEAR" and blocked items apart, and reports unreadable files instead of skipping them. The default (browser) path is unchanged.
+- **ESLint baseline gate**: `.eslint-baseline.json` records the 115 existing violations and `scripts/check-eslint-baseline.ts` fails on any new one. It compares findings as multisets keyed on file, line and rule, and fails closed on a spawn failure, an unexpected exit code, unparseable output, or a suspiciously clean run. A `lint-baseline` CI job builds first (an unbuilt tree reports far more findings) and then runs it. `scripts/generate-eslint-baseline.ts` regenerates the file; the procedure is in `CONTRIBUTING.md`.
+- **`.env.example`**: Lists the 11 environment variables the code reads.
+- **Ruling parser tests**: `parseRuling`, `parseP10Ruling` and `parseSafetyCarRisks` are exported with contract docstrings and covered by 21 unit tests.
 
 ### Changed
 - **DRS Rule 2 fails closed by default**: Breaking behavior change: `rule2_scope()`'s old bypass (`allowedPaths.length === 0 → allow`) is removed. Any deployment relying on an empty `allowed_paths` meaning "no restriction" must now set `permissive: true` explicitly.
 - **DRS override scope narrowed (TS/MCP path)**: `message_before: "override drs: <reason>"` on the `drs_check` tool now bypasses Rules 2/3/4 only. It no longer bypasses Rule 1 (frozen path, a curated list an override shouldn't defeat) or Rule 5 (destructive pattern, which already has its own narrower `--force-confirmed` override). This is a live behavior change from the previous undocumented all-5-rules bypass.
-- **DRS hook registration moved**: The live PreToolUse hook is now registered in `.claude/settings.local.json`, pointing at the tracked `.claude/skills/drs/bin/drs-check.sh`. `.pi/hooks.json` (which pointed at a stale, divergent external fork) is removed.
+- **DRS hook registration moved**: The live PreToolUse hook is now registered in the committed `.claude/settings.json` (using `${CLAUDE_PROJECT_DIR}`, so it holds across worktrees and machines), pointing at the tracked `.claude/skills/drs/bin/drs-check.sh`. The previous registration lived only in the git-ignored `.claude/settings.local.json` with a hardcoded absolute path. `.pi/hooks.json` (which pointed at a stale, divergent external fork) is removed.
 - **`.toto/freeze.json` schema**: Now `{"frozen": [...]}` instead of a bare array, matching `DRSService.ts`'s own tolerant parse and fixing a schema mismatch that silently broke the bash hook's Rule 1 check (both the jq and python3 code paths).
 - **`.toto/config.yml`'s `drs.allowed_paths` widened**: Added `.toto/`, `.claude/`, `P10-Plans/`, `.pi/sessions/`, `.github/`, and repo-root essentials (`CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `package.json`, `pnpm-lock.yaml`) so Rule 2's new fail-closed default doesn't block this repo's own normal write traffic.
 - **Override documentation corrected at 5 sites** (`generate-claude-md.ts`, `generate-agents-md.ts`, `.claude/skills/drs/SKILL.md`, and `drs-check.sh`'s own comment/echo text): previously described a single message-based override mechanism; now accurately describes the two distinct mechanisms (TS/MCP path, Rules 2/3/4 only, audited; bash-hook path, `DRS_OVERRIDE_REASON` env var only, any rule) and their different scopes.
+- **DRS Rule 1 and coverage documentation** (`.claude/skills/drs/SKILL.md`): Rule 1 now names the real route to a frozen path (a council ruling and the unfreeze cycle, or an audited `DRS_OVERRIDE_REASON`; there is no `toto unfreeze` command). The coverage claims now match the hook: Bash commands are checked against Rules 3 and 5 only, other mutating tools never reach the hook, and the bash-hook override applies to any rule it evaluates. The known gaps are listed in the same file.
+- **Ruling parsers exported**: `SafetyCarService.parseRisks` is extracted, verbatim, into the exported `parseSafetyCarRisks` (the private method delegates to it), and `parseRuling` and `parseP10Ruling` are exported. The package barrel is unchanged.
+- **CLI palette**: One shared `colors.ts` replaces two drifted copies in `ui.ts` and `radio.ts`. `packages/cli` is now `"private": true`.
+- **ESLint**: Test files get a 150-line `max-lines-per-function` limit; source stays at 60.
+- **Documentation**: The README counts (CLI commands, MCP tools, HTTP endpoints, packages and services) are re-derived from the code. The generator templates behind `AGENTS.md` and `CLAUDE.md` no longer show nonexistent CLI commands or a deleted package, and they describe the hook registration and both override paths accurately. `CONTRIBUTING.md` and the PR template gain the lint-baseline steps.
+
+### Removed
+- **`packages/dashboard` and `packages/personas`**: The standalone terminal dashboard was never published to npm and its logic now lives in `toto dashboard --terminal`.
+- **Dead code in `packages/core/src/types.ts`**: The duplicate `P10Result` interface and five unused error classes (`CabinetError`, `SafetyCarError`, `KarpathyError`, `DRSError`, `SubagentError`), plus the dead exports in `anthropic.ts`.
+- **Committed CI artifacts**: `report.json` and `gitleaks-report.json`. CI regenerates the latter on every run and it is now git-ignored.
 
 ### Fixed
 - **DRS hook exit code**: `drs_halt()` now exits 2, not 1. This harness's PreToolUse contract only blocks on exit code 2, so every rule that fired via the bash hook was previously non-blocking regardless of whether it detected a real violation.
@@ -29,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **The python3 fallbacks no longer fail open on project paths containing an apostrophe**: the path was spliced into a single-quoted python string, producing invalid python that was silently read as "no restriction configured" (Rules 1, 2 and 4). Path and field are now passed as arguments.
 - **`HookSystem.execute()` no longer discards `override` / `overrideReason`** from an executor that accepted an override.
 - **`DRS_OVERRIDE_REASON` validation gate (L2-004)**: Previously any non-empty value was accepted with no further checks. Now rejects whitespace-only and common placeholder values (`reason`, `todo`, `n/a`, etc.) via a new `validate_override_reason()` helper.
+- **Browser dashboard** (`dashboard_html.ts`): Blocked items are no longer hidden by the empty state. The cabinet and subagent sparklines animate, and sparklines plot real monthly buckets. Card labels meet WCAG AA contrast, the record panel tells a 404 from other failures, and sparkline sizing and the mobile grid are fixed.
 
 ## [1.4.1] - 2025-08-05
 

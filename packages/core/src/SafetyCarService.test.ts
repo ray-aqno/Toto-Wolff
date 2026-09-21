@@ -31,6 +31,11 @@ describe('parseSafetyCarRisks', () => {
     expect(parseSafetyCarRisks(raw, PLAN)[0]).toMatchObject({ description: '', mitigation: '' });
   });
 
+  // KNOWN GAP (tracked for v1.5.1): the first four inputs are unusable model output, and
+  // pinning them to [] records the parser's documented fail-to-empty contract, not a
+  // desirable one. SafetyCarService turns an empty list into a 'pass' verdict, so
+  // unparseable output passes review. Only the last input is a legitimate empty review.
+  // When the service is fixed, unusable output stops returning [] and this table changes.
   it.each([['not json at all'], ['null'], ['{"risks": "nope"}'], ['{}'], ['{"risks": []}']])(
     'returns an empty list for %j',
     (raw) => {

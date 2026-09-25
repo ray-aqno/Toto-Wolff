@@ -54,6 +54,8 @@ TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
 
 **Already installed and want to update?** Run `toto upgrade` — it pulls the latest release, rebuilds all packages, and re-runs setup non-destructively. Vault, credentials, and config are untouched.
 
+**Upgrading to 1.5.0:** DRS Rule 2 (out-of-scope write) now fails closed. An empty `allowed_paths` used to mean "no restriction" and now means "nothing allowed", so an existing install relying on that must either list its allowed paths or set `permissive: true` in `.toto/config.yml`'s `drs:` block to keep the old behavior. See the CHANGELOG for details.
+
 **New to the terminology?** See [Concepts](#concepts) below for plain-English definitions of everything you'll encounter.
 
 ---

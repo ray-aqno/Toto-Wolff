@@ -51,6 +51,9 @@ This release ships six streams: DRS live enforcement, the vault read API, creden
 - **`DRS_OVERRIDE_REASON` validation gate (L2-004)**: Previously any non-empty value was accepted with no further checks. Now rejects whitespace-only and common placeholder values (`reason`, `todo`, `n/a`, etc.) via a new `validate_override_reason()` helper.
 - **Browser dashboard** (`dashboard_html.ts`): Blocked items are no longer hidden by the empty state. The cabinet and subagent sparklines animate, and sparklines plot real monthly buckets. Card labels meet WCAG AA contrast, the record panel tells a 404 from other failures, and sparkline sizing and the mobile grid are fixed.
 
+### Known limitations
+- **Safety Car and Karpathy pass on unusable model output**: `safety_car_run` and `karpathy_check` return a `pass` verdict when the reviewing model's response is unparseable, truncated or empty, or when a finding is missing a required field. A `pass` from either gate therefore does not by itself show that the review ran. This is inherited from v1.4.1, not new in this release; a fix that makes unusable output produce a non-pass result is planned for a future patch.
+
 ## [1.4.1] - 2025-08-05
 
 ### Added

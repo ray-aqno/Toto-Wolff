@@ -303,6 +303,8 @@ Start command (manual path): `node <repo>/packages/mcp-server/dist/index.js`
 The server calls the Anthropic API and exits if no credentials are present
 (`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked shell environment and ~/.claude.json mcpServers.toto-wolff.env)`).
 
+This applies to the MCP server process only: the `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, and `karpathy_check` tool calls. The `/council`, `/p10`, `/cabinet`, `/safety-car`, and `/karpathy` slash commands dispatch Claude Code subagents instead and need no Anthropic credential of their own. MCP has a protocol mechanism for a server to borrow the connecting client's own model access without one (`sampling/createMessage`), but Claude Code does not implement it as a client, so the slash-command path is what fills that gap here, not the MCP tool-call path.
+
 Resolution order (see `packages/core/src/utils/anthropic.ts`):
 1. `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the shell environment Claude Code was launched from — this is the primary path for marketplace installs, since the plugin manifest never embeds a real token.
 2. Falls back to `~/.claude.json`'s `mcpServers.toto-wolff.env` — the manual-wiring path below still works even after a marketplace install, since this is a plain file read, independent of how the server was launched.

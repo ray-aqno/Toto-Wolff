@@ -20,6 +20,8 @@ claude plugin install toto-wolff@toto-wolff
 
 Export `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) in your shell before launching Claude Code — the plugin has no mechanism to prompt for or store a credential itself, so this is the one manual step. See [Credentials](CLAUDE.md#credentials-required) for the fallback if you'd rather wire it into `~/.claude.json` instead.
 
+This is only needed for the MCP tool-call surface (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`). The `/council`, `/p10`, `/cabinet`, `/safety-car`, and `/karpathy` slash commands run as Claude Code subagents instead, riding on whatever account you're already logged into Claude Code with: no separate credential, no separate cost. If you only plan to use the slash commands, skip this step.
+
 **Manual path (for contributing to this repo, or if your Claude Code host doesn't support plugin marketplaces yet):**
 
 ```bash

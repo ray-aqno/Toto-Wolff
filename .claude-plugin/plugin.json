@@ -1,7 +1,7 @@
 {
   "name": "toto-wolff",
   "description": "Persistent AI governance for Claude Code — council deliberation, P10 pre-execution planning, and a local vault that survives session resets.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": {
     "name": "Rayyan Aquino"
   },

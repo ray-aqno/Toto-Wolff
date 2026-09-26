@@ -20,6 +20,8 @@ claude plugin install toto-wolff@toto-wolff
 
 Export `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) in your shell before launching Claude Code — the plugin has no mechanism to prompt for or store a credential itself, so this is the one manual step. See [Credentials](CLAUDE.md#credentials-required) for the fallback if you'd rather wire it into `~/.claude.json` instead.
 
+The MCP server constructs its five model-backed services (and asserts on a missing credential) at process startup, before any tool is registered, so a missing credential takes down the whole server: every MCP tool it exposes, including non-model ones like `vault_write` and `drs_check`, not just the five that call a model. The `/council`, `/p10`, `/cabinet`, `/safety-car`, and `/karpathy` slash commands are unaffected either way: they run as Claude Code subagents, not through this MCP server, riding on whatever account you're already logged into Claude Code with, no separate credential and no separate cost. If you only plan to use the slash commands, skip this step; if you want any `toto-wolff` MCP tool at all, you need it.
+
 **Manual path (for contributing to this repo, or if your Claude Code host doesn't support plugin marketplaces yet):**
 
 ```bash
@@ -53,6 +55,8 @@ TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
 ```
 
 **Already installed and want to update?** Run `toto upgrade` — it pulls the latest release, rebuilds all packages, and re-runs setup non-destructively. Vault, credentials, and config are untouched.
+
+**Upgrading to 1.5.0:** DRS Rule 2 (out-of-scope write) now fails closed. An empty `allowed_paths` used to mean "no restriction" and now means "nothing allowed", so an existing install relying on that must either list its allowed paths or set `permissive: true` in `.toto/config.yml`'s `drs:` block to keep the old behavior. Run `pnpm generate:drs-config` from the repository root after changing the config: DRS reads the generated `.toto/drs-config.json`, not the YAML directly, so an edit to `config.yml` alone leaves writes blocked. See the CHANGELOG for details.
 
 **New to the terminology?** See [Concepts](#concepts) below for plain-English definitions of everything you'll encounter.
 

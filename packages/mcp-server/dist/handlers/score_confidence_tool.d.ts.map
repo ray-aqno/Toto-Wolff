@@ -1,0 +1,1 @@
+{"version":3,"file":"score_confidence_tool.d.ts","sourceRoot":"","sources":["../../src/handlers/score_confidence_tool.ts"],"names":[],"mappings":"AAuCA;;;;;;;;GAQG;AACH,wBAAsB,qBAAqB,CACzC,IAAI,EAAE,OAAO,EACb,SAAS,EAAE,MAAM,GAChB,OAAO,CAAC;IAAE,IAAI,EAAE,MAAM,GAAG,KAAK,CAAC;IAAC,UAAU,EAAE,MAAM,CAAC;IAAC,aAAa,EAAE,MAAM,EAAE,CAAA;CAAE,CAAC,CAqBhF"}

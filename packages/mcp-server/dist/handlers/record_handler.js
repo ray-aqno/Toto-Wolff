@@ -1,0 +1,115 @@
+import { join, isAbsolute, sep, resolve, relative } from 'node:path';
+import assert from 'node:assert';
+import { VaultServiceV2 } from '@toto-wolff/core';
+const MAX_CONTENT_BYTES = 100_000;
+let vaultPromise = null;
+/**
+ * Lazily construct (and memoize) the V2 vault facade for this vaultPath.
+ * On construction failure the memo is cleared so the next call retries —
+ * a transient init error must not permanently wedge every future request.
+ */
+function getVault(vaultPath) {
+    if (vaultPromise === null) {
+        vaultPromise = VaultServiceV2.create({ backend: 'file', options: { rootPath: vaultPath } }).catch((err) => {
+            vaultPromise = null;
+            throw err;
+        });
+    }
+    return vaultPromise;
+}
+const TYPE_TO_DIR = {
+    council: join('Council', 'Congressional-Records'),
+    p10: 'P10-Plans',
+    cabinet: 'Cabinet',
+    'safety-car': 'SafetyCar',
+    karpathy: 'Karpathy',
+    drs: 'DRS',
+    subagent: 'Subagent',
+};
+/** Returns true only if resolved path is strictly inside vaultPath (not a sibling prefix). */
+function isInsideVault(resolved, vaultPath) {
+    return resolved === vaultPath || resolved.startsWith(vaultPath + sep);
+}
+/**
+ * Resolves a vault-relative filename to an absolute path.
+ * Returns null if type is invalid or filename is empty/contains path separators.
+ */
+function resolveRecordPath(vaultPath, type, filename) {
+    assert(isAbsolute(vaultPath), 'resolveRecordPath: vaultPath must be absolute');
+    const subDir = TYPE_TO_DIR[type];
+    if (subDir === undefined)
+        return null;
+    if (filename.length === 0 || filename.includes('..') || filename.includes('/') || filename.includes(sep)) {
+        return null;
+    }
+    const resolved = resolve(join(vaultPath, subDir, filename));
+    if (!isInsideVault(resolved, vaultPath))
+        return null;
+    assert(resolved.startsWith(vaultPath), 'resolveRecordPath: post-check — resolved must be inside vault');
+    return resolved;
+}
+/**
+ * Reads a vault record file and streams it to the response.
+ * ENOENT → 404. Content > MAX_CONTENT_BYTES → 413. Other errors → 500.
+ */
+async function sendRecord(res, vaultPath, relPath) {
+    assert(!isAbsolute(relPath), 'sendRecord: relPath must be relative to the vault root');
+    assert(!res.destroyed, 'sendRecord: response already destroyed');
+    let content;
+    try {
+        const vault = await getVault(vaultPath);
+        content = await vault.read(relPath);
+    }
+    catch {
+        if (res.destroyed)
+            return;
+        res.writeHead(500, { 'Content-Type': 'text/plain' }).end('Internal error.');
+        return;
+    }
+    if (content === null) {
+        if (!res.destroyed) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Record not found.');
+        }
+        return;
+    }
+    if (content.length > MAX_CONTENT_BYTES) {
+        if (!res.destroyed) {
+            res.writeHead(413, { 'Content-Type': 'text/plain' }).end('Record too large.');
+        }
+        return;
+    }
+    if (!res.destroyed) {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }).end(content);
+    }
+}
+/**
+ * Handles GET /dashboard/record?type=council|p10&file=<filename>.
+ * Validates params, resolves path, and streams file content.
+ * 400 for missing/invalid params. 404 for traversal attempts or missing files.
+ */
+export async function handleRecordRequest(req, res, vaultPath) {
+    assert(isAbsolute(vaultPath), 'handleRecordRequest: vaultPath must be absolute');
+    assert(!res.destroyed, 'handleRecordRequest: response already destroyed on entry');
+    const rawUrl = req.url ?? '';
+    const qIdx = rawUrl.indexOf('?');
+    const qs = qIdx >= 0 ? new URLSearchParams(rawUrl.slice(qIdx + 1)) : new URLSearchParams();
+    const type = qs.get('type') ?? '';
+    const file = qs.get('file') ?? '';
+    if (!type || !file) {
+        if (!res.destroyed) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+                .end(JSON.stringify({ error: 'missing required params: type, file' }));
+        }
+        return;
+    }
+    const filePath = resolveRecordPath(vaultPath, type, file);
+    if (filePath === null) {
+        if (!res.destroyed) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found.');
+        }
+        return;
+    }
+    const relPath = relative(vaultPath, filePath);
+    await sendRecord(res, vaultPath, relPath);
+}
+//# sourceMappingURL=record_handler.js.map

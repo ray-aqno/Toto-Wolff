@@ -18,6 +18,7 @@
     ".eslintrc.json",
     "CONTRIBUTING.md",
     "README.md",
+    "RELEASE.md",
     ".env.example",
     ".gitignore",
     "tsconfig.json",

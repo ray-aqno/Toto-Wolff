@@ -21,9 +21,9 @@
   ],
   "mcpServers": {
     "toto-wolff": {
-      "command": "sh",
+      "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/plugin-launch.sh"
+        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js"
       ],
       "env": {
         "ANTHROPIC_API_KEY": "${user_config.anthropic_api_key}",

@@ -292,7 +292,7 @@ claude plugin marketplace add <owner>/Toto-Wolff
 claude plugin install toto-wolff@toto-wolff
 ```
 
-The plugin launches the server directly from TypeScript source (`npx tsx --tsconfig packages/mcp-server/tsconfig.plugin.json packages/mcp-server/src/index.ts`) — no `pnpm install`/build step required before first use.
+The plugin launches the server via `node ${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js` against a committed, esbuild-bundled `dist/index.js`: no `pnpm install`/build step required before first use. See `RELEASE.md` for how that committed output stays in sync with source.
 
 **Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Run `pnpm -C packages/mcp-server build` before first use with this path.
 

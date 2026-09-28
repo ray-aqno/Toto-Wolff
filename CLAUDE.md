@@ -292,7 +292,7 @@ claude plugin marketplace add <owner>/Toto-Wolff
 claude plugin install toto-wolff@toto-wolff
 ```
 
-The plugin launches the server directly from TypeScript source (`npx tsx --tsconfig packages/mcp-server/tsconfig.plugin.json packages/mcp-server/src/index.ts`) — no `pnpm install`/build step required before first use.
+The plugin launches the server via `node ${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js` against a committed, esbuild-bundled `dist/index.js`: no `pnpm install`/build step required before first use. See `RELEASE.md` for how that committed output stays in sync with source.
 
 **Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Run `pnpm -C packages/mcp-server build` before first use with this path.
 
@@ -301,13 +301,16 @@ Start command (manual path): `node <repo>/packages/mcp-server/dist/index.js`
 ## Credentials (required)
 
 The server calls the Anthropic API and exits if no credentials are present
-(`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked shell environment and ~/.claude.json mcpServers.toto-wolff.env)`).
+(`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)`).
 
 `index.ts` constructs `CouncilService`, `P10Service`, `CabinetService`, `SafetyCarService`, and `KarpathyService` at module load, each asserting a credential in its own constructor, alongside `DRSService` and `SubagentService`, which need none, before any tool is registered. A missing credential throws during that construction and crashes the whole process before it ever reaches tool registration, so it takes down every MCP tool this server exposes: `vault_write` and `drs_check` included, not only `council_run`/`p10_plan`/`cabinet_run`/`safety_car_run`/`karpathy_check`. The `/council`, `/p10`, `/cabinet`, `/safety-car`, and `/karpathy` slash commands are unaffected: they dispatch Claude Code subagents directly, not through this server, and need no Anthropic credential of their own. MCP has a protocol mechanism for a server to borrow the connecting client's own model access without one (`sampling/createMessage`), but Claude Code does not implement it as a client, so the slash-command path is what fills that gap here, not the MCP tool-call path.
 
 Resolution order (see `packages/core/src/utils/anthropic.ts`):
-1. `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the shell environment Claude Code was launched from — this is the primary path for marketplace installs, since the plugin manifest never embeds a real token.
-2. Falls back to `~/.claude.json`'s `mcpServers.toto-wolff.env` — the manual-wiring path below still works even after a marketplace install, since this is a plain file read, independent of how the server was launched.
+1. The plugin's `userConfig` (`/plugin configure toto-wolff@toto-wolff`). `plugin.json` hands these to the server as `TOTO_ANTHROPIC_API_KEY`, `TOTO_ANTHROPIC_AUTH_TOKEN` and `TOTO_ANTHROPIC_BASE_URL`, not the standard names: Claude Code substitutes an unset optional value as an empty string, which under the standard names would overwrite a key exported in the shell. Empty values here fall through to step 2.
+2. `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the shell environment Claude Code was launched from.
+3. Falls back to `~/.claude.json`'s `mcpServers.toto-wolff.env`: the manual-wiring path below still works even after a marketplace install, since this is a plain file read, independent of how the server was launched.
+
+Whichever source wins supplies the base URL too; a URL from one source never pairs with a credential from another. An API key with no URL of its own goes to `https://api.anthropic.com`. An auth token is a gateway credential, so a token without a URL from the same source fails the startup check instead of being sent to the public endpoint. If a source has both a key and a token, only the key is sent.
 
 Manual wiring (fallback path), never committing a real token to this repo:
 

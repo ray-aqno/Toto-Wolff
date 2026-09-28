@@ -1,0 +1,425 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import assert from 'node:assert';
+const DEFAULT_CONFIG = {
+    freezePaths: [],
+    allowedPaths: [],
+    tenantNamespaces: [],
+    currentTenant: '',
+    haltPatterns: ['TRUNCATE TABLE', 'git push --force'],
+};
+const AUTH_PATTERNS = [
+    'auth',
+    'permission',
+    'role',
+    'tenant',
+    'policy',
+    'rbac',
+    'acl',
+    'iam',
+];
+const DESTRUCTIVE_PATTERNS = [
+    'rm -rf',
+    'DROP TABLE',
+    'DELETE FROM',
+];
+/**
+ * Extracts a freeze-paths array from a parsed JSON value, tolerant of a bare
+ * array or a `freeze_paths`/`freeze`/`frozen` key on an object. Distinguishes
+ * "key present but empty" from "key absent" via `keyPresent`: a bare `[]`
+ * result alone can't tell those apart, and callers need to.
+ */
+function parseFreezeConfig(raw) {
+    if (Array.isArray(raw)) {
+        return { paths: raw, keyPresent: true };
+    }
+    if (raw !== null && typeof raw === 'object') {
+        const obj = raw;
+        for (const key of ['freeze_paths', 'freeze', 'frozen']) {
+            if (Array.isArray(obj[key])) {
+                return { paths: obj[key], keyPresent: true };
+            }
+        }
+    }
+    return { paths: [], keyPresent: false };
+}
+/**
+ * Deterministic boundary enforcement (Rules 1-5) for tool calls, usable as a
+ * HookExecutor. Mirrors the bash PreToolUse hook's rules so both enforcement
+ * paths give the same answer; tests/drs-conformance.bats asserts that they do.
+ */
+export class DRSService {
+    id = 'drs';
+    name = 'Drag Reduction System';
+    priority = 10;
+    config;
+    /** Diagnostic: where this instance's config actually came from. Public so
+     * callers (and tests) can tell a resolution failure apart from a genuinely
+     * empty-but-resolved config; see resolveDrsConfig(). */
+    configSource;
+    /** Audit-trail sink for overrides. Undefined is tolerated for construction
+     * that never exercises an override, but without a vault no override is ever
+     * honored (see check()); both live construction sites inject a real one. */
+    vault;
+    /**
+     * Resolves the active config (explicit path, then TOTO_DRS_CONFIG, then the
+     * cwd-relative .toto/drs-config.json). Never throws on a resolution failure:
+     * it falls back to deny-all and reports that through `configSource`, so a
+     * bad working directory is a visible signal rather than a silent allow-all.
+     * `vault` receives an audit record for each accepted override.
+     */
+    constructor(configPath, vault) {
+        const resolved = this.resolveDrsConfig(configPath);
+        this.config = resolved.config;
+        this.configSource = resolved.source;
+        this.vault = vault;
+        assert(this.config.freezePaths !== undefined, 'freezePaths required');
+        assert(this.config.allowedPaths !== undefined, 'allowedPaths required');
+        assert(this.config.tenantNamespaces !== undefined, 'tenantNamespaces required');
+        assert(this.config.currentTenant !== undefined, 'currentTenant required');
+        assert(this.config.haltPatterns !== undefined, 'haltPatterns required');
+        this.validateNonPermissive(this.config, this.configSource);
+    }
+    /**
+     * Resolves the active DRSConfig: an explicit configPath argument wins
+     * outright; otherwise TOTO_DRS_CONFIG (env escape hatch) is tried; otherwise
+     * `.toto/drs-config.json` relative to process.cwd(). A genuine resolution
+     * failure at any of these falls back to DEFAULT_CONFIG's shape tagged
+     * 'deny-all-fallback', never DEFAULT_CONFIG silently mislabeled as if it
+     * were a real, permissive configuration.
+     */
+    resolveDrsConfig(configPath) {
+        if (configPath !== undefined) {
+            const loaded = this.loadConfig(configPath);
+            return { config: loaded.config, source: loaded.resolved ? 'cwd-relative' : 'deny-all-fallback' };
+        }
+        const envPath = process.env['TOTO_DRS_CONFIG'];
+        if (envPath !== undefined && envPath.length > 0) {
+            const loaded = this.loadConfig(envPath);
+            return loaded.resolved
+                ? { config: loaded.config, source: 'env:TOTO_DRS_CONFIG' }
+                : { config: DEFAULT_CONFIG, source: 'deny-all-fallback' };
+        }
+        const cwdPath = path.join(process.cwd(), '.toto', 'drs-config.json');
+        const loaded = this.loadConfig(cwdPath);
+        return loaded.resolved
+            ? { config: loaded.config, source: 'cwd-relative' }
+            : { config: DEFAULT_CONFIG, source: 'deny-all-fallback' };
+    }
+    /**
+     * Surfaces (via stderr, non-throwing) the case where resolution genuinely
+     * failed and `permissive` isn't set to explicitly opt into the old
+     * no-restriction behavior. Construction must never throw here (a resolution
+     * failure from an unexpected cwd is a real, named scenario, not a bug to
+     * crash on), so this only logs, it does not assert() in the throwing sense.
+     */
+    validateNonPermissive(config, source) {
+        if (source === 'deny-all-fallback' && config.permissive !== true) {
+            process.stderr.write('DRSService: configuration resolution failed, falling back to deny-all ' +
+                '(every Rule 2 check will block until this is fixed). Set permissive: true ' +
+                'in your DRS config to opt into unrestricted mode instead, or ensure ' +
+                '.toto/drs-config.json / TOTO_DRS_CONFIG resolves correctly.\n');
+        }
+    }
+    /**
+     * Evaluates a tool call against the DRS rules; the first rule that fires
+     * wins. Rules 1 (frozen path) and 5 (destructive pattern) run first and can
+     * never be overridden. An "override drs: <reason>" message then bypasses
+     * Rules 2/3/4, but only if its audit record is written to the vault first;
+     * an override that can't be audited is ignored and the call is judged as if
+     * none was given. Without an override, Rules 2 (scope), 3 (auth surface)
+     * and 4 (tenant) apply. Returns `{ allowed: true }` when no rule fires.
+     */
+    async check(input) {
+        assert(input !== undefined && input !== null, 'input required');
+        assert(typeof input.tool === 'string', 'tool required');
+        if (input.tool === 'Bash') {
+            assert(typeof input.command === 'string', 'command required for Bash');
+        }
+        else {
+            assert(typeof input.targetPath === 'string' && input.targetPath.length > 0, 'targetPath required');
+        }
+        // Rules 1 and 5 run before, and are exempt from, checkOverride(): Rule 1's
+        // freeze list is a small, deliberately curated set an override shouldn't
+        // defeat; Rule 5 already has its own narrower --force-confirmed override,
+        // so a second, wider, message-based bypass for the same rule is redundant
+        // and strictly increases blast radius for no gain. checkOverride() can
+        // only bypass Rules 2/3/4.
+        // Rule 1: Frozen path
+        const rule1 = this.rule1_frozen(input);
+        if (rule1)
+            return rule1;
+        // Rule 5: Destructive shell pattern
+        const rule5 = this.rule5_destructive(input);
+        if (rule5)
+            return rule5;
+        // An override is honored only if its audit record was durably written.
+        // If it can't be (no vault, or the write failed) it is ignored and the
+        // call is judged as if no override had been given, so a bypass never
+        // takes effect without the record that is supposed to accompany it.
+        let unauditedOverride = false;
+        const overrideResult = this.checkOverride(input);
+        if (overrideResult) {
+            if (await this.writeOverrideAuditRecord(input, overrideResult))
+                return overrideResult;
+            unauditedOverride = true;
+        }
+        // Rule 2 (out of scope), then Rule 3 (auth/permission surface), then
+        // Rule 4 (cross-tenant); first to fire wins.
+        const blocked = this.rule2_scope(input) ?? this.rule3_auth(input) ?? this.rule4_tenant(input);
+        if (blocked) {
+            return unauditedOverride
+                ? { ...blocked, reason: `${blocked.reason ?? ''} (override not honored: its audit record could not be written)` }
+                : blocked;
+        }
+        return { allowed: true };
+    }
+    /**
+     * Writes a durable audit record for an accepted override, mirroring bash's
+     * write_override_record() shape. check() is the sole choke point for this,
+     * not the MCP handler, since execute() calls check() directly too,
+     * bypassing the MCP handler entirely. Returns whether the record was
+     * written: false when no vault is configured or the write fails (the
+     * failure is also reported on stderr). check() treats false as "override
+     * not honored": fail closed, so an override never takes effect without
+     * its audit trail (the bash hook does the same).
+     */
+    async writeOverrideAuditRecord(input, result) {
+        if (this.vault === undefined)
+            return false;
+        const target = input.tool === 'Bash' ? (input.command ?? '') : (input.targetPath ?? '');
+        const now = new Date();
+        const slug = `${now.toISOString().replace(/[:.]/g, '-')}-drs-override`;
+        const reason = result.overrideReason ?? '';
+        const body = [
+            '---',
+            `date: "${now.toISOString().slice(0, 10)}"`,
+            `tool: "${input.tool}"`,
+            `target: "${target.replace(/"/g, '\\"')}"`,
+            'override: true',
+            `override_reason: "${reason.replace(/"/g, '\\"')}"`,
+            '---',
+            '',
+            'DRS override accepted (TS/MCP path).',
+            `Target: ${target}`,
+            `Reason: ${reason}`,
+            '',
+        ].join('\n');
+        try {
+            await this.vault.write(`DRS/${slug}.md`, body);
+            return true;
+        }
+        catch (err) {
+            process.stderr.write(`DRSService: failed to write override audit record, override not honored: ${String(err)}\n`);
+            return false;
+        }
+    }
+    /** HookExecutor implementation: converts HookContext to DRSCheckInput and runs check. */
+    async execute(context) {
+        const input = {
+            tool: context.tool,
+        };
+        if (context.input.targetPath !== undefined)
+            input.targetPath = context.input.targetPath;
+        if (context.input.command !== undefined)
+            input.command = context.input.command;
+        if (context.metadata.messageBefore !== undefined)
+            input.messageBefore = context.metadata.messageBefore;
+        return await this.check(input);
+    }
+    checkOverride(input) {
+        if (!input.messageBefore)
+            return null;
+        const match = input.messageBefore.match(/override drs:\s*(.+)/i);
+        if (!match)
+            return null;
+        const reason = match[1]?.trim();
+        if (!reason || reason.length === 0)
+            return null;
+        return {
+            allowed: true,
+            override: true,
+            overrideReason: reason,
+        };
+    }
+    rule1_frozen(input) {
+        if (input.tool === 'Bash')
+            return null;
+        const target = input.targetPath ?? '';
+        if (target.length === 0)
+            return null;
+        for (const freezePath of this.config.freezePaths) {
+            if (this.matchGlob(target, freezePath)) {
+                return {
+                    allowed: false,
+                    ruleFired: 1,
+                    reason: `Frozen path: ${freezePath}`,
+                };
+            }
+        }
+        return null;
+    }
+    rule2_scope(input) {
+        if (input.tool === 'Bash')
+            return null;
+        const target = input.targetPath ?? '';
+        if (target.length === 0)
+            return null;
+        if (this.config.allowedPaths.length === 0) {
+            // Fail-closed default: empty allowedPaths means "nothing allowed," not
+            // "no restriction." permissive: true is the explicit, documented opt-out
+            // that restores the old no-restriction behavior.
+            if (this.config.permissive === true)
+                return null;
+            return {
+                allowed: false,
+                ruleFired: 2,
+                reason: 'Out of scope: allowedPaths is empty and permissive mode is not enabled',
+            };
+        }
+        let inScope = false;
+        for (const allowed of this.config.allowedPaths) {
+            if (this.matchGlob(target, allowed)) {
+                inScope = true;
+                break;
+            }
+        }
+        if (!inScope) {
+            return {
+                allowed: false,
+                ruleFired: 2,
+                reason: `Out of scope: ${target} not in allowed paths`,
+            };
+        }
+        return null;
+    }
+    rule3_auth(input) {
+        const target = input.tool === 'Bash' ? (input.command ?? '') : (input.targetPath ?? '');
+        if (target.length === 0)
+            return null;
+        const lower = target.toLowerCase();
+        for (const pattern of AUTH_PATTERNS) {
+            if (lower.includes(pattern)) {
+                return {
+                    allowed: false,
+                    ruleFired: 3,
+                    reason: `Auth/permission surface: ${pattern}`,
+                };
+            }
+        }
+        // Also check for chmod/chown/usermod in bash commands
+        if (input.tool === 'Bash' && typeof input.command === 'string') {
+            const cmd = input.command.toLowerCase();
+            if (cmd.includes('chmod') || cmd.includes('chown') || cmd.includes('usermod') || cmd.includes('groupadd') || cmd.includes('setcap')) {
+                return {
+                    allowed: false,
+                    ruleFired: 3,
+                    reason: 'Auth/permission surface: shell permission command',
+                };
+            }
+        }
+        return null;
+    }
+    rule4_tenant(input) {
+        if (this.config.tenantNamespaces.length === 0 || this.config.currentTenant.length === 0) {
+            return null;
+        }
+        if (input.tool === 'Bash')
+            return null;
+        const target = input.targetPath ?? '';
+        if (target.length === 0)
+            return null;
+        for (const tenant of this.config.tenantNamespaces) {
+            if (tenant !== this.config.currentTenant && target.includes(tenant)) {
+                return {
+                    allowed: false,
+                    ruleFired: 4,
+                    reason: `Cross-tenant write: ${tenant} (current: ${this.config.currentTenant})`,
+                };
+            }
+        }
+        return null;
+    }
+    rule5_destructive(input) {
+        if (input.tool !== 'Bash')
+            return null;
+        const cmd = input.command ?? '';
+        if (cmd.length === 0)
+            return null;
+        // Check for override first (already done in checkOverride, but double-check)
+        if (cmd.includes('--force-confirmed'))
+            return null;
+        // rm -rf
+        if (/\brm\s+-rf\b/.test(cmd)) {
+            return { allowed: false, ruleFired: 5, reason: 'Destructive: rm -rf' };
+        }
+        // DROP TABLE
+        if (/DROP\s+TABLE\b/i.test(cmd)) {
+            return { allowed: false, ruleFired: 5, reason: 'Destructive: DROP TABLE' };
+        }
+        // DELETE FROM without WHERE
+        const deleteMatch = cmd.match(/DELETE\s+FROM\s+\w+/i);
+        if (deleteMatch && !/WHERE\b/i.test(cmd)) {
+            return { allowed: false, ruleFired: 5, reason: 'Destructive: DELETE FROM without WHERE' };
+        }
+        // Custom halt patterns
+        for (const pattern of this.config.haltPatterns) {
+            if (cmd.includes(pattern)) {
+                return { allowed: false, ruleFired: 5, reason: `Destructive: ${pattern}` };
+            }
+        }
+        return null;
+    }
+    matchGlob(target, pattern) {
+        if (pattern.includes('*')) {
+            const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+            return regex.test(target);
+        }
+        const prefix = pattern.endsWith('/') ? pattern : pattern + '/';
+        return target === pattern || target.startsWith(prefix);
+    }
+    loadConfig(configPath) {
+        if (!fs.existsSync(configPath)) {
+            return { config: DEFAULT_CONFIG, freezeSource: 'absent', resolved: false };
+        }
+        try {
+            const content = fs.readFileSync(configPath, 'utf-8');
+            const parsed = JSON.parse(content);
+            const primary = parseFreezeConfig(parsed);
+            let freezePaths = primary.paths;
+            let freezeSource = primary.keyPresent ? 'config' : 'absent';
+            // Check adjacent freeze.json if freezePaths is empty
+            if (freezePaths.length === 0) {
+                const freezeJsonPath = path.join(path.dirname(configPath), 'freeze.json');
+                if (fs.existsSync(freezeJsonPath)) {
+                    try {
+                        const freezeContent = fs.readFileSync(freezeJsonPath, 'utf-8');
+                        const parsedFreeze = JSON.parse(freezeContent);
+                        const fallback = parseFreezeConfig(parsedFreeze);
+                        if (fallback.paths.length > 0) {
+                            freezePaths = fallback.paths;
+                            freezeSource = 'freeze.json-fallback';
+                        }
+                    }
+                    catch {
+                        // Ignore freeze.json read failure
+                    }
+                }
+            }
+            const obj = (parsed !== null && typeof parsed === 'object') ? parsed : {};
+            const config = {
+                freezePaths,
+                allowedPaths: Array.isArray(obj['allowed_paths']) ? obj['allowed_paths'] : (Array.isArray(obj['allowedPaths']) ? obj['allowedPaths'] : []),
+                tenantNamespaces: Array.isArray(obj['tenant_namespaces']) ? obj['tenant_namespaces'] : (Array.isArray(obj['tenantNamespaces']) ? obj['tenantNamespaces'] : []),
+                currentTenant: typeof obj['current_tenant'] === 'string' ? obj['current_tenant'] : (typeof obj['currentTenant'] === 'string' ? obj['currentTenant'] : ''),
+                haltPatterns: Array.isArray(obj['halt_patterns']) ? obj['halt_patterns'] : (Array.isArray(obj['haltPatterns']) ? obj['haltPatterns'] : DEFAULT_CONFIG.haltPatterns),
+                ...(typeof obj['permissive'] === 'boolean' ? { permissive: obj['permissive'] } : {}),
+            };
+            return { config, freezeSource, resolved: true };
+        }
+        catch {
+            return { config: DEFAULT_CONFIG, freezeSource: 'absent', resolved: false };
+        }
+    }
+}
+//# sourceMappingURL=DRSService.js.map

@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@toto-wolff/core": ["../core/src/index.ts"]
-    }
-  }
-}

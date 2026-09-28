@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && esbuild dist/index.js --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __totoCreateRequire } from 'node:module'; const require = __totoCreateRequire(import.meta.url);\" --outfile=dist/index.js --allow-overwrite && rm -f dist/index.js.map",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.5.0",
     "vitest": "^3.0.0"
   }

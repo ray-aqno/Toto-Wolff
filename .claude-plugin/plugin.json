@@ -21,10 +21,34 @@
   ],
   "mcpServers": {
     "toto-wolff": {
-      "command": "sh",
+      "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/plugin-launch.sh"
-      ]
+        "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "TOTO_ANTHROPIC_API_KEY": "${user_config.anthropic_api_key}",
+        "TOTO_ANTHROPIC_AUTH_TOKEN": "${user_config.anthropic_auth_token}",
+        "TOTO_ANTHROPIC_BASE_URL": "${user_config.anthropic_base_url}"
+      }
+    }
+  },
+  "userConfig": {
+    "anthropic_api_key": {
+      "type": "string",
+      "title": "Anthropic API key",
+      "description": "Credential for the toto-wolff MCP server's own Anthropic API calls (council_run, p10_plan, cabinet_run, safety_car_run, karpathy_check). Not needed if you only use the /council, /p10, /cabinet, /safety-car, /karpathy slash commands, which run through Claude Code directly instead. Leave unset if you use ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL instead.",
+      "sensitive": true
+    },
+    "anthropic_auth_token": {
+      "type": "string",
+      "title": "Anthropic auth token (enterprise/Manifest)",
+      "description": "Alternative to anthropic_api_key for an enterprise or Manifest-gateway credential. Requires anthropic_base_url to also be set. Leave unset if you use anthropic_api_key instead.",
+      "sensitive": true
+    },
+    "anthropic_base_url": {
+      "type": "string",
+      "title": "Anthropic base URL (enterprise/Manifest)",
+      "description": "The gateway URL that pairs with anthropic_auth_token. Leave unset if you use anthropic_api_key instead."
     }
   }
 }

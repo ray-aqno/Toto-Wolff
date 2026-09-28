@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+Plugin autopublish readiness: the marketplace plugin now declares its credential and launches with plain `node` instead of a shell script that builds at launch time, the pattern the plugin directory's automated review holds for a human reviewer.
+
+### Added
+- **Credential declared via `userConfig`**: `.claude-plugin/plugin.json` declares three optional options, `anthropic_api_key`, `anthropic_auth_token` (both `sensitive`) and `anthropic_base_url`, set with `/plugin configure toto-wolff@toto-wolff` or `claude plugin install ... --config KEY=VALUE`. They reach the server as `TOTO_ANTHROPIC_API_KEY`, `TOTO_ANTHROPIC_AUTH_TOKEN` and `TOTO_ANTHROPIC_BASE_URL`, not the standard names: Claude Code passes an unset optional value as an empty string, which under the standard names would overwrite a key exported in the shell and crash the server at startup. `createAnthropicClient` now checks, in order: the `TOTO_*` values (non-empty only, and a plugin base URL pairs only with a plugin credential), the shell's `ANTHROPIC_*` variables, then `~/.claude.json`.
+- **Build-free launch from committed `dist/`**: `packages/core/dist` and `packages/mcp-server/dist` are now tracked (a scoped `.gitignore` exception), and `packages/mcp-server/dist/index.js` is a single esbuild bundle, so a fresh install needs neither a build nor `node_modules`.
+- **`pnpm check:dist-sync` and `pnpm sync:dist`**: `scripts/check-dist-sync.ts` deletes `dist/` and local `.tsbuildinfo`, rebuilds, and fails if `git status --porcelain --untracked-files=all` shows any difference, so stale, missing or extra committed build output fails closed. `scripts/sync-dist.ts` rebuilds and stages the result. The check runs unconditionally in the `lint-baseline` CI job.
+- **`RELEASE.md`**: The canonical release runbook, including running `pnpm sync:dist` before `/cabinet`.
+- **Spawn-path credential check in CI**: `plugin-launch-smoke-test` now also runs `claude mcp list` against the installed plugin with the key only in the shell, only in `userConfig`, and nowhere (which must fail), so the manifest's `userConfig`-to-env wiring is exercised through Claude Code itself, not a raw `node` launch.
+
+### Changed
+- **Plugin launch**: `plugin.json` runs `node ${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js` instead of `sh plugin-launch.sh`, which built TypeScript at launch time. `plugin-launch.sh` and the orphaned `tsconfig.plugin.json` are removed.
+- **`plugin-launch-smoke-test` inverted**: It used to require that `dist/` be absent from the installed plugin; it now requires both committed `dist/` trees to be present and launches the manifest's own command.
+- **DRS `allowed_paths`**: `.claude-plugin/` and `RELEASE.md` added, so the plugin manifest and runbook can be edited without an override.
+- **README and CLAUDE.md credential instructions**: Describe both ways to supply the key (`/plugin configure` or a shell export) and the resolution order.
+- **An auth token now requires its base URL**: `ANTHROPIC_AUTH_TOKEN` (or the plugin's `anthropic_auth_token`) without a base URL from the same source now fails the MCP server's startup check with a message naming the missing URL, instead of sending the gateway token to `https://api.anthropic.com`. This applies to the shell as well as the plugin and `~/.claude.json`: a shell token without a shell `ANTHROPIC_BASE_URL` used to go to the public endpoint. Set the matching base URL, or switch to an API key.
+- **An API key now wins outright**: when one source has both a key and a token, only the key is sent. Previously both went out as separate headers, although the README already said the key wins.
+
+### Fixed
+- **`.gitleaks.toml` path exclusions never applied**: The top-level `paths-ignore` array is not a key gitleaks reads, so it had silently excluded nothing since it was added. Exclusions now live under `[allowlist].paths`. The committed `dist/` trees are exempt from the `generic-api-key` rule only (bundled library code matches it wherever an `apiKey` property is assigned a long unquoted identifier), so `anthropic-api-key` and `manifest-auth-token` still scan the shipped files. The old list's `ci.yml` exclusion is dropped rather than carried over, so `.github/workflows/ci.yml` is scanned by every rule; its smoke-test placeholder is already covered by a value allowlist.
+- **A credential could be sent to the shell's gateway**: When a credential came from `~/.claude.json` (and, within this release, from the plugin's `userConfig`) with no base URL of its own, `createAnthropicClient` handed the SDK an undefined base URL, and the SDK then read the shell's `ANTHROPIC_BASE_URL`. The base URL now always comes from the same source as the credential. An API key without one goes to `https://api.anthropic.com`.
+- **Stale bundle sourcemap no longer shipped**: esbuild overwrote `dist/index.js` without regenerating `dist/index.js.map`, so the committed map described code that no longer existed. The build now removes it; a real bundle map would be about 20.5MB.
+
 ## [1.5.0] - 2026-09-21
 
 This release ships six streams: DRS live enforcement, the vault read API, credential and config-migration fixes, CLI and dashboard consolidation, repo hygiene, and documentation truth with an ESLint baseline gate. The credential and config stream ships Stages 1, 2 and 5 only (the credential-file reader, the config migration and a dead-export cleanup).

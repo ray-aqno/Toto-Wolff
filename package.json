@@ -22,7 +22,9 @@
     "generate:agents-md": "tsx --tsconfig scripts/tsconfig.json scripts/generate-agents-md.ts",
     "generate:claude-md": "tsx --tsconfig scripts/tsconfig.json scripts/generate-claude-md.ts",
     "generate:drs-config": "tsx --tsconfig scripts/tsconfig.json scripts/generate-drs-config.ts",
-    "generate:all": "pnpm generate:agents-md && pnpm generate:claude-md && pnpm generate:drs-config"
+    "generate:all": "pnpm generate:agents-md && pnpm generate:claude-md && pnpm generate:drs-config",
+    "check:dist-sync": "tsx --tsconfig scripts/tsconfig.json scripts/check-dist-sync.ts",
+    "sync:dist": "tsx --tsconfig scripts/tsconfig.json scripts/sync-dist.ts"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

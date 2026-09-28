@@ -20,6 +20,13 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Exceptions: packages/core and packages/mcp-server ship their built dist/ so the
+# plugin can launch via a plain `node` command with no build step at install time
+# (packages/cli's dist/ and any other package's stay ignored: the blanket `dist/`
+# rule above still applies to them)
+!packages/core/dist/
+!packages/mcp-server/dist/
+
 # macOS
 .DS_Store
 

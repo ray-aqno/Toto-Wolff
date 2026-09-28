@@ -1,16 +1,15 @@
 title = "toto-wolff gitleaks config"
 
-paths-ignore = [
-  '''pnpm-lock\.yaml''',
-  '''pnpm-workspace\.yaml''',
-  '''package-lock\.json''',
-  '''yarn\.lock''',
-  '''**/ci\.yml''',
-  '''\.gitleaks\.toml''',
-]
-
+# By direct testing, real path-exclusion key is [allowlist].paths. A top-level paths-ignore would be silently accepted.
 [allowlist]
 description = "Allow example placeholders and test fixtures"
+paths = [
+  '''pnpm-lock\.yaml''', 
+  '''pnpm-workspace\.yaml''', 
+  '''package-lock\.json''',
+  '''yarn\.lock''',
+  '''\.gitleaks\.toml''',
+]
 regexes = [
   '''<YOUR_[A-Z_]+>''',
   '''example-key''',
@@ -56,6 +55,13 @@ description = "Generic API Key assignment"
 regex = '''(?i)(?:api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['""]?([a-zA-Z0-9\-_]{20,})['""]?'''
 tags = ["key", "generic"]
 [rules.allowlist]
+# Bundled third-party code in dist/ matches this rule on identifiers such as
+# `apiKey: azureADTokenProvider`. Exempt dist/ from this rule only, so every
+# other rule (anthropic-api-key, manifest-auth-token) still scans shipped files.
+paths = [
+  '''packages/core/dist/''',
+  '''packages/mcp-server/dist/''',
+]
 regexes = [
   '''process\.env''',
   '''secrets\.''',

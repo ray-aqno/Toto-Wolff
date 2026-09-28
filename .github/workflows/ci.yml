@@ -129,6 +129,15 @@ jobs:
       - name: Check for new ESLint violations against the committed baseline
         run: pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-eslint-baseline.ts
 
+      # Unconditional, not path-filtered to packages/*/src changes: a dependency
+      # or shared tsconfig change can desync the committed dist/ from source
+      # without touching either package's src/ directly, and path-filtering
+      # would silently reproduce the exact staleness bug this check exists to
+      # catch. Reuses the Build step above; check:dist-sync deletes and rebuilds
+      # dist/ itself, so this is a genuinely fresh compile, not a cache hit.
+      - name: Check that committed dist/ matches a fresh rebuild
+        run: pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-dist-sync.ts
+
   check-patterns:
     runs-on: ubuntu-latest
     permissions:
@@ -183,7 +192,7 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.206
 
-      - name: Install the plugin fresh (simulates a real marketplace install, no build step)
+      - name: Install the plugin fresh (simulates a real marketplace install - the committed dist/ is what makes this build-free now)
         run: |
           claude plugin marketplace add "$(pwd)"
           claude plugin install toto-wolff@toto-wolff
@@ -196,26 +205,46 @@ jobs:
             echo "::error::plugin cache directory not found after install — 'claude plugin install' may have changed its cache layout"
             exit 1
           fi
-          if [ -d "$CACHE_DIR/packages/mcp-server/dist" ]; then
-            echo "::error::dist/ exists in the installed cache — this smoke test is meant to run against a build-free install; something built it unexpectedly"
+
+          # (i) Both dist/ trees must exist in the installed cache. Their absence
+          # now means packaging or the .gitignore scoping regressed, not that a
+          # build-free install worked as intended (the old assumption here was the
+          # opposite: this check used to require dist/ NOT exist).
+          if [ ! -d "$CACHE_DIR/packages/core/dist" ] || [ ! -d "$CACHE_DIR/packages/mcp-server/dist" ]; then
+            echo "::error::installed plugin cache is missing committed dist/: packaging or .gitignore scoping regressed"
             exit 1
           fi
 
-          # Read the command directly from the installed manifest — never hand-copy it —
-          # so this test fails the moment plugin.json's launch command drifts from what
-          # actually works, instead of silently testing a stale copy.
+          # (ii) Read command/args directly from the installed manifest, never
+          # hand-copy them, so this test fails the moment plugin.json's launch
+          # command drifts from what actually works, instead of silently testing
+          # a stale copy. jq footgun: a missing key returns the literal string
+          # "null", not an empty string. Check both; a bare -z test alone would
+          # silently pass on a broken manifest.
           COMMAND=$(jq -r '.mcpServers["toto-wolff"].command' "$CACHE_DIR/.claude-plugin/plugin.json")
+          if [ -z "$COMMAND" ] || [ "$COMMAND" = "null" ]; then
+            echo "::error::installed manifest's mcpServers.toto-wolff.command is missing or null"
+            exit 1
+          fi
+          if [ "$COMMAND" != "node" ]; then
+            echo "::error::installed manifest's mcpServers.toto-wolff.command is '$COMMAND', expected 'node': the launch mechanism regressed to a shell wrapper"
+            exit 1
+          fi
           ARGS=()
           while IFS= read -r arg; do
             ARGS+=("$arg")
           done < <(jq -r --arg root "$CACHE_DIR" \
             '.mcpServers["toto-wolff"].args[] | gsub("\\$\\{CLAUDE_PLUGIN_ROOT\\}"; $root)' \
             "$CACHE_DIR/.claude-plugin/plugin.json")
+          RESOLVED_ARGS_PATH="${ARGS[0]:-}"
+          if [ -z "$RESOLVED_ARGS_PATH" ] || [ "$RESOLVED_ARGS_PATH" = "null" ] || [ ! -f "$RESOLVED_ARGS_PATH" ]; then
+            echo "::error::installed manifest's resolved args path ('$RESOLVED_ARGS_PATH') does not exist"
+            exit 1
+          fi
 
-          # No node_modules exists yet either (fresh checkout, no pnpm install step
-          # in this job) — the launch command's first run installs workspace deps
-          # from a cold registry cache before starting the server, so give it real
-          # room before checking whether it's alive.
+          # (iii) Launch using the exact command/args just read, never a
+          # hand-written literal, so this exercises the real installed manifest,
+          # not an assumption about what it says.
           #
           # ANTHROPIC_API_KEY is a placeholder, never a real secret: CouncilService/
           # P10Service construct eagerly at process startup (index.ts top level,
@@ -232,7 +261,46 @@ jobs:
             exit 1
           fi
           kill "$SERVER_PID"
-          echo "Plugin launch smoke test passed: server started and stayed alive from a build-free, dependency-free install."
+          echo "Plugin launch smoke test passed: server started and stayed alive from the manifest's real, installed launch command."
+
+      - name: Confirm Claude Code's own spawn path delivers the credential (userConfig unset, set, and absent)
+        run: |
+          set -euo pipefail
+          # The step above launches with raw node, so it never exercises the
+          # manifest's userConfig-to-env substitution. `claude mcp list` spawns
+          # the server the way Claude Code really does. Claude Code substitutes
+          # an unset optional userConfig value as an empty string, so case 1
+          # fails if a manifest env entry ever overwrites a shell-exported key
+          # again. Case 3 is the negative control: with no credential anywhere
+          # the server must NOT connect, or cases 1 and 2 prove nothing.
+          KEY=sk-ci-smoke-test-placeholder-not-real
+          connected() {
+            local out
+            out=$(TOTO_MCP_PORT=0 timeout 120 claude mcp list 2>&1 || true)
+            echo "$out"
+            echo "$out" | grep -q "plugin:toto-wolff:toto-wolff:.*Connected"
+          }
+
+          # (1) Key exported in the shell, userConfig left unset.
+          if ! ANTHROPIC_API_KEY="$KEY" connected; then
+            echo "::error::server did not connect with a shell-exported key and userConfig unset: an empty userConfig value is shadowing the shell credential"
+            exit 1
+          fi
+
+          # (3) No credential anywhere.
+          if connected; then
+            echo "::error::server connected with no credential configured anywhere, so this check cannot tell a working credential path from a broken one"
+            exit 1
+          fi
+
+          # (2) Key supplied only through userConfig.
+          claude plugin uninstall toto-wolff@toto-wolff
+          claude plugin install toto-wolff@toto-wolff --config anthropic_api_key="$KEY"
+          if ! connected; then
+            echo "::error::server did not connect with the key supplied only through userConfig"
+            exit 1
+          fi
+          echo "Credential spawn-path check passed: shell key survives an unset userConfig, userConfig key works alone, no key fails."
 
   pre-commit-hook-test:
     runs-on: ubuntu-latest

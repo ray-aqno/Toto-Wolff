@@ -258802,11 +258802,7 @@ function createAnthropicClient() {
   const pluginApiKey = nonEmpty(process.env["TOTO_ANTHROPIC_API_KEY"]);
   const pluginAuthToken = nonEmpty(process.env["TOTO_ANTHROPIC_AUTH_TOKEN"]);
   if (pluginApiKey || pluginAuthToken) {
-    return new sdk_default({
-      apiKey: pluginApiKey ?? null,
-      authToken: pluginAuthToken ?? null,
-      baseURL: nonEmpty(process.env["TOTO_ANTHROPIC_BASE_URL"]) ?? DEFAULT_BASE_URL
-    });
+    return buildClient(pluginApiKey, pluginAuthToken, nonEmpty(process.env["TOTO_ANTHROPIC_BASE_URL"]));
   }
   let apiKey = process.env["ANTHROPIC_API_KEY"];
   let authToken = process.env["ANTHROPIC_AUTH_TOKEN"];
@@ -258820,11 +258816,14 @@ function createAnthropicClient() {
     baseURL = fromFile2.baseUrl;
   }
   assert5(typeof apiKey === "string" && apiKey.length > 0 || typeof authToken === "string" && authToken.length > 0, "ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)");
-  return new sdk_default({
-    apiKey: apiKey ?? null,
-    authToken: authToken ?? null,
-    baseURL: baseURL ?? DEFAULT_BASE_URL
-  });
+  return buildClient(nonEmpty(apiKey), nonEmpty(authToken), baseURL);
+}
+function buildClient(apiKey, authToken, baseURL) {
+  if (apiKey) {
+    return new sdk_default({ apiKey, authToken: null, baseURL: baseURL ?? DEFAULT_BASE_URL });
+  }
+  assert5(baseURL, "ANTHROPIC_AUTH_TOKEN is set without a base URL from the same source (plugin userConfig anthropic_base_url, shell ANTHROPIC_BASE_URL, or ~/.claude.json mcpServers.toto-wolff.env); refusing to send a gateway token to the public Anthropic endpoint");
+  return new sdk_default({ apiKey: null, authToken: authToken ?? null, baseURL });
 }
 function nonEmpty(value2) {
   return typeof value2 === "string" && value2.length > 0 ? value2 : void 0;

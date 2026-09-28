@@ -36,17 +36,25 @@ describe('createAnthropicClient — shell environment', () => {
     expect(client).toBeDefined();
   });
 
-  it('constructs with ANTHROPIC_AUTH_TOKEN set', () => {
+  it('constructs with ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL set', () => {
     process.env['ANTHROPIC_AUTH_TOKEN'] = 'bearer-test-456';
+    process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
     const client = createAnthropicClient();
-    expect(client).toBeDefined();
+    expect(client.authToken).toBe('bearer-test-456');
+    expect(client.baseURL).toBe('https://gateway.shell.example');
   });
 
-  it('constructs with both set (no error)', () => {
+  it('rejects a shell token without a shell base URL instead of sending it to the public endpoint', () => {
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'bearer-test-456';
+    assert.throws(() => createAnthropicClient(), /without a base URL from the same source/);
+  });
+
+  it('uses only the API key when both are set, never sending the token', () => {
     process.env['ANTHROPIC_API_KEY'] = 'sk-test-123';
     process.env['ANTHROPIC_AUTH_TOKEN'] = 'bearer-test-456';
     const client = createAnthropicClient();
-    expect(client).toBeDefined();
+    expect(client.apiKey).toBe('sk-test-123');
+    expect(client.authToken).toBeNull();
   });
 
   it('throws when neither credential is set anywhere (env or ~/.claude.json)', () => {
@@ -82,14 +90,22 @@ describe('createAnthropicClient — ~/.claude.json fallback', () => {
     expect(client).toBeDefined();
   });
 
-  it('falls back to ANTHROPIC_AUTH_TOKEN when no env vars are set', () => {
+  it('falls back to ANTHROPIC_AUTH_TOKEN with its file base URL when no env vars are set', () => {
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({
-        mcpServers: { 'toto-wolff': { env: { ANTHROPIC_AUTH_TOKEN: 'bearer-from-file' } } },
+        mcpServers: {
+          'toto-wolff': {
+            env: {
+              ANTHROPIC_AUTH_TOKEN: 'bearer-from-file',
+              ANTHROPIC_BASE_URL: 'https://gateway.file.example',
+            },
+          },
+        },
       }),
     );
     const client = createAnthropicClient();
-    expect(client).toBeDefined();
+    expect(client.authToken).toBe('bearer-from-file');
+    expect(client.baseURL).toBe('https://gateway.file.example');
   });
 });
 
@@ -173,6 +189,7 @@ describe('createAnthropicClient — precedence', () => {
 
   it('prefers env ANTHROPIC_AUTH_TOKEN over file even when API_KEY is unset', () => {
     process.env['ANTHROPIC_AUTH_TOKEN'] = 'token-from-env';
+    process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
     const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({
         mcpServers: { 'toto-wolff': { env: { ANTHROPIC_API_KEY: 'sk-from-file' } } },
@@ -240,16 +257,33 @@ describe('createAnthropicClient: plugin userConfig (TOTO_ANTHROPIC_*)', () => {
     expect(client.baseURL).toBe('https://api.anthropic.com');
   });
 
-  it('never sends a ~/.claude.json credential to a shell base URL', () => {
+  it('never sends a ~/.claude.json key to a shell base URL', () => {
+    process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        mcpServers: { 'toto-wolff': { env: { ANTHROPIC_API_KEY: 'sk-from-file' } } },
+      }),
+    );
+    const client = createAnthropicClient();
+    expect(client.apiKey).toBe('sk-from-file');
+    expect(client.baseURL).toBe('https://api.anthropic.com');
+  });
+
+  it('rejects a ~/.claude.json token without a file base URL, even when the shell has one', () => {
     process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({
         mcpServers: { 'toto-wolff': { env: { ANTHROPIC_AUTH_TOKEN: 'token-from-file' } } },
       }),
     );
-    const client = createAnthropicClient();
-    expect(client.authToken).toBe('token-from-file');
-    expect(client.baseURL).toBe('https://api.anthropic.com');
+    assert.throws(() => createAnthropicClient(), /without a base URL from the same source/);
+  });
+
+  it('rejects a plugin token without a plugin base URL, even when the shell has one', () => {
+    process.env['TOTO_ANTHROPIC_AUTH_TOKEN'] = 'token-from-plugin';
+    process.env['TOTO_ANTHROPIC_BASE_URL'] = '';
+    process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
+    assert.throws(() => createAnthropicClient(), /without a base URL from the same source/);
   });
 
   it('ignores a plugin base URL when the credential comes from the shell', () => {

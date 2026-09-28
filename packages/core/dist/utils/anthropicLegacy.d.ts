@@ -31,9 +31,8 @@ import Anthropic from '@anthropic-ai/sdk';
  *
  * At least one of {API_KEY, AUTH_TOKEN} must be resolved from either source.
  * The base URL always comes from the same tier as the credential, never from
- * another one: a plugin or ~/.claude.json credential with no base URL of its
- * own goes to DEFAULT_BASE_URL, not to a shell ANTHROPIC_BASE_URL, so a
- * credential is never sent to a gateway it was not configured for.
+ * another one, so a credential is never sent to a gateway it was not
+ * configured for. See buildClient for how a tier's values become a client.
  *
  * Credentials are passed explicitly (null disables the SDK's own env lookup)
  * so the assertion below is the single source of truth for required auth.

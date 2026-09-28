@@ -1,1 +1,1 @@
-{"version":3,"file":"anthropicLegacy.d.ts","sourceRoot":"","sources":["../../src/utils/anthropicLegacy.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAEH,OAAO,SAAS,MAAM,mBAAmB,CAAC;AAc1C;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;GAiCG;AACH,wBAAgB,qBAAqB,IAAI,SAAS,CAmCjD"}
+{"version":3,"file":"anthropicLegacy.d.ts","sourceRoot":"","sources":["../../src/utils/anthropicLegacy.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAEH,OAAO,SAAS,MAAM,mBAAmB,CAAC;AAc1C;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;GAgCG;AACH,wBAAgB,qBAAqB,IAAI,SAAS,CA+BjD"}

@@ -12,7 +12,7 @@ import { readClaudeJsonEnv } from './claudeJsonCredentials.js';
 const MCP_KEY = 'toto-wolff';
 
 /**
- * Passed whenever the credential's own source supplies no base URL. The SDK
+ * Used for an API key whose own source supplies no base URL. The SDK
  * treats an undefined baseURL as "read ANTHROPIC_BASE_URL from the
  * environment", which would send a plugin or ~/.claude.json credential to
  * whatever gateway the shell happens to point at.
@@ -45,9 +45,8 @@ const DEFAULT_BASE_URL = 'https://api.anthropic.com';
  *
  * At least one of {API_KEY, AUTH_TOKEN} must be resolved from either source.
  * The base URL always comes from the same tier as the credential, never from
- * another one: a plugin or ~/.claude.json credential with no base URL of its
- * own goes to DEFAULT_BASE_URL, not to a shell ANTHROPIC_BASE_URL, so a
- * credential is never sent to a gateway it was not configured for.
+ * another one, so a credential is never sent to a gateway it was not
+ * configured for. See buildClient for how a tier's values become a client.
  *
  * Credentials are passed explicitly (null disables the SDK's own env lookup)
  * so the assertion below is the single source of truth for required auth.
@@ -57,11 +56,11 @@ export function createAnthropicClient(): Anthropic {
   const pluginApiKey = nonEmpty(process.env['TOTO_ANTHROPIC_API_KEY']);
   const pluginAuthToken = nonEmpty(process.env['TOTO_ANTHROPIC_AUTH_TOKEN']);
   if (pluginApiKey || pluginAuthToken) {
-    return new Anthropic({
-      apiKey: pluginApiKey ?? null,
-      authToken: pluginAuthToken ?? null,
-      baseURL: nonEmpty(process.env['TOTO_ANTHROPIC_BASE_URL']) ?? DEFAULT_BASE_URL,
-    });
+    return buildClient(
+      pluginApiKey,
+      pluginAuthToken,
+      nonEmpty(process.env['TOTO_ANTHROPIC_BASE_URL']),
+    );
   }
 
   let apiKey = process.env['ANTHROPIC_API_KEY'];
@@ -83,11 +82,28 @@ export function createAnthropicClient(): Anthropic {
       (typeof authToken === 'string' && authToken.length > 0),
     'ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)',
   );
-  return new Anthropic({
-    apiKey: apiKey ?? null,
-    authToken: authToken ?? null,
-    baseURL: baseURL ?? DEFAULT_BASE_URL,
-  });
+  return buildClient(nonEmpty(apiKey), nonEmpty(authToken), baseURL);
+}
+
+/**
+ * Builds the client from one tier's values. An API key wins when both are
+ * present, and the token is then not sent at all. A token is a gateway
+ * credential, so it requires a base URL from the same tier: without one the
+ * assertion fails rather than sending the token to DEFAULT_BASE_URL.
+ */
+function buildClient(
+  apiKey: string | undefined,
+  authToken: string | undefined,
+  baseURL: string | undefined,
+): Anthropic {
+  if (apiKey) {
+    return new Anthropic({ apiKey, authToken: null, baseURL: baseURL ?? DEFAULT_BASE_URL });
+  }
+  assert(
+    baseURL,
+    'ANTHROPIC_AUTH_TOKEN is set without a base URL from the same source (plugin userConfig anthropic_base_url, shell ANTHROPIC_BASE_URL, or ~/.claude.json mcpServers.toto-wolff.env); refusing to send a gateway token to the public Anthropic endpoint',
+  );
+  return new Anthropic({ apiKey: null, authToken: authToken ?? null, baseURL });
 }
 
 /** Returns the value if it is a non-empty string, otherwise undefined. */

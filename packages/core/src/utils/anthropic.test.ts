@@ -49,12 +49,35 @@ describe('createAnthropicClient — shell environment', () => {
     assert.throws(() => createAnthropicClient(), /without a base URL from the same source/);
   });
 
-  it('uses only the API key when both are set, never sending the token', () => {
+  it('rejects a shell key and token set together, even with a gateway URL', () => {
     process.env['ANTHROPIC_API_KEY'] = 'sk-test-123';
     process.env['ANTHROPIC_AUTH_TOKEN'] = 'bearer-test-456';
-    const client = createAnthropicClient();
-    expect(client.apiKey).toBe('sk-test-123');
-    expect(client.authToken).toBeNull();
+    process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
+    assert.throws(() => createAnthropicClient(), /both set in the same source/);
+  });
+
+  it('rejects a plugin key and token set together', () => {
+    process.env['TOTO_ANTHROPIC_API_KEY'] = 'sk-from-plugin';
+    process.env['TOTO_ANTHROPIC_AUTH_TOKEN'] = 'token-from-plugin';
+    process.env['TOTO_ANTHROPIC_BASE_URL'] = 'https://gateway.plugin.example';
+    assert.throws(() => createAnthropicClient(), /both set in the same source/);
+  });
+
+  it('rejects a ~/.claude.json key and token set together', () => {
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        mcpServers: {
+          'toto-wolff': {
+            env: {
+              ANTHROPIC_API_KEY: 'sk-from-file',
+              ANTHROPIC_AUTH_TOKEN: 'token-from-file',
+              ANTHROPIC_BASE_URL: 'https://gateway.file.example',
+            },
+          },
+        },
+      }),
+    );
+    assert.throws(() => createAnthropicClient(), /both set in the same source/);
   });
 
   it('throws when neither credential is set anywhere (env or ~/.claude.json)', () => {

@@ -41,9 +41,12 @@ in order and get explicit sign-off before each step marked **confirm**.
      the violations already recorded in `.eslint-baseline.json`. The gate
      fails only on new ones, and it is what CI runs.
    - `pnpm check-patterns`
-   - `pnpm check:dist-sync`, which confirms step 4's committed `dist/` still
-     matches a fresh rebuild; if it doesn't, re-run `pnpm sync:dist` and
-     re-review before continuing
+   - `pnpm check:dist-sync`, run after the release commit (including
+     step 4's staged `dist/`) is committed. It treats any uncommitted change
+     under `dist/`, staged or not, as drift, so it fails if run between
+     `pnpm sync:dist` and the commit even when the output is correct. If it
+     fails after the commit, re-run `pnpm sync:dist`, review, and amend or
+     add a commit before continuing.
 
 6. **Push the release commit** (**confirm**). Watch CI to green, including
    the `plugin-launch-smoke-test` and `check:dist-sync` jobs. Read Greptile's
@@ -51,7 +54,10 @@ in order and get explicit sign-off before each step marked **confirm**.
 
 7. **Run `/cabinet "<release description>" vX.Y.Z`** (**confirm**). All three
    seats (Garry Tan, Richard Feynman, Andrej Karpathy) must vote to ship.
-   - **SHIP or CONDITIONAL**: proceed to step 8.
+   - **SHIP**: proceed to step 8.
+   - **CONDITIONAL**: meet every listed condition first, check each one off
+     in the Cabinet record with the commit that meets it, and get CI green on
+     that commit. Only then proceed to step 8.
    - **BLOCK**: a seat named a specific release-critical defect. Fix it,
      re-run the Karpathy check against the affected stage, and re-convene
      Cabinet on the fix before proceeding.

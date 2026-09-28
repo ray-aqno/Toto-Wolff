@@ -310,7 +310,7 @@ Resolution order (see `packages/core/src/utils/anthropic.ts`):
 2. `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the shell environment Claude Code was launched from.
 3. Falls back to `~/.claude.json`'s `mcpServers.toto-wolff.env`: the manual-wiring path below still works even after a marketplace install, since this is a plain file read, independent of how the server was launched.
 
-Whichever source wins supplies the base URL too; a URL from one source never pairs with a credential from another. An API key with no URL of its own goes to `https://api.anthropic.com`. An auth token is a gateway credential, so a token without a URL from the same source fails the startup check instead of being sent to the public endpoint. If a source has both a key and a token, only the key is sent.
+Whichever source wins supplies the base URL too; a URL from one source never pairs with a credential from another. An API key with no URL of its own goes to `https://api.anthropic.com`. An auth token is a gateway credential, so a token without a URL from the same source fails the startup check instead of being sent to the public endpoint. A source that sets both a key and a token also fails the startup check, since its base URL could belong to either credential.
 
 Manual wiring (fallback path), never committing a real token to this repo:
 

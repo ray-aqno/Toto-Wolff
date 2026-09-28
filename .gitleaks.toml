@@ -8,8 +8,7 @@ paths = [
   '''pnpm-workspace\.yaml''', 
   '''package-lock\.json''',
   '''yarn\.lock''',
-  '''.*ci\.yml''', 
-  '''\.gitleaks\.toml''', 
+  '''\.gitleaks\.toml''',
 ]
 regexes = [
   '''<YOUR_[A-Z_]+>''',

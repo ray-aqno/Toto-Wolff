@@ -165,6 +165,23 @@ describe('createAnthropicClient: plugin userConfig (TOTO_ANTHROPIC_*)', () => {
         expect(client.apiKey).toBeNull();
         expect(client.baseURL).toBe('https://gateway.plugin.example');
     });
+    it('never sends a plugin credential to a shell base URL when the plugin URL is empty', () => {
+        process.env['TOTO_ANTHROPIC_API_KEY'] = 'sk-from-plugin';
+        process.env['TOTO_ANTHROPIC_BASE_URL'] = '';
+        process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
+        const client = createAnthropicClient();
+        expect(client.apiKey).toBe('sk-from-plugin');
+        expect(client.baseURL).toBe('https://api.anthropic.com');
+    });
+    it('never sends a ~/.claude.json credential to a shell base URL', () => {
+        process.env['ANTHROPIC_BASE_URL'] = 'https://gateway.shell.example';
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify({
+            mcpServers: { 'toto-wolff': { env: { ANTHROPIC_AUTH_TOKEN: 'token-from-file' } } },
+        }));
+        const client = createAnthropicClient();
+        expect(client.authToken).toBe('token-from-file');
+        expect(client.baseURL).toBe('https://api.anthropic.com');
+    });
     it('ignores a plugin base URL when the credential comes from the shell', () => {
         process.env['TOTO_ANTHROPIC_BASE_URL'] = 'https://gateway.plugin.example';
         process.env['ANTHROPIC_API_KEY'] = 'sk-from-shell';

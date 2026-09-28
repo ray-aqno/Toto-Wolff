@@ -258797,6 +258797,7 @@ function readClaudeJsonEnv(mcpKey) {
 
 // ../core/dist/utils/anthropicLegacy.js
 var MCP_KEY = "toto-wolff";
+var DEFAULT_BASE_URL = "https://api.anthropic.com";
 function createAnthropicClient() {
   const pluginApiKey = nonEmpty(process.env["TOTO_ANTHROPIC_API_KEY"]);
   const pluginAuthToken = nonEmpty(process.env["TOTO_ANTHROPIC_AUTH_TOKEN"]);
@@ -258804,22 +258805,26 @@ function createAnthropicClient() {
     return new sdk_default({
       apiKey: pluginApiKey ?? null,
       authToken: pluginAuthToken ?? null,
-      baseURL: nonEmpty(process.env["TOTO_ANTHROPIC_BASE_URL"])
+      baseURL: nonEmpty(process.env["TOTO_ANTHROPIC_BASE_URL"]) ?? DEFAULT_BASE_URL
     });
   }
   let apiKey = process.env["ANTHROPIC_API_KEY"];
   let authToken = process.env["ANTHROPIC_AUTH_TOKEN"];
-  let baseURL = process.env["ANTHROPIC_BASE_URL"];
+  let baseURL = nonEmpty(process.env["ANTHROPIC_BASE_URL"]);
   const haveEnvApiKey = typeof apiKey === "string" && apiKey.length > 0;
   const haveEnvAuthToken = typeof authToken === "string" && authToken.length > 0;
   if (!haveEnvApiKey && !haveEnvAuthToken) {
     const fromFile2 = readClaudeJsonEnv(MCP_KEY);
     apiKey = fromFile2.apiKey;
     authToken = fromFile2.authToken;
-    baseURL = fromFile2.baseUrl ?? baseURL;
+    baseURL = fromFile2.baseUrl;
   }
   assert5(typeof apiKey === "string" && apiKey.length > 0 || typeof authToken === "string" && authToken.length > 0, "ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)");
-  return new sdk_default({ apiKey: apiKey ?? null, authToken: authToken ?? null, baseURL });
+  return new sdk_default({
+    apiKey: apiKey ?? null,
+    authToken: authToken ?? null,
+    baseURL: baseURL ?? DEFAULT_BASE_URL
+  });
 }
 function nonEmpty(value2) {
   return typeof value2 === "string" && value2.length > 0 ? value2 : void 0;

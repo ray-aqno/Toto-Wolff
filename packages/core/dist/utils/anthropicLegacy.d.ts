@@ -30,11 +30,10 @@ import Anthropic from '@anthropic-ai/sdk';
  *      construction (not per-request), so it does not sit on any hot path.
  *
  * At least one of {API_KEY, AUTH_TOKEN} must be resolved from either source.
- * ANTHROPIC_BASE_URL follows the same resolution: the environment wins, and
- * the file's baseUrl is used only when credentials themselves fell back to
- * the file — so a proxy's token and its own base URL travel together instead
- * of a stray env ANTHROPIC_BASE_URL pointing a file-sourced token at the
- * wrong endpoint.
+ * The base URL always comes from the same tier as the credential, never from
+ * another one: a plugin or ~/.claude.json credential with no base URL of its
+ * own goes to DEFAULT_BASE_URL, not to a shell ANTHROPIC_BASE_URL, so a
+ * credential is never sent to a gateway it was not configured for.
  *
  * Credentials are passed explicitly (null disables the SDK's own env lookup)
  * so the assertion below is the single source of truth for required auth.

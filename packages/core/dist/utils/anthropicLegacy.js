@@ -9,6 +9,13 @@ import assert from 'node:assert';
 import { readClaudeJsonEnv } from './claudeJsonCredentials.js';
 const MCP_KEY = 'toto-wolff';
 /**
+ * Passed whenever the credential's own source supplies no base URL. The SDK
+ * treats an undefined baseURL as "read ANTHROPIC_BASE_URL from the
+ * environment", which would send a plugin or ~/.claude.json credential to
+ * whatever gateway the shell happens to point at.
+ */
+const DEFAULT_BASE_URL = 'https://api.anthropic.com';
+/**
  * Construct the Anthropic client from environment, accepting either auth scheme,
  * falling back to ~/.claude.json's mcpServers.toto-wolff.env when neither is set
  * in the shell environment (mirrors the `toto doctor` CLI check — see
@@ -33,11 +40,10 @@ const MCP_KEY = 'toto-wolff';
  *      construction (not per-request), so it does not sit on any hot path.
  *
  * At least one of {API_KEY, AUTH_TOKEN} must be resolved from either source.
- * ANTHROPIC_BASE_URL follows the same resolution: the environment wins, and
- * the file's baseUrl is used only when credentials themselves fell back to
- * the file — so a proxy's token and its own base URL travel together instead
- * of a stray env ANTHROPIC_BASE_URL pointing a file-sourced token at the
- * wrong endpoint.
+ * The base URL always comes from the same tier as the credential, never from
+ * another one: a plugin or ~/.claude.json credential with no base URL of its
+ * own goes to DEFAULT_BASE_URL, not to a shell ANTHROPIC_BASE_URL, so a
+ * credential is never sent to a gateway it was not configured for.
  *
  * Credentials are passed explicitly (null disables the SDK's own env lookup)
  * so the assertion below is the single source of truth for required auth.
@@ -50,23 +56,27 @@ export function createAnthropicClient() {
         return new Anthropic({
             apiKey: pluginApiKey ?? null,
             authToken: pluginAuthToken ?? null,
-            baseURL: nonEmpty(process.env['TOTO_ANTHROPIC_BASE_URL']),
+            baseURL: nonEmpty(process.env['TOTO_ANTHROPIC_BASE_URL']) ?? DEFAULT_BASE_URL,
         });
     }
     let apiKey = process.env['ANTHROPIC_API_KEY'];
     let authToken = process.env['ANTHROPIC_AUTH_TOKEN'];
-    let baseURL = process.env['ANTHROPIC_BASE_URL'];
+    let baseURL = nonEmpty(process.env['ANTHROPIC_BASE_URL']);
     const haveEnvApiKey = typeof apiKey === 'string' && apiKey.length > 0;
     const haveEnvAuthToken = typeof authToken === 'string' && authToken.length > 0;
     if (!haveEnvApiKey && !haveEnvAuthToken) {
         const fromFile = readClaudeJsonEnv(MCP_KEY);
         apiKey = fromFile.apiKey;
         authToken = fromFile.authToken;
-        baseURL = fromFile.baseUrl ?? baseURL;
+        baseURL = fromFile.baseUrl;
     }
     assert((typeof apiKey === 'string' && apiKey.length > 0) ||
         (typeof authToken === 'string' && authToken.length > 0), 'ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)');
-    return new Anthropic({ apiKey: apiKey ?? null, authToken: authToken ?? null, baseURL });
+    return new Anthropic({
+        apiKey: apiKey ?? null,
+        authToken: authToken ?? null,
+        baseURL: baseURL ?? DEFAULT_BASE_URL,
+    });
 }
 /** Returns the value if it is a non-empty string, otherwise undefined. */
 function nonEmpty(value) {

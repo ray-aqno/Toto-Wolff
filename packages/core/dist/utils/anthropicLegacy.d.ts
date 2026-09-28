@@ -17,8 +17,13 @@ import Anthropic from '@anthropic-ai/sdk';
  *   2. ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL — Bearer token routed through a
  *      proxy (e.g. a self-hosted gateway or org-internal relay).
  *
- * Resolution order (env wins over file; an empty-string/unset env var does NOT
- * short-circuit the file fallback):
+ * Resolution order (an empty-string/unset var never short-circuits the next tier):
+ *   0. TOTO_ANTHROPIC_API_KEY / TOTO_ANTHROPIC_AUTH_TOKEN / TOTO_ANTHROPIC_BASE_URL,
+ *      which .claude-plugin/plugin.json fills from the plugin's userConfig. They
+ *      use their own names because Claude Code substitutes an unset optional
+ *      userConfig value as an empty string, and an env entry named
+ *      ANTHROPIC_API_KEY would overwrite a key the user exported in their shell.
+ *      The base URL here pairs only with a credential from this same tier.
  *   1. process.env — used if at least one of the two vars is a non-empty string.
  *   2. ~/.claude.json mcpServers.toto-wolff.env — checked only when neither env
  *      var above resolved. This is a one-time synchronous file read at client

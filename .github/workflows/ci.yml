@@ -263,6 +263,45 @@ jobs:
           kill "$SERVER_PID"
           echo "Plugin launch smoke test passed: server started and stayed alive from the manifest's real, installed launch command."
 
+      - name: Confirm Claude Code's own spawn path delivers the credential (userConfig unset, set, and absent)
+        run: |
+          set -euo pipefail
+          # The step above launches with raw node, so it never exercises the
+          # manifest's userConfig-to-env substitution. `claude mcp list` spawns
+          # the server the way Claude Code really does. Claude Code substitutes
+          # an unset optional userConfig value as an empty string, so case 1
+          # fails if a manifest env entry ever overwrites a shell-exported key
+          # again. Case 3 is the negative control: with no credential anywhere
+          # the server must NOT connect, or cases 1 and 2 prove nothing.
+          KEY=sk-ci-smoke-test-placeholder-not-real
+          connected() {
+            local out
+            out=$(TOTO_MCP_PORT=0 timeout 120 claude mcp list 2>&1 || true)
+            echo "$out"
+            echo "$out" | grep -q "plugin:toto-wolff:toto-wolff:.*Connected"
+          }
+
+          # (1) Key exported in the shell, userConfig left unset.
+          if ! ANTHROPIC_API_KEY="$KEY" connected; then
+            echo "::error::server did not connect with a shell-exported key and userConfig unset: an empty userConfig value is shadowing the shell credential"
+            exit 1
+          fi
+
+          # (3) No credential anywhere.
+          if connected; then
+            echo "::error::server connected with no credential configured anywhere, so this check cannot tell a working credential path from a broken one"
+            exit 1
+          fi
+
+          # (2) Key supplied only through userConfig.
+          claude plugin uninstall toto-wolff@toto-wolff
+          claude plugin install toto-wolff@toto-wolff --config anthropic_api_key="$KEY"
+          if ! connected; then
+            echo "::error::server did not connect with the key supplied only through userConfig"
+            exit 1
+          fi
+          echo "Credential spawn-path check passed: shell key survives an unset userConfig, userConfig key works alone, no key fails."
+
   pre-commit-hook-test:
     runs-on: ubuntu-latest
     permissions:

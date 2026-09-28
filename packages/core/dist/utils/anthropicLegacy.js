@@ -20,8 +20,13 @@ const MCP_KEY = 'toto-wolff';
  *   2. ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL — Bearer token routed through a
  *      proxy (e.g. a self-hosted gateway or org-internal relay).
  *
- * Resolution order (env wins over file; an empty-string/unset env var does NOT
- * short-circuit the file fallback):
+ * Resolution order (an empty-string/unset var never short-circuits the next tier):
+ *   0. TOTO_ANTHROPIC_API_KEY / TOTO_ANTHROPIC_AUTH_TOKEN / TOTO_ANTHROPIC_BASE_URL,
+ *      which .claude-plugin/plugin.json fills from the plugin's userConfig. They
+ *      use their own names because Claude Code substitutes an unset optional
+ *      userConfig value as an empty string, and an env entry named
+ *      ANTHROPIC_API_KEY would overwrite a key the user exported in their shell.
+ *      The base URL here pairs only with a credential from this same tier.
  *   1. process.env — used if at least one of the two vars is a non-empty string.
  *   2. ~/.claude.json mcpServers.toto-wolff.env — checked only when neither env
  *      var above resolved. This is a one-time synchronous file read at client
@@ -39,6 +44,15 @@ const MCP_KEY = 'toto-wolff';
  * Neither credential is ever logged or reflected in error messages.
  */
 export function createAnthropicClient() {
+    const pluginApiKey = nonEmpty(process.env['TOTO_ANTHROPIC_API_KEY']);
+    const pluginAuthToken = nonEmpty(process.env['TOTO_ANTHROPIC_AUTH_TOKEN']);
+    if (pluginApiKey || pluginAuthToken) {
+        return new Anthropic({
+            apiKey: pluginApiKey ?? null,
+            authToken: pluginAuthToken ?? null,
+            baseURL: nonEmpty(process.env['TOTO_ANTHROPIC_BASE_URL']),
+        });
+    }
     let apiKey = process.env['ANTHROPIC_API_KEY'];
     let authToken = process.env['ANTHROPIC_AUTH_TOKEN'];
     let baseURL = process.env['ANTHROPIC_BASE_URL'];
@@ -51,7 +65,11 @@ export function createAnthropicClient() {
         baseURL = fromFile.baseUrl ?? baseURL;
     }
     assert((typeof apiKey === 'string' && apiKey.length > 0) ||
-        (typeof authToken === 'string' && authToken.length > 0), 'ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked shell environment and ~/.claude.json mcpServers.toto-wolff.env)');
+        (typeof authToken === 'string' && authToken.length > 0), 'ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)');
     return new Anthropic({ apiKey: apiKey ?? null, authToken: authToken ?? null, baseURL });
+}
+/** Returns the value if it is a non-empty string, otherwise undefined. */
+function nonEmpty(value) {
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 //# sourceMappingURL=anthropicLegacy.js.map

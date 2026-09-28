@@ -26,9 +26,9 @@
         "${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js"
       ],
       "env": {
-        "ANTHROPIC_API_KEY": "${user_config.anthropic_api_key}",
-        "ANTHROPIC_AUTH_TOKEN": "${user_config.anthropic_auth_token}",
-        "ANTHROPIC_BASE_URL": "${user_config.anthropic_base_url}"
+        "TOTO_ANTHROPIC_API_KEY": "${user_config.anthropic_api_key}",
+        "TOTO_ANTHROPIC_AUTH_TOKEN": "${user_config.anthropic_auth_token}",
+        "TOTO_ANTHROPIC_BASE_URL": "${user_config.anthropic_base_url}"
       }
     }
   },

@@ -18,7 +18,7 @@ claude plugin marketplace add ray-aqno/Toto-Wolff
 claude plugin install toto-wolff@toto-wolff
 ```
 
-Export `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) in your shell before launching Claude Code — the plugin has no mechanism to prompt for or store a credential itself, so this is the one manual step. See [Credentials](CLAUDE.md#credentials-required) for the fallback if you'd rather wire it into `~/.claude.json` instead.
+Then give the MCP server a credential, in either of two ways: run `/plugin configure toto-wolff@toto-wolff` inside Claude Code (the key is masked and kept in Claude Code's secure credential store), or export `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN` plus `ANTHROPIC_BASE_URL`) in your shell before launching Claude Code. A value set through `/plugin configure` wins over the shell. See [Credentials](CLAUDE.md#credentials-required) for the `~/.claude.json` fallback.
 
 The MCP server constructs its five model-backed services (and asserts on a missing credential) at process startup, before any tool is registered, so a missing credential takes down the whole server: every MCP tool it exposes, including non-model ones like `vault_write` and `drs_check`, not just the five that call a model. The `/council`, `/p10`, `/cabinet`, `/safety-car`, and `/karpathy` slash commands are unaffected either way: they run as Claude Code subagents, not through this MCP server, riding on whatever account you're already logged into Claude Code with, no separate credential and no separate cost. If you only plan to use the slash commands, skip this step; if you want any `toto-wolff` MCP tool at all, you need it.
 

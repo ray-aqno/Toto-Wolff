@@ -258798,6 +258798,15 @@ function readClaudeJsonEnv(mcpKey) {
 // ../core/dist/utils/anthropicLegacy.js
 var MCP_KEY = "toto-wolff";
 function createAnthropicClient() {
+  const pluginApiKey = nonEmpty(process.env["TOTO_ANTHROPIC_API_KEY"]);
+  const pluginAuthToken = nonEmpty(process.env["TOTO_ANTHROPIC_AUTH_TOKEN"]);
+  if (pluginApiKey || pluginAuthToken) {
+    return new sdk_default({
+      apiKey: pluginApiKey ?? null,
+      authToken: pluginAuthToken ?? null,
+      baseURL: nonEmpty(process.env["TOTO_ANTHROPIC_BASE_URL"])
+    });
+  }
   let apiKey = process.env["ANTHROPIC_API_KEY"];
   let authToken = process.env["ANTHROPIC_AUTH_TOKEN"];
   let baseURL = process.env["ANTHROPIC_BASE_URL"];
@@ -258809,8 +258818,11 @@ function createAnthropicClient() {
     authToken = fromFile2.authToken;
     baseURL = fromFile2.baseUrl ?? baseURL;
   }
-  assert5(typeof apiKey === "string" && apiKey.length > 0 || typeof authToken === "string" && authToken.length > 0, "ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked shell environment and ~/.claude.json mcpServers.toto-wolff.env)");
+  assert5(typeof apiKey === "string" && apiKey.length > 0 || typeof authToken === "string" && authToken.length > 0, "ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)");
   return new sdk_default({ apiKey: apiKey ?? null, authToken: authToken ?? null, baseURL });
+}
+function nonEmpty(value2) {
+  return typeof value2 === "string" && value2.length > 0 ? value2 : void 0;
 }
 
 // ../core/dist/utils/timeout.js

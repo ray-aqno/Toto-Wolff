@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-Plugin autopublish readiness: the marketplace plugin now declares its credential and launches with plain `node` instead of a shell script that builds at launch time, the pattern the plugin directory's automated review holds for a human reviewer.
+## [1.6.0] - 2026-09-28
+
+Plugin autopublish readiness: the marketplace plugin now declares its credential and launches with plain `node` instead of a shell script that builds at launch time, the pattern the plugin directory's automated review holds for a human reviewer. One configuration change is breaking: an auth token without a base URL from the same source now stops the MCP server at startup (see Changed, and the README's "Upgrading to 1.6.0" note).
 
 ### Added
 - **Credential declared via `userConfig`**: `.claude-plugin/plugin.json` declares three optional options, `anthropic_api_key`, `anthropic_auth_token` (both `sensitive`) and `anthropic_base_url`, set with `/plugin configure toto-wolff@toto-wolff` or `claude plugin install ... --config KEY=VALUE`. They reach the server as `TOTO_ANTHROPIC_API_KEY`, `TOTO_ANTHROPIC_AUTH_TOKEN` and `TOTO_ANTHROPIC_BASE_URL`, not the standard names: Claude Code passes an unset optional value as an empty string, which under the standard names would overwrite a key exported in the shell and crash the server at startup. `createAnthropicClient` now checks, in order: the `TOTO_*` values (non-empty only, and a plugin base URL pairs only with a plugin credential), the shell's `ANTHROPIC_*` variables, then `~/.claude.json`.

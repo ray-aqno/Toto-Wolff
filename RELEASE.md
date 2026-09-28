@@ -36,8 +36,10 @@ in order and get explicit sign-off before each step marked **confirm**.
    - `pnpm typecheck`
    - `pnpm test`
    - `pnpm -r test`
-   - `pnpm lint`
-   - the lint-baseline gate: `pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-eslint-baseline.ts`
+   - the lint-baseline gate: `pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-eslint-baseline.ts`.
+     Don't use raw `pnpm lint` as the pass/fail signal: it exits non-zero on
+     the violations already recorded in `.eslint-baseline.json`. The gate
+     fails only on new ones, and it is what CI runs.
    - `pnpm check-patterns`
    - `pnpm check:dist-sync`, which confirms step 4's committed `dist/` still
      matches a fresh rebuild; if it doesn't, re-run `pnpm sync:dist` and

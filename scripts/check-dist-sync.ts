@@ -132,6 +132,7 @@ export function rebuildPackage(pkg: PackageName): { ok: true } | { ok: false; me
   return { ok: true };
 }
 
+/** Rebuilds every package in PACKAGES, in array order, stopping at the first failure - relies on that order already being core-then-mcp-server (see PACKAGES above), does not enforce it itself. */
 export function runRebuild(): { ok: true } | { ok: false; message: string } {
   for (const pkg of PACKAGES) {
     const result = rebuildPackage(pkg);

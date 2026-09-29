@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **`strangler-pattern-guide` no longer ships in the plugin**: the plugin directory's review held the plugin because that skill's sample C# token handling, read together with a PowerShell `Invoke-RestMethod` call in its reference material, looks like a credential leaving the machine in two steps. It is a .NET migration guide rather than a governance skill, so it is removed from `plugin.json`'s `skills` list. It stays in the repository under `.claude/skills/` and still works as a project skill when working in this repo.
+
 ### Fixed
 - **Bundled MCP server was too large for the plugin directory**: `packages/mcp-server/dist/index.js` was 12.86 MiB, over the directory's 5 MiB per-file limit, so submission failed with "A file is too large". Almost all of it came from one import: `SubagentService` used `getAgentDir()` from `@earendil-works/pi-coding-agent`, which pulled that package's whole multi-provider AI stack (Mistral, Google, OpenAI SDKs, a runtime TypeScript loader, a syntax highlighter) into the bundle. `getPiAgentDir()` in `SubagentService.ts` now implements the same lookup: `$PI_CODING_AGENT_DIR` if set (a bare `~`, a leading `~/`, or `~\` on Windows expands to the home directory, and a `file://` URL becomes a path), otherwise `~/.pi/agent`. On Linux its output matches the original's on ten inputs, including `file://` URLs, spaces and a trailing slash; the Windows `~\` branch mirrors the original's code and is unit-tested but was not compared against it on Windows. The dependency is removed and the bundle is now 1.35 MiB.
 

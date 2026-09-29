@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "toto-wolff",
-      "source": "./",
+      "source": "./plugin",
       "description": "MCP server, skills, and vault tooling for AI-governed engineering: /council deliberation, /p10 pre-execution plans, /cabinet release gates.",
       "category": "productivity"
     }

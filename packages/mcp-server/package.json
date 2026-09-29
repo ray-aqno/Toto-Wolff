@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && esbuild dist/index.js --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __totoCreateRequire } from 'node:module'; const require = __totoCreateRequire(import.meta.url);\" --outfile=dist/index.js --allow-overwrite && rm -f dist/index.js.map",
+    "build": "tsc -p tsconfig.json && esbuild dist/index.js --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __totoCreateRequire } from 'node:module'; const require = __totoCreateRequire(import.meta.url);\" --minify --outfile=../../plugin/server/index.mjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

@@ -51,12 +51,12 @@ description = "Generic API Key assignment"
 regex = '''(?i)(?:api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['""]?([a-zA-Z0-9\-_]{20,})['""]?'''
 tags = ["key", "generic"]
 [rules.allowlist]
-# Bundled third-party code in dist/ matches this rule on identifiers such as
-# `apiKey: azureADTokenProvider`. Exempt dist/ from this rule only, so every
-# other rule (anthropic-api-key, manifest-auth-token) still scans shipped files.
+# Bundled third-party code in the plugin's MCP server bundle matches this rule
+# on identifiers assigned to an apiKey property. Exempt that one file from
+# this rule only, so every other rule (anthropic-api-key, manifest-auth-token)
+# still scans the shipped bundle.
 paths = [
-  '''packages/core/dist/''',
-  '''packages/mcp-server/dist/''',
+  '''^plugin/server/index\.mjs$''',
 ]
 regexes = [
   '''process\.env''',

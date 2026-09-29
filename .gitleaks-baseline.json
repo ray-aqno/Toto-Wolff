@@ -44,5 +44,74 @@
   ],
   "RuleID": "generic-api-key",
   "Fingerprint": "c60a3ed66175c2f3c64fb858f32605c9059187d6:.github/workflows/ci.yml:generic-api-key:200"
+ },
+ {
+  "Description": "Generic API Key assignment",
+  "StartLine": 51788,
+  "EndLine": 51788,
+  "StartColumn": 12,
+  "EndColumn": 39,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": "packages/mcp-server/dist/index.js",
+  "SymlinkFile": "",
+  "Commit": "d3f51291417d4571448828fda2d6fd7dc7a900af",
+  "Entropy": 4.1375375,
+  "Author": "Rayyan Aquino",
+  "Email": "rayyan.aquino26@gmail.com",
+  "Date": "2026-09-27T23:23:11Z",
+  "Message": "fix(mcp-server): bundle dist/index.js with esbuild so a fresh install needs no node_modules\n\nCI caught a real defect that three review passes (two P10 Arbiter\npasses, one Safety Car adversarial review) all missed: committing\nplain tsc output was never sufficient for a build-free launch. tsc\ntranspiles, it doesn't bundle - dist/index.js still had bare-specifier\nimports (@modelcontextprotocol/sdk, @anthropic-ai/sdk,\n@earendil-works/pi-coding-agent, @toto-wolff/core). A genuinely fresh\ninstall (CI's git clone, no node_modules) threw ERR_MODULE_NOT_FOUND\non launch. Local \"verified end-to-end\" testing earlier in this PR's\nhistory reused this dev worktree's own already-installed\nnode_modules, which masked exactly this failure mode.\n\npackages/mcp-server's build script now runs esbuild --bundle\n--platform=node --format=esm --allow-overwrite on the tsc output,\nin place, with a createRequire banner (the standard fix for\nnode-fetch, a transitive dep of pi-coding-agent, calling require()\nin a way the ESM-output shim can't statically convert - verified by\nreproducing the exact failure without the banner first, then\nconfirming it's gone with it).\n\nVerified by direct execution, not just re-running CI locally: copied\nthe resulting dist/index.js alone into an empty directory with zero\nnode_modules anywhere on its path, launched it with the same\nplaceholder-credential/TOTO_MCP_PORT=0 conditions the CI smoke test\nuses, confirmed it boots and stays alive. Confirmed determinism\n(three independent rebuilds, byte-identical). packages/core/dist is\nunchanged - unbundled, since core is never launched directly, only\nimported by mcp-server's new bundle and by packages/cli (a local dev\ntool, not part of the plugin's declared runtime surface).\n\nKnown, non-blocking, deliberately deferred: committed\npackages/mcp-server/dist/ still also contains ~18 individually\ntsc-compiled .test.js files (importing vitest) alongside the new\nbundle, dead weight now, pre-existing since Stage 1, not introduced\nhere. Out of scope for this fix (touches the shared composite\nproject-reference graph); flagged for a follow-up.\n\nFindings recorded: Safety-Car/2026-09-27-plugin-deployment-infra-redesign.md\n(new \"F11\" section), P10-Plans/2026-09-27-plugin-deployment-infra-redesign.md\nexecution log.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015KziG5wi1Waa2vs32zyp8D",
+  "Tags": [
+   "key",
+   "generic"
+  ],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "d3f51291417d4571448828fda2d6fd7dc7a900af:packages/mcp-server/dist/index.js:generic-api-key:51788"
+ },
+ {
+  "Description": "Generic API Key assignment",
+  "StartLine": 270187,
+  "EndLine": 270187,
+  "StartColumn": 14,
+  "EndColumn": 44,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": "packages/mcp-server/dist/index.js",
+  "SymlinkFile": "",
+  "Commit": "d3f51291417d4571448828fda2d6fd7dc7a900af",
+  "Entropy": 4.2201676,
+  "Author": "Rayyan Aquino",
+  "Email": "rayyan.aquino26@gmail.com",
+  "Date": "2026-09-27T23:23:11Z",
+  "Message": "fix(mcp-server): bundle dist/index.js with esbuild so a fresh install needs no node_modules\n\nCI caught a real defect that three review passes (two P10 Arbiter\npasses, one Safety Car adversarial review) all missed: committing\nplain tsc output was never sufficient for a build-free launch. tsc\ntranspiles, it doesn't bundle - dist/index.js still had bare-specifier\nimports (@modelcontextprotocol/sdk, @anthropic-ai/sdk,\n@earendil-works/pi-coding-agent, @toto-wolff/core). A genuinely fresh\ninstall (CI's git clone, no node_modules) threw ERR_MODULE_NOT_FOUND\non launch. Local \"verified end-to-end\" testing earlier in this PR's\nhistory reused this dev worktree's own already-installed\nnode_modules, which masked exactly this failure mode.\n\npackages/mcp-server's build script now runs esbuild --bundle\n--platform=node --format=esm --allow-overwrite on the tsc output,\nin place, with a createRequire banner (the standard fix for\nnode-fetch, a transitive dep of pi-coding-agent, calling require()\nin a way the ESM-output shim can't statically convert - verified by\nreproducing the exact failure without the banner first, then\nconfirming it's gone with it).\n\nVerified by direct execution, not just re-running CI locally: copied\nthe resulting dist/index.js alone into an empty directory with zero\nnode_modules anywhere on its path, launched it with the same\nplaceholder-credential/TOTO_MCP_PORT=0 conditions the CI smoke test\nuses, confirmed it boots and stays alive. Confirmed determinism\n(three independent rebuilds, byte-identical). packages/core/dist is\nunchanged - unbundled, since core is never launched directly, only\nimported by mcp-server's new bundle and by packages/cli (a local dev\ntool, not part of the plugin's declared runtime surface).\n\nKnown, non-blocking, deliberately deferred: committed\npackages/mcp-server/dist/ still also contains ~18 individually\ntsc-compiled .test.js files (importing vitest) alongside the new\nbundle, dead weight now, pre-existing since Stage 1, not introduced\nhere. Out of scope for this fix (touches the shared composite\nproject-reference graph); flagged for a follow-up.\n\nFindings recorded: Safety-Car/2026-09-27-plugin-deployment-infra-redesign.md\n(new \"F11\" section), P10-Plans/2026-09-27-plugin-deployment-infra-redesign.md\nexecution log.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015KziG5wi1Waa2vs32zyp8D",
+  "Tags": [
+   "key",
+   "generic"
+  ],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "d3f51291417d4571448828fda2d6fd7dc7a900af:packages/mcp-server/dist/index.js:generic-api-key:270187"
+ },
+ {
+  "Description": "Generic API Key assignment",
+  "StartLine": 270203,
+  "EndLine": 270203,
+  "StartColumn": 14,
+  "EndColumn": 44,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": "packages/mcp-server/dist/index.js",
+  "SymlinkFile": "",
+  "Commit": "d3f51291417d4571448828fda2d6fd7dc7a900af",
+  "Entropy": 4.3248487,
+  "Author": "Rayyan Aquino",
+  "Email": "rayyan.aquino26@gmail.com",
+  "Date": "2026-09-27T23:23:11Z",
+  "Message": "fix(mcp-server): bundle dist/index.js with esbuild so a fresh install needs no node_modules\n\nCI caught a real defect that three review passes (two P10 Arbiter\npasses, one Safety Car adversarial review) all missed: committing\nplain tsc output was never sufficient for a build-free launch. tsc\ntranspiles, it doesn't bundle - dist/index.js still had bare-specifier\nimports (@modelcontextprotocol/sdk, @anthropic-ai/sdk,\n@earendil-works/pi-coding-agent, @toto-wolff/core). A genuinely fresh\ninstall (CI's git clone, no node_modules) threw ERR_MODULE_NOT_FOUND\non launch. Local \"verified end-to-end\" testing earlier in this PR's\nhistory reused this dev worktree's own already-installed\nnode_modules, which masked exactly this failure mode.\n\npackages/mcp-server's build script now runs esbuild --bundle\n--platform=node --format=esm --allow-overwrite on the tsc output,\nin place, with a createRequire banner (the standard fix for\nnode-fetch, a transitive dep of pi-coding-agent, calling require()\nin a way the ESM-output shim can't statically convert - verified by\nreproducing the exact failure without the banner first, then\nconfirming it's gone with it).\n\nVerified by direct execution, not just re-running CI locally: copied\nthe resulting dist/index.js alone into an empty directory with zero\nnode_modules anywhere on its path, launched it with the same\nplaceholder-credential/TOTO_MCP_PORT=0 conditions the CI smoke test\nuses, confirmed it boots and stays alive. Confirmed determinism\n(three independent rebuilds, byte-identical). packages/core/dist is\nunchanged - unbundled, since core is never launched directly, only\nimported by mcp-server's new bundle and by packages/cli (a local dev\ntool, not part of the plugin's declared runtime surface).\n\nKnown, non-blocking, deliberately deferred: committed\npackages/mcp-server/dist/ still also contains ~18 individually\ntsc-compiled .test.js files (importing vitest) alongside the new\nbundle, dead weight now, pre-existing since Stage 1, not introduced\nhere. Out of scope for this fix (touches the shared composite\nproject-reference graph); flagged for a follow-up.\n\nFindings recorded: Safety-Car/2026-09-27-plugin-deployment-infra-redesign.md\n(new \"F11\" section), P10-Plans/2026-09-27-plugin-deployment-infra-redesign.md\nexecution log.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015KziG5wi1Waa2vs32zyp8D",
+  "Tags": [
+   "key",
+   "generic"
+  ],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "d3f51291417d4571448828fda2d6fd7dc7a900af:packages/mcp-server/dist/index.js:generic-api-key:270203"
  }
 ]

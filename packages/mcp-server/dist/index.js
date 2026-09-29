@@ -27346,6 +27346,7 @@ var HookSystemInstance = new HookSystem();
 import * as fs4 from "node:fs";
 import * as os2 from "node:os";
 import * as path3 from "node:path";
+import { fileURLToPath } from "node:url";
 var CONFIG_DIR_NAME = ".pi";
 var VALID_THINKING = ["off", "minimal", "low", "medium", "high", "max"];
 function getFrontmatter(content) {
@@ -27432,16 +27433,18 @@ var SubagentService = class {
     }));
   }
 };
-function getPiAgentDir(env = process.env, home = os2.homedir()) {
+function getPiAgentDir(env = process.env, home = os2.homedir(), platform = process.platform) {
   const envDir = env["PI_CODING_AGENT_DIR"];
-  if (envDir) {
-    if (envDir === "~")
-      return home;
-    if (envDir.startsWith("~/"))
-      return path3.join(home, envDir.slice(2));
-    return envDir;
+  if (!envDir)
+    return path3.join(home, ".pi", "agent");
+  if (envDir === "~")
+    return home;
+  if (envDir.startsWith("~/") || platform === "win32" && envDir.startsWith("~\\")) {
+    return path3.join(home, envDir.slice(2));
   }
-  return path3.join(home, ".pi", "agent");
+  if (/^file:\/\//.test(envDir))
+    return fileURLToPath(envDir);
+  return envDir;
 }
 
 // dist/handlers/vault_write.js

@@ -372,7 +372,7 @@
   {
     "file": "packages/core/src/SubagentService.ts",
     "ruleId": "@typescript-eslint/require-await",
-    "line": 22
+    "line": 23
   },
   {
     "file": "packages/mcp-server/src/__tests__/council_run.test.ts",

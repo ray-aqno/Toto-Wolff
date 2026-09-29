@@ -23,6 +23,15 @@ describe('getPiAgentDir', () => {
     expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~' }, home)).toBe(home);
   });
 
+  it('expands a leading ~\\ on Windows only', () => {
+    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~\\agent' }, home, 'win32')).toBe(path.join(home, 'agent'));
+    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~\\agent' }, home, 'linux')).toBe('~\\agent');
+  });
+
+  it('converts a file:// URL to a path', () => {
+    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: 'file:///tmp/pi-agents' }, home, 'linux')).toBe('/tmp/pi-agents');
+  });
+
   it('ignores an empty PI_CODING_AGENT_DIR', () => {
     expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '' }, home)).toBe(path.join(home, '.pi', 'agent'));
   });

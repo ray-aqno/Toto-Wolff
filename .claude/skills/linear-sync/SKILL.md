@@ -1,3 +1,12 @@
+---
+name: linear-sync
+description: >
+  Sync an approved toto-wolff P10 plan into a Linear issue through an already-authenticated
+  Linear MCP connector. Use only when the user explicitly runs
+  `/linear-sync <plan-path> --team <name> --project <name>`; never run it automatically or
+  as a side effect of a /p10 approval.
+---
+
 # linear-sync
 
 Syncs an approved toto-wolff P10 plan into a Linear issue, using an already-authenticated

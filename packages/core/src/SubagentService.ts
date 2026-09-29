@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { getAgentDir } from '@earendil-works/pi-coding-agent';
+import { fileURLToPath } from 'node:url';
 import type { AgentConfig } from './types.js';
 
 const CONFIG_DIR_NAME = '.pi';
@@ -31,7 +32,7 @@ export class SubagentService {
     const agents = new Map<string, AgentConfig>();
 
     if (scope === 'user' || scope === 'both') {
-      const userAgentsDir = path.join(getAgentDir(), 'agents');
+      const userAgentsDir = path.join(getPiAgentDir(), 'agents');
       if (fs.existsSync(userAgentsDir)) {
         for (const file of fs.readdirSync(userAgentsDir)) {
           if (file.endsWith('.md')) {
@@ -99,4 +100,29 @@ export class SubagentService {
       filePath: a.filePath,
     }));
   }
+}
+
+/**
+ * The pi coding agent's user config directory: $PI_CODING_AGENT_DIR if set,
+ * otherwise ~/.pi/agent. Mirrors getAgentDir() from
+ * @earendil-works/pi-coding-agent 0.83.0 (dist/config.js), including its
+ * normalizePath() defaults (dist/utils/paths.js): a bare `~`, a leading `~/`
+ * (or `~\` on Windows) expands to the home directory, and a `file://` URL is
+ * converted to a path. Reimplemented here because importing that package
+ * pulled its whole multi-provider AI stack into the bundled MCP server (about
+ * 10 MB of a 12.9 MB bundle), past the plugin directory's 5 MiB per-file limit.
+ */
+export function getPiAgentDir(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = os.homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const envDir = env['PI_CODING_AGENT_DIR'];
+  if (!envDir) return path.join(home, '.pi', 'agent');
+  if (envDir === '~') return home;
+  if (envDir.startsWith('~/') || (platform === 'win32' && envDir.startsWith('~\\'))) {
+    return path.join(home, envDir.slice(2));
+  }
+  if (/^file:\/\//.test(envDir)) return fileURLToPath(envDir);
+  return envDir;
 }

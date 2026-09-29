@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Bundled MCP server was too large for the plugin directory**: `packages/mcp-server/dist/index.js` was 12.86 MiB, over the directory's 5 MiB per-file limit, so submission failed with "A file is too large". Almost all of it came from one import: `SubagentService` used `getAgentDir()` from `@earendil-works/pi-coding-agent`, which pulled that package's whole multi-provider AI stack (Mistral, Google, OpenAI SDKs, a runtime TypeScript loader, a syntax highlighter) into the bundle. `getPiAgentDir()` in `SubagentService.ts` now implements the same lookup: `$PI_CODING_AGENT_DIR` if set (a bare `~`, a leading `~/`, or `~\` on Windows expands to the home directory, and a `file://` URL becomes a path), otherwise `~/.pi/agent`. On Linux its output matches the original's on ten inputs, including `file://` URLs, spaces and a trailing slash; the Windows `~\` branch mirrors the original's code and is unit-tested but was not compared against it on Windows. The dependency is removed and the bundle is now 1.35 MiB.
+
 ## [1.6.0] - 2026-09-28
 
 Plugin autopublish readiness: the marketplace plugin now declares its credential and launches with plain `node` instead of a shell script that builds at launch time, the pattern the plugin directory's automated review holds for a human reviewer. Two configuration changes are breaking, both now stopping the MCP server at startup: an auth token without a base URL from the same source, and a key and a token set in the same source (see Changed, and the README's "Upgrading to 1.6.0" note).

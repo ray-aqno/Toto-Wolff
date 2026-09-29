@@ -51,9 +51,11 @@ pnpm -C packages/mcp-server test
 
 Start the MCP server locally:
 ```bash
-node packages/mcp-server/dist/index.js
+node plugin/server/index.mjs
 # Server binds to 127.0.0.1:3099
 ```
+
+`pnpm build` rewrites `plugin/server/index.mjs` (the minified bundle the plugin ships); commit it with the source change. `pnpm sync:plugin` also refreshes the skill copies under `plugin/skills/`, and CI's `check:plugin-sync` fails if either is stale.
 
 Drive the full governance cycle end-to-end:
 ```bash

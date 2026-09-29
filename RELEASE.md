@@ -14,22 +14,27 @@ in order and get explicit sign-off before each step marked **confirm**.
    file and syncs it into the four `package.json` files that track it in
    lockstep (root, `packages/core`, `packages/cli`, `packages/mcp-server`).
    None of these packages publish to npm independently; `VERSION` is what
-   has to match `CHANGELOG.md` and the eventual git tag.
+   has to match `CHANGELOG.md` and the eventual git tag. `bump-version`
+   does not touch the plugin manifest: set `"version"` in
+   `plugin/.claude-plugin/plugin.json` to the same number by hand. Installed
+   copies and the plugin directory key updates on that field, so a release
+   that changes the plugin without raising it may never reach existing
+   installs.
 
 3. **Expand `CHANGELOG.md`.** Add a dated `## [x.y.z]` section under
    `Keep a Changelog` conventions, in the same depth and voice as the
    existing entries: what shipped, why it's safe, what changed and why.
 
-4. **Sync `dist/`.** `pnpm sync:dist` deletes and rebuilds
-   `packages/core/dist` and `packages/mcp-server/dist` from current source
-   and stages the result with `git add`. Both directories ship committed
-   because the plugin launches `node packages/mcp-server/dist/index.js`
-   directly, with no build step at install time: the committed output has
-   to already be what the source produces. Review the staged diff before
-   folding it into the release commit; don't run this and then ignore what
-   it staged. This step has to happen before `/cabinet`, not after, so the
-   reviewers in that gate see the real `dist/` diff along with everything
-   else.
+4. **Sync the plugin.** `pnpm sync:plugin` rebuilds the minified server
+   bundle `plugin/server/index.mjs` from clean, copies every skill that
+   `plugin/.claude-plugin/plugin.json` lists from `.claude/skills/` into
+   `plugin/skills/`, checks the result, and stages `plugin/` with `git add`.
+   `plugin/` is the only thing the plugin ships, launched with no build step
+   at install time, so the committed copy has to already be what the source
+   produces. Review the staged diff before folding it into the release
+   commit; don't run this and then ignore what it staged. This step has to
+   happen before `/cabinet`, not after, so the reviewers in that gate see
+   the real `plugin/` diff along with everything else.
 
 5. **Local verification**, all of it, before pushing:
    - `pnpm build`
@@ -41,15 +46,17 @@ in order and get explicit sign-off before each step marked **confirm**.
      the violations already recorded in `.eslint-baseline.json`. The gate
      fails only on new ones, and it is what CI runs.
    - `pnpm check-patterns`
-   - `pnpm check:dist-sync`, run after the release commit (including
-     step 4's staged `dist/`) is committed. It treats any uncommitted change
-     under `dist/`, staged or not, as drift, so it fails if run between
-     `pnpm sync:dist` and the commit even when the output is correct. If it
-     fails after the commit, re-run `pnpm sync:dist`, review, and amend or
+   - `claude plugin validate plugin --strict`
+   - `pnpm check:plugin-sync`, run after the release commit (including
+     step 4's staged `plugin/`) is committed. It treats any uncommitted change
+     under `plugin/`, staged or not, as drift, so it fails if run between
+     `pnpm sync:plugin` and the commit even when the output is correct. If it
+     fails after the commit, re-run `pnpm sync:plugin`, review, and amend or
      add a commit before continuing.
 
 6. **Push the release commit** (**confirm**). Watch CI to green, including
-   the `plugin-launch-smoke-test` and `check:dist-sync` jobs. Read Greptile's
+   the `plugin-launch-smoke-test` job and the lint-baseline job's
+   `check:plugin-sync` step. Read Greptile's
    review comments; they're data to act on, not a gate to wait out.
 
 7. **Run `/cabinet "<release description>" vX.Y.Z`** (**confirm**). All three

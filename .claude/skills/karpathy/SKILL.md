@@ -1,6 +1,6 @@
 ---
 name: karpathy
-description: Execution-layer quality rules for implementation work. Active after a P10 plan reaches status: approved. Governs how code is written, not what is built.
+description: "Execution-layer quality rules for implementation work. Active after a P10 plan reaches status: approved. Governs how code is written, not what is built."
 version: 1.0.0
 ---
 

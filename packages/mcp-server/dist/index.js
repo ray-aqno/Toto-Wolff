@@ -258819,6 +258819,7 @@ function createAnthropicClient() {
   return buildClient(nonEmpty(apiKey), nonEmpty(authToken), baseURL);
 }
 function buildClient(apiKey, authToken, baseURL) {
+  assert5(!(apiKey && authToken), "ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN are both set in the same source (plugin userConfig, shell environment, or ~/.claude.json mcpServers.toto-wolff.env); set only one, so neither credential is sent to an endpoint meant for the other");
   if (apiKey) {
     return new sdk_default({ apiKey, authToken: null, baseURL: baseURL ?? DEFAULT_BASE_URL });
   }

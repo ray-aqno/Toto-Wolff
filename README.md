@@ -58,6 +58,8 @@ TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
 
 **Upgrading to 1.5.0:** DRS Rule 2 (out-of-scope write) now fails closed. An empty `allowed_paths` used to mean "no restriction" and now means "nothing allowed", so an existing install relying on that must either list its allowed paths or set `permissive: true` in `.toto/config.yml`'s `drs:` block to keep the old behavior. Run `pnpm generate:drs-config` from the repository root after changing the config: DRS reads the generated `.toto/drs-config.json`, not the YAML directly, so an edit to `config.yml` alone leaves writes blocked. See the CHANGELOG for details.
 
+**Upgrading to 1.6.0:** the MCP server now refuses an `ANTHROPIC_AUTH_TOKEN` that has no base URL from the same place (the shell, `/plugin configure`, or `~/.claude.json`), instead of sending that gateway token to Anthropic's public endpoint. If the server stops starting after the upgrade, set the matching `ANTHROPIC_BASE_URL` (or `anthropic_base_url` in the plugin settings) next to the token, or switch to an API key. Setting both a key and a token in the same place now also stops the server; keep only one. See the CHANGELOG for details.
+
 **New to the terminology?** See [Concepts](#concepts) below for plain-English definitions of everything you'll encounter.
 
 ---
@@ -236,7 +238,7 @@ The vault is the source of truth: a directory of `.md` files with YAML frontmatt
 | `ANTHROPIC_AUTH_TOKEN` | — | Enterprise/proxy bearer token (Option B) |
 | `ANTHROPIC_BASE_URL` | — | Required with `ANTHROPIC_AUTH_TOKEN` (Option B) |
 
-Option A and Option B are mutually exclusive. If both are set, `ANTHROPIC_API_KEY` wins.
+Option A and Option B are mutually exclusive. If both are set in the same place, the MCP server stops at startup and asks you to keep only one.
 
 Set `TOTO_VAULT_PATH` to your Obsidian vault path for the recommended setup, or leave it unset to use `~/.toto/vault` as a standalone directory. Shared team vaults (multi-user, git-backed) are a v1.1.0 roadmap item — the vault is single-user local storage in v1.0.0.
 

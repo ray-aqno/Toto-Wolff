@@ -86,16 +86,22 @@ export function createAnthropicClient(): Anthropic {
 }
 
 /**
- * Builds the client from one tier's values. An API key wins when both are
- * present, and the token is then not sent at all. A token is a gateway
- * credential, so it requires a base URL from the same tier: without one the
- * assertion fails rather than sending the token to DEFAULT_BASE_URL.
+ * Builds the client from one tier's values. A tier that sets both an API key
+ * and a token is ambiguous (its base URL could belong to either), so the
+ * assertion fails rather than guess which credential goes to which endpoint.
+ * A token is a gateway credential, so it requires a base URL from the same
+ * tier: without one the assertion fails rather than sending the token to
+ * DEFAULT_BASE_URL.
  */
 function buildClient(
   apiKey: string | undefined,
   authToken: string | undefined,
   baseURL: string | undefined,
 ): Anthropic {
+  assert(
+    !(apiKey && authToken),
+    'ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN are both set in the same source (plugin userConfig, shell environment, or ~/.claude.json mcpServers.toto-wolff.env); set only one, so neither credential is sent to an endpoint meant for the other',
+  );
   if (apiKey) {
     return new Anthropic({ apiKey, authToken: null, baseURL: baseURL ?? DEFAULT_BASE_URL });
   }

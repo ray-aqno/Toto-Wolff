@@ -4,10 +4,6 @@ title = "toto-wolff gitleaks config"
 [allowlist]
 description = "Allow example placeholders and test fixtures"
 paths = [
-  '''pnpm-lock\.yaml''', 
-  '''pnpm-workspace\.yaml''', 
-  '''package-lock\.json''',
-  '''yarn\.lock''',
   '''\.gitleaks\.toml''',
 ]
 regexes = [

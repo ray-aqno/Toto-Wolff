@@ -1,1 +1,0 @@
-{"version":3,"file":"council_run.d.ts","sourceRoot":"","sources":["../../src/handlers/council_run.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,cAAc,EAAE,aAAa,EAAgB,MAAM,kBAAkB,CAAC;AAkBpF;;;;GAIG;AACH,wBAAgB,mBAAmB,CAAC,QAAQ,EAAE,MAAM,GAAG,MAAM,EAAE,CAM9D;AAiCD,wBAAsB,gBAAgB,CAAC,KAAK,EAAE,OAAO,EAAE,OAAO,EAAE,cAAc,EAAE,SAAS,EAAE,MAAM,GAAG,OAAO,CAAC,aAAa,CAAC,CAezH"}

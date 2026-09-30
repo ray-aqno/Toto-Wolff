@@ -292,11 +292,11 @@ claude plugin marketplace add <owner>/Toto-Wolff
 claude plugin install toto-wolff@toto-wolff
 ```
 
-The plugin launches the server via `node ${CLAUDE_PLUGIN_ROOT}/packages/mcp-server/dist/index.js` against a committed, esbuild-bundled `dist/index.js`: no `pnpm install`/build step required before first use. See `RELEASE.md` for how that committed output stays in sync with source.
+The plugin ships from `plugin/` only (the marketplace source is `./plugin`): its manifest, copies of the listed skills from `.claude/skills/`, and `plugin/server/index.mjs`, a committed, minified esbuild bundle. It launches the server via `node ${CLAUDE_PLUGIN_ROOT}/server/index.mjs`: no `pnpm install`/build step required before first use. `.claude/skills/` stays the source of truth; `pnpm sync:plugin` regenerates `plugin/` and CI's `check:plugin-sync` fails if the committed copy is stale. See `RELEASE.md`.
 
-**Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Run `pnpm -C packages/mcp-server build` before first use with this path.
+**Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]`. The committed bundle runs as-is; run `pnpm build` first only if you changed server or core source.
 
-Start command (manual path): `node <repo>/packages/mcp-server/dist/index.js`
+Start command (manual path): `node <repo>/plugin/server/index.mjs`
 
 ## Credentials (required)
 
@@ -318,7 +318,7 @@ Manual wiring (fallback path), never committing a real token to this repo:
 "toto-wolff": {
   "type": "stdio",
   "command": "node",
-  "args": ["<repo>/packages/mcp-server/dist/index.js"],
+  "args": ["<repo>/plugin/server/index.mjs"],
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:2099",
     "ANTHROPIC_AUTH_TOKEN": "<your-manifest-token>"

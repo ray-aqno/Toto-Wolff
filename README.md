@@ -188,16 +188,16 @@ Register the MCP server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Th
 | `dashboard_status` | Return vault stats (`councilCount`, `p10Count`, `blockedCount`) |
 | `score_confidence` | Deterministic HIGH/LOW confidence tier for plan provenance — not model reasoning |
 
-Start the server:
+Start the server (the committed, self-contained bundle the plugin ships; `pnpm build` refreshes it):
 
 ```bash
-node packages/mcp-server/dist/index.js   # binds 127.0.0.1:3099
+node plugin/server/index.mjs   # binds 127.0.0.1:3099
 ```
 
 Override the port:
 
 ```bash
-TOTO_MCP_PORT=4000 node packages/mcp-server/dist/index.js
+TOTO_MCP_PORT=4000 node plugin/server/index.mjs
 ```
 
 The server exposes these read-only HTTP endpoints (loopback only — never accessible from outside your machine):

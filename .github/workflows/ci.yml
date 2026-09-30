@@ -129,14 +129,15 @@ jobs:
       - name: Check for new ESLint violations against the committed baseline
         run: pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-eslint-baseline.ts
 
-      # Unconditional, not path-filtered to packages/*/src changes: a dependency
-      # or shared tsconfig change can desync the committed dist/ from source
-      # without touching either package's src/ directly, and path-filtering
-      # would silently reproduce the exact staleness bug this check exists to
-      # catch. Reuses the Build step above; check:dist-sync deletes and rebuilds
-      # dist/ itself, so this is a genuinely fresh compile, not a cache hit.
-      - name: Check that committed dist/ matches a fresh rebuild
-        run: pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-dist-sync.ts
+      # Unconditional, not path-filtered: a dependency, shared tsconfig or skill
+      # change can desync the committed plugin/ folder from its sources without
+      # touching packages/*/src, and path-filtering would silently reproduce
+      # the staleness this check exists to catch. check:plugin-sync deletes
+      # dist/ and tsconfig.tsbuildinfo and rebuilds itself, so this is a fresh
+      # compile, then compares plugin/ (bundle and skill copies) with the
+      # committed tree.
+      - name: Check that the committed plugin/ folder matches a fresh rebuild
+        run: pnpm check:plugin-sync
 
   check-patterns:
     runs-on: ubuntu-latest
@@ -174,8 +175,12 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.206
 
-      - name: Validate marketplace + plugin manifest
-        run: claude plugin validate .
+      # The repo root holds only the marketplace; the plugin itself ships from
+      # plugin/. Both must validate with warnings treated as errors.
+      - name: Validate the marketplace and the plugin manifest
+        run: |
+          claude plugin validate . --strict
+          claude plugin validate plugin --strict
 
   plugin-launch-smoke-test:
     runs-on: ubuntu-latest
@@ -192,7 +197,7 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.206
 
-      - name: Install the plugin fresh (simulates a real marketplace install - the committed dist/ is what makes this build-free now)
+      - name: Install the plugin fresh (simulates a real marketplace install from the committed plugin/ folder, no build step)
         run: |
           claude plugin marketplace add "$(pwd)"
           claude plugin install toto-wolff@toto-wolff
@@ -206,12 +211,30 @@ jobs:
             exit 1
           fi
 
-          # (i) Both dist/ trees must exist in the installed cache. Their absence
-          # now means packaging or the .gitignore scoping regressed, not that a
-          # build-free install worked as intended (the old assumption here was the
-          # opposite: this check used to require dist/ NOT exist).
-          if [ ! -d "$CACHE_DIR/packages/core/dist" ] || [ ! -d "$CACHE_DIR/packages/mcp-server/dist" ]; then
-            echo "::error::installed plugin cache is missing committed dist/: packaging or .gitignore scoping regressed"
+          # (i) The installed cache is the plugin/ folder and nothing else: the
+          # minified bundle, the listed skills (drs-check.sh still executable),
+          # no symlinks (one pointing outside the folder ships dangling), and no
+          # repository files such as packages/ (the whole repo used to ship).
+          if [ ! -f "$CACHE_DIR/server/index.mjs" ]; then
+            echo "::error::installed plugin cache is missing server/index.mjs: the plugin/ bundle was not committed"
+            exit 1
+          fi
+          if [ ! -x "$CACHE_DIR/skills/drs/bin/drs-check.sh" ]; then
+            echo "::error::skills/drs/bin/drs-check.sh is missing or not executable in the installed cache"
+            exit 1
+          fi
+          if [ -n "$(find "$CACHE_DIR" -type l)" ]; then
+            echo "::error::installed plugin cache contains symlinks: $(find "$CACHE_DIR" -type l)"
+            exit 1
+          fi
+          if [ -e "$CACHE_DIR/packages" ]; then
+            echo "::error::installed plugin cache contains packages/: the marketplace source is shipping the whole repository again"
+            exit 1
+          fi
+          LISTED=$(jq '.skills | length' "$CACHE_DIR/.claude-plugin/plugin.json")
+          FOUND=$(find "$CACHE_DIR/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)
+          if [ "$LISTED" != "$FOUND" ]; then
+            echo "::error::manifest lists $LISTED skills but the cache has $FOUND skill folders with a SKILL.md"
             exit 1
           fi
 

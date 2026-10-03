@@ -1,0 +1,19 @@
+{
+  "name": "toto-wolff",
+  "version": "2.0.0-spike.1",
+  "description": "Layout spike for toto-wolff 2.0: a dependency-free MCP server run directly by Node 24. Not for install.",
+  "author": {
+    "name": "Rayyan Aquino"
+  },
+  "homepage": "https://github.com/ray-aqno/Toto-Wolff",
+  "repository": "https://github.com/ray-aqno/Toto-Wolff",
+  "license": "MIT",
+  "keywords": ["governance", "mcp"],
+  "skills": ["./skills/hello"],
+  "mcpServers": {
+    "toto-wolff": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.ts"]
+    }
+  }
+}

@@ -129,14 +129,19 @@ jobs:
       - name: Check for new ESLint violations against the committed baseline
         run: pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/check-eslint-baseline.ts
 
+      # The baseline gate above lints packages/ only. The plugin server and its
+      # tests have no baseline: zero errors and zero warnings, from day one.
+      - name: Lint the plugin server strictly
+        run: pnpm lint:plugin
+
       # Unconditional, not path-filtered: a dependency, shared tsconfig or skill
       # change can desync the committed plugin/ folder from its sources without
       # touching packages/*/src, and path-filtering would silently reproduce
-      # the staleness this check exists to catch. check:plugin-sync deletes
-      # dist/ and tsconfig.tsbuildinfo and rebuilds itself, so this is a fresh
-      # compile, then compares plugin/ (bundle and skill copies) with the
-      # committed tree.
-      - name: Check that the committed plugin/ folder matches a fresh rebuild
+      # the staleness this check exists to catch. check:plugin-sync checks the
+      # plugin/ layout (manifest, listed skills, only .mts files under server/,
+      # every file under 256 KiB) and compares the skill copies with their
+      # sources and plugin/ with the committed tree.
+      - name: Check that the committed plugin/ folder matches its sources
         run: pnpm check:plugin-sync
 
   check-patterns:
@@ -212,11 +217,17 @@ jobs:
           fi
 
           # (i) The installed cache is the plugin/ folder and nothing else: the
-          # minified bundle, the listed skills (drs-check.sh still executable),
-          # no symlinks (one pointing outside the folder ships dangling), and no
+          # readable .mts server (no .js or .mjs anywhere: nothing is built or
+          # bundled), the listed skills (drs-check.sh still executable), no
+          # symlinks (one pointing outside the folder ships dangling), and no
           # repository files such as packages/ (the whole repo used to ship).
-          if [ ! -f "$CACHE_DIR/server/index.mjs" ]; then
-            echo "::error::installed plugin cache is missing server/index.mjs: the plugin/ bundle was not committed"
+          if [ ! -f "$CACHE_DIR/server/index.mts" ]; then
+            echo "::error::installed plugin cache is missing server/index.mts"
+            exit 1
+          fi
+          BUILT=$(find "$CACHE_DIR" \( -name '*.js' -o -name '*.mjs' \) -print)
+          if [ -n "$BUILT" ]; then
+            echo "::error::installed plugin cache contains built JavaScript: $BUILT"
             exit 1
           fi
           if [ ! -x "$CACHE_DIR/skills/drs/bin/drs-check.sh" ]; then
@@ -266,64 +277,65 @@ jobs:
           fi
 
           # (iii) Launch using the exact command/args just read, never a
-          # hand-written literal, so this exercises the real installed manifest,
-          # not an assumption about what it says.
-          #
-          # ANTHROPIC_API_KEY is a placeholder, never a real secret: CouncilService/
-          # P10Service construct eagerly at process startup (index.ts top level,
-          # not lazily on first tool call — this is documented, intended behavior,
-          # see CLAUDE.md's "MCP Server" section), so createAnthropicClient() throws
-          # immediately with no credential at all. This test proves the launch
-          # command resolves and the process runs — it never calls a tool, so no
-          # real credential or network access is needed, only a non-empty string.
-          ANTHROPIC_API_KEY=sk-ci-smoke-test-placeholder-not-real TOTO_MCP_PORT=0 "$COMMAND" "${ARGS[@]}" &
-          SERVER_PID=$!
-          sleep 60
-          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            echo "::error::MCP server exited within 60s of running the plugin's own declared launch command ($COMMAND ${ARGS[*]})"
+          # hand-written literal, and complete a real MCP exchange: initialize,
+          # then ping. The server needs no credential and exits 0 when its
+          # input ends, so this is a round trip, not a liveness wait.
+          INPUT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}
+          {"jsonrpc":"2.0","id":2,"method":"ping"}'
+          OUT=$(printf '%s\n' "$INPUT" | timeout 30 "$COMMAND" "${ARGS[@]}")
+          if ! echo "$OUT" | jq -e 'select(.id == 1) | .result.serverInfo.name == "toto-wolff"' >/dev/null; then
+            echo "::error::no initialize reply from the manifest's launch command ($COMMAND ${ARGS[*]}): $OUT"
             exit 1
           fi
-          kill "$SERVER_PID"
-          echo "Plugin launch smoke test passed: server started and stayed alive from the manifest's real, installed launch command."
+          if ! echo "$OUT" | jq -e 'select(.id == 2) | .result == {}' >/dev/null; then
+            echo "::error::no ping reply from the manifest's launch command: $OUT"
+            exit 1
+          fi
+          echo "Plugin launch smoke test passed: initialize and ping answered through the manifest's real, installed launch command."
 
-      - name: Confirm Claude Code's own spawn path delivers the credential (userConfig unset, set, and absent)
+      - name: Confirm Claude Code's own spawn path connects with no credential
         run: |
           set -euo pipefail
-          # The step above launches with raw node, so it never exercises the
-          # manifest's userConfig-to-env substitution. `claude mcp list` spawns
-          # the server the way Claude Code really does. Claude Code substitutes
-          # an unset optional userConfig value as an empty string, so case 1
-          # fails if a manifest env entry ever overwrites a shell-exported key
-          # again. Case 3 is the negative control: with no credential anywhere
-          # the server must NOT connect, or cases 1 and 2 prove nothing.
-          KEY=sk-ci-smoke-test-placeholder-not-real
-          connected() {
-            local out
-            out=$(TOTO_MCP_PORT=0 timeout 120 claude mcp list 2>&1 || true)
-            echo "$out"
-            echo "$out" | grep -q "plugin:toto-wolff:toto-wolff:.*Connected"
-          }
-
-          # (1) Key exported in the shell, userConfig left unset.
-          if ! ANTHROPIC_API_KEY="$KEY" connected; then
-            echo "::error::server did not connect with a shell-exported key and userConfig unset: an empty userConfig value is shadowing the shell credential"
+          # The step above launches with raw node. `claude mcp list` spawns the
+          # server the way Claude Code really does. The 2.0 server makes no
+          # model calls, so it must connect with no credential anywhere.
+          unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL
+          OUT=$(timeout 120 claude mcp list 2>&1 || true)
+          echo "$OUT"
+          if ! echo "$OUT" | grep -q "plugin:toto-wolff:toto-wolff:.*Connected"; then
+            echo "::error::the plugin's MCP server did not connect through Claude Code's own spawn path"
             exit 1
           fi
 
-          # (3) No credential anywhere.
-          if connected; then
-            echo "::error::server connected with no credential configured anywhere, so this check cannot tell a working credential path from a broken one"
-            exit 1
-          fi
+  # Node 22.18 to 23.x can load the .mts server but are below its floor, so it
+  # must refuse with one line and exit 1. A job of its own: setup-node changes
+  # the Node every later step uses, so no pnpm or claude step may follow it.
+  node-version-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-          # (2) Key supplied only through userConfig.
-          claude plugin uninstall toto-wolff@toto-wolff
-          claude plugin install toto-wolff@toto-wolff --config anthropic_api_key="$KEY"
-          if ! connected; then
-            echo "::error::server did not connect with the key supplied only through userConfig"
-            exit 1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: 22.18.0
+
+      - name: The server refuses Node 22.18 with one line on stderr
+        run: |
+          set -euo pipefail
+          [ "$(node -v)" = "v22.18.0" ] || { echo "::error::expected Node v22.18.0, got $(node -v)"; exit 1; }
+          code=0
+          node plugin/server/index.mts </dev/null >out.txt 2>err.txt || code=$?
+          if [ "$code" -ne 1 ]; then
+            echo "::error::expected exit 1 on Node 22.18, got $code"; cat err.txt; exit 1
           fi
-          echo "Credential spawn-path check passed: shell key survives an unset userConfig, userConfig key works alone, no key fails."
+          if ! grep -qx "toto-wolff needs Node 24+" err.txt; then
+            echo "::error::stderr lacks the refusal line:"; cat err.txt; exit 1
+          fi
+          if [ -s out.txt ]; then
+            echo "::error::stdout must stay empty on refusal:"; cat out.txt; exit 1
+          fi
 
   pre-commit-hook-test:
     runs-on: ubuntu-latest

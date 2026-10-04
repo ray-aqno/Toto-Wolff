@@ -1,0 +1,149 @@
+// The MCP request layer: built-in methods plus a fixed tool registry.
+// createServer validates the tools once and returns a line handler.
+import assert from 'node:assert/strict';
+import process from 'node:process';
+import {
+  INTERNAL_ERROR,
+  INVALID_PARAMS,
+  LATEST_PROTOCOL_VERSION,
+  METHOD_NOT_FOUND,
+  RpcError,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  errorResponse,
+  isRecord,
+  parseRequest,
+  successResponse,
+  truncateUtf8,
+} from './protocol.mts';
+import type { Id, Message, Request } from './protocol.mts';
+
+export const SERVER_NAME = 'toto-wolff';
+export const SERVER_VERSION = '2.0.0-dev.1';
+export const MAX_TOOLS = 64;
+export const MAX_RESULT_BYTES = 1024 * 1024;
+const TOOL_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+export interface Tool {
+  definition: ToolDefinition;
+  handler: (args: Record<string, unknown>) => Message | Promise<Message>;
+}
+
+type Method = (params: unknown) => Promise<Message>;
+export type LineHandler = (line: string) => Promise<Message | null>;
+
+// Throws at startup on a bad registry: too many tools, a bad or duplicate name.
+function buildRegistry(tools: readonly Tool[]): ReadonlyMap<string, Tool> {
+  assert.ok(tools.length <= MAX_TOOLS, `at most ${String(MAX_TOOLS)} tools`);
+  const registry = new Map<string, Tool>();
+  // Bound: tools.length <= MAX_TOOLS (asserted above).
+  for (const tool of tools) {
+    const name = tool.definition.name;
+    assert.ok(TOOL_NAME_PATTERN.test(name), `invalid tool name: ${name}`);
+    assert.ok(!registry.has(name), `duplicate tool name: ${name}`);
+    registry.set(name, tool);
+  }
+  assert.equal(registry.size, tools.length, 'every tool is registered once');
+  return registry;
+}
+
+function initialize(params: unknown): Message {
+  if (!isRecord(params) || typeof params.protocolVersion !== 'string') {
+    throw new RpcError(INVALID_PARAMS, 'initialize needs a protocolVersion string');
+  }
+  const requested = params.protocolVersion;
+  const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : LATEST_PROTOCOL_VERSION;
+  assert.ok(SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion), 'the answered version is supported');
+  return {
+    protocolVersion,
+    capabilities: { tools: {} },
+    serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+  };
+}
+
+function toolArguments(params: Record<string, unknown>): Record<string, unknown> {
+  const args = params.arguments;
+  if (args === undefined) return {};
+  if (!isRecord(args)) throw new RpcError(INVALID_PARAMS, 'tool arguments must be an object');
+  assert.ok(isRecord(args), 'arguments narrowed to an object');
+  return args;
+}
+
+// Runs one tool. Its own RpcErrors pass through; anything else is logged by
+// tool name only (never its arguments) and becomes INTERNAL_ERROR.
+async function callTool(registry: ReadonlyMap<string, Tool>, params: unknown): Promise<Message> {
+  if (!isRecord(params) || typeof params.name !== 'string') {
+    throw new RpcError(INVALID_PARAMS, 'tools/call needs a tool name');
+  }
+  const tool = registry.get(params.name);
+  if (tool === undefined) throw new RpcError(INVALID_PARAMS, `Unknown tool: ${truncateUtf8(params.name, 64)}`);
+  const args = toolArguments(params);
+  let result: unknown;
+  try {
+    result = await tool.handler(args);
+  } catch (err) {
+    if (err instanceof RpcError) throw err;
+    const kind = err instanceof Error ? err.name : typeof err;
+    process.stderr.write(`toto-wolff: tool ${tool.definition.name} failed (${kind})\n`);
+    throw new RpcError(INTERNAL_ERROR, 'Internal error');
+  }
+  return checkedResult(tool.definition.name, result);
+}
+
+function checkedResult(name: string, result: unknown): Message {
+  assert.ok(name.length > 0, 'a tool has a name');
+  if (!isRecord(result)) {
+    process.stderr.write(`toto-wolff: tool ${name} returned a non-object result\n`);
+    throw new RpcError(INTERNAL_ERROR, 'Internal error');
+  }
+  const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
+  if (bytes > MAX_RESULT_BYTES) {
+    throw new RpcError(INTERNAL_ERROR, `Tool result exceeds ${String(MAX_RESULT_BYTES)} bytes`);
+  }
+  return result;
+}
+
+function buildMethods(registry: ReadonlyMap<string, Tool>): ReadonlyMap<string, Method> {
+  const definitions = [...registry.values()].map((tool) => tool.definition);
+  assert.equal(definitions.length, registry.size, 'tools/list covers every tool');
+  const methods = new Map<string, Method>([
+    ['initialize', (params) => Promise.resolve(initialize(params))],
+    ['ping', () => Promise.resolve({})],
+    ['tools/list', () => Promise.resolve({ tools: definitions })],
+    ['tools/call', (params) => callTool(registry, params)],
+  ]);
+  assert.equal(methods.size, 4, 'four built-in methods');
+  return methods;
+}
+
+async function dispatch(methods: ReadonlyMap<string, Method>, request: Request): Promise<Message> {
+  const id: Id = request.id;
+  const method = methods.get(request.method);
+  if (method === undefined) return errorResponse(id, METHOD_NOT_FOUND, 'Method not found');
+  try {
+    return successResponse(id, await method(request.params));
+  } catch (err) {
+    if (err instanceof RpcError) return errorResponse(id, err.code, err.message);
+    process.stderr.write(`toto-wolff: ${request.method} failed\n`);
+    return errorResponse(id, INTERNAL_ERROR, 'Internal error');
+  }
+}
+
+// Returns the handler for input lines. A null result means no reply is owed.
+export function createServer(tools: readonly Tool[]): LineHandler {
+  const methods = buildMethods(buildRegistry(tools));
+  assert.ok(methods.has('tools/call'), 'tools/call is always available');
+  return async (line: string): Promise<Message | null> => {
+    const text = line.endsWith('\r') ? line.slice(0, -1) : line;
+    if (text.trim() === '') return null;
+    const parsed = parseRequest(text);
+    if (!parsed.ok) return errorResponse(null, parsed.error.code, parsed.error.message);
+    if (!parsed.request.hasId) return null;
+    return dispatch(methods, parsed.request);
+  };
+}

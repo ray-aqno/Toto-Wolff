@@ -16,6 +16,7 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint packages --max-warnings 0",
     "lint:plugin": "eslint plugin/server tests/plugin-server --ext .mts,.ts --max-warnings 0",
+    "check:modern-mcp": "bash scripts/check-modern-mcp.sh plugin",
     "typecheck": "tsc -b && tsc -p tests/plugin-server/tsconfig.json",
     "check-patterns": "tsx --tsconfig scripts/tsconfig.json scripts/check-patterns.ts",
     "bump-version": "tsx --tsconfig scripts/tsconfig.json scripts/bump-version.ts",

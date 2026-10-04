@@ -1,5 +1,8 @@
-// The MCP request layer: built-in methods plus a fixed tool registry.
-// createServer validates the tools once and returns a line handler.
+// The MCP request layer: built-in methods plus a fixed tool registry, served
+// in two eras. A request whose params._meta carries the 2026-07-28 keys is
+// served statelessly (mcp/modern.mts); every other request gets the 2025-11-25
+// handshake behavior. createServer validates the tools once and returns a line
+// handler; it keeps no state between requests.
 import assert from 'node:assert/strict';
 import process from 'node:process';
 import {
@@ -18,11 +21,14 @@ import {
   validateRequest,
 } from './protocol.mts';
 import type { Id, Message, Request } from './protocol.mts';
+import { checkMeta, discoverResult, isModern, toolsListResult, withComplete } from './modern.mts';
+import type { ServerInfo } from './modern.mts';
 
 export const SERVER_NAME = 'toto-wolff';
 export const SERVER_VERSION = '2.0.0-dev.1';
 export const MAX_TOOLS = 64;
 export const MAX_RESULT_BYTES = 1024 * 1024;
+const SERVER_INFO: ServerInfo = Object.freeze({ name: SERVER_NAME, version: SERVER_VERSION });
 
 const TOOL_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
 
@@ -38,6 +44,10 @@ export interface Tool {
 }
 
 type Method = (params: unknown) => Promise<Message>;
+interface Eras {
+  legacy: ReadonlyMap<string, Method>;
+  modern: ReadonlyMap<string, Method>;
+}
 export type LineHandler = (line: string) => Promise<Message | null>;
 
 // Throws at startup on a bad registry: too many tools, a bad or duplicate name.
@@ -104,6 +114,11 @@ function checkedResult(name: string, result: unknown): Message {
     process.stderr.write(`toto-wolff: tool ${name} returned a non-object result\n`);
     throw new RpcError(INTERNAL_ERROR, 'Internal error');
   }
+  return enforceResultCap(result);
+}
+
+function enforceResultCap(result: Message): Message {
+  assert.ok(isRecord(result), 'a capped result is an object');
   const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
   if (bytes > MAX_RESULT_BYTES) {
     throw new RpcError(INTERNAL_ERROR, `Tool result exceeds ${String(MAX_RESULT_BYTES)} bytes`);
@@ -124,6 +139,19 @@ function buildMethods(registry: ReadonlyMap<string, Tool>): ReadonlyMap<string, 
   return methods;
 }
 
+// The 2026-07-28 methods: no initialize and no ping (both answer -32601).
+function buildModernMethods(registry: ReadonlyMap<string, Tool>): ReadonlyMap<string, Method> {
+  const definitions = [...registry.values()].map((tool) => tool.definition);
+  assert.equal(definitions.length, registry.size, 'tools/list covers every tool');
+  const methods = new Map<string, Method>([
+    ['server/discover', (): Promise<Message> => Promise.resolve(discoverResult(SERVER_INFO))],
+    ['tools/list', (params): Promise<Message> => Promise.resolve(toolsListResult(definitions, params, SERVER_INFO))],
+    ['tools/call', async (params): Promise<Message> => enforceResultCap(withComplete(await callTool(registry, params), SERVER_INFO))],
+  ]);
+  assert.equal(methods.size, 3, 'three modern methods');
+  return methods;
+}
+
 async function dispatch(methods: ReadonlyMap<string, Method>, request: Request): Promise<Message> {
   const id: Id = request.id;
   const method = methods.get(request.method);
@@ -131,24 +159,40 @@ async function dispatch(methods: ReadonlyMap<string, Method>, request: Request):
   try {
     return successResponse(id, await method(request.params));
   } catch (err) {
-    if (err instanceof RpcError) return errorResponse(id, err.code, err.message);
+    if (err instanceof RpcError) return errorResponse(id, err.code, err.message, err.data);
     process.stderr.write(`toto-wolff: ${request.method} failed\n`);
     return errorResponse(id, INTERNAL_ERROR, 'Internal error');
   }
 }
 
-// Answers one decoded request object; null for a notification.
-async function handleOne(methods: ReadonlyMap<string, Method>, value: unknown): Promise<Message | null> {
+// A modern request: ids may not be null, and _meta must be complete and name a
+// served version, before the request reaches its method.
+async function serveModern(methods: ReadonlyMap<string, Method>, request: Request): Promise<Message> {
+  assert.ok(request.hasId, 'notifications never reach serveModern');
+  if (request.id === null) return errorResponse(null, INVALID_REQUEST, 'Request id must not be null');
+  try {
+    checkMeta(request.params);
+  } catch (err) {
+    if (err instanceof RpcError) return errorResponse(request.id, err.code, err.message, err.data);
+    throw err;
+  }
+  return dispatch(methods, request);
+}
+
+// Answers one decoded request object; null for a notification (either era).
+async function handleOne(eras: Eras, value: unknown): Promise<Message | null> {
   const parsed = validateRequest(value);
   if (!parsed.ok) return errorResponse(parsed.id, parsed.error.code, parsed.error.message);
-  if (!parsed.request.hasId) return null;
-  return dispatch(methods, parsed.request);
+  const request = parsed.request;
+  if (!request.hasId) return null;
+  return isModern(request.params) ? serveModern(eras.modern, request) : dispatch(eras.legacy, request);
 }
 
 // Returns the handler for input lines. A null result means no reply is owed.
 export function createServer(tools: readonly Tool[]): LineHandler {
-  const methods = buildMethods(buildRegistry(tools));
-  assert.ok(methods.has('tools/call'), 'tools/call is always available');
+  const registry = buildRegistry(tools);
+  const eras: Eras = { legacy: buildMethods(registry), modern: buildModernMethods(registry) };
+  assert.ok(eras.legacy.has('tools/call') && eras.modern.has('tools/call'), 'tools/call is served in both eras');
   return async (line: string): Promise<Message | null> => {
     const text = line.endsWith('\r') ? line.slice(0, -1) : line;
     if (text.trim() === '') return null;
@@ -160,6 +204,6 @@ export function createServer(tools: readonly Tool[]): LineHandler {
       throw err;
     }
     if (Array.isArray(value)) return errorResponse(null, INVALID_REQUEST, 'Batch requests are not supported');
-    return handleOne(methods, value);
+    return handleOne(eras, value);
   };
 }

@@ -89,8 +89,16 @@ describe('drift in a skill copy is caught', () => {
 
 describe('the plugin folder layout is enforced', () => {
   it('extra top-level file', () => {
-    writeFileSync(join(root, 'plugin', 'README.md'), 'x');
-    expect(problems()).toContain('not allowed in the plugin folder: README.md');
+    writeFileSync(join(root, 'plugin', 'NOTES.md'), 'x');
+    expect(problems()).toContain('not allowed in the plugin folder: NOTES.md');
+  });
+  it('a README.md at the plugin root is allowed', () => {
+    writeFileSync(join(root, 'plugin', 'README.md'), '# plugin\n');
+    expect(problems()).toEqual([]);
+  });
+  it('a README.md anywhere else is not', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'README.md'), 'x');
+    expect(problems()).toContain('only readable .mts files may ship under server/: server/README.md');
   });
   it('symlink in the plugin folder', () => {
     symlinkSync(join(root, '.claude', 'skills', 'p10'), join(root, 'plugin', 'skills', 'linked'));

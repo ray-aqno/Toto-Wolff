@@ -40,6 +40,8 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const PLUGIN_DIR = 'plugin';
 /** The plugin manifest, relative to the plugin folder. */
 export const MANIFEST_REL = join('.claude-plugin', 'plugin.json');
+/** The plugin's own README, the one other file allowed at the plugin root. */
+export const README_REL = 'README.md';
 /** The MCP server folder, relative to the plugin folder. Only .mts files may ship in it. */
 export const SERVER_DIR_REL = 'server';
 /** The MCP server entry Claude Code starts, relative to the plugin folder. */
@@ -207,8 +209,8 @@ export function diffTrees(expected: TreeEntry[], actual: TreeEntry[]): Finding[]
 }
 
 /**
- * Checks the plugin folder's shape: only the manifest, the listed skills and
- * .mts files under server/ may exist; every file must be under MAX_FILE_BYTES;
+ * Checks the plugin folder's shape: only the manifest, README.md, the listed
+ * skills and .mts files under server/ may exist; every file must be under MAX_FILE_BYTES;
  * the server entry must exist. Symlinks already fail listTree. Returns the
  * problems found.
  */
@@ -232,7 +234,7 @@ export function checkPluginLayout(pluginRoot: string, skills: string[]): string[
 /** Why one plugin file is not allowed where it is, or null if it is fine. */
 function layoutProblem(rel: string, allowedSkillDirs: string[]): string | null {
   assert(rel.length > 0, 'a plugin file has a path');
-  if (rel === MANIFEST_REL) return null;
+  if (rel === MANIFEST_REL || rel === README_REL) return null;
   if (allowedSkillDirs.some((dir) => rel.startsWith(dir))) return null;
   if (rel.startsWith(SERVER_DIR_REL + sep)) {
     return rel.endsWith('.mts') ? null : `only readable .mts files may ship under ${SERVER_DIR_REL}/: ${rel}`;

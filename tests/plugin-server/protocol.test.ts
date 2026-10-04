@@ -7,6 +7,7 @@ import {
   isId,
   isRecord,
   parseRequest,
+  validateRequest,
   requireString,
   toolError,
   truncateUtf8,
@@ -34,6 +35,23 @@ describe('parseRequest', () => {
     const parsed = parseRequest(line);
     expect(parsed.ok).toBe(false);
     expect(!parsed.ok && parsed.error.code).toBe(code);
+  });
+});
+
+describe('validateRequest keeps a readable id and checks params', () => {
+  it.each([
+    ['{"jsonrpc":"2.0","id":7,"method":42}', 7],
+    ['{"jsonrpc":"2.0","id":"a","method":"ping","params":42}', 'a'],
+    ['{"jsonrpc":"2.0","id":0,"method":"ping","params":null}', 0],
+    ['{"jsonrpc":"2.0","id":{},"method":"ping"}', null],
+  ])('%s fails with id %s', (line, id) => {
+    const parsed = validateRequest(JSON.parse(line) as unknown);
+    expect(parsed).toMatchObject({ ok: false, id, error: { code: INVALID_REQUEST } });
+  });
+
+  it('accepts object and array params', () => {
+    expect(validateRequest({ jsonrpc: '2.0', id: 1, method: 'm', params: {} }).ok).toBe(true);
+    expect(validateRequest({ jsonrpc: '2.0', id: 1, method: 'm', params: [1] }).ok).toBe(true);
   });
 });
 

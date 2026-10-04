@@ -330,8 +330,8 @@ jobs:
           if [ "$code" -ne 1 ]; then
             echo "::error::expected exit 1 on Node 22.18, got $code"; cat err.txt; exit 1
           fi
-          if ! grep -qx "toto-wolff needs Node 24+" err.txt; then
-            echo "::error::stderr lacks the refusal line:"; cat err.txt; exit 1
+          if [ "$(cat err.txt)" != "toto-wolff needs Node 24+" ]; then
+            echo "::error::stderr must be exactly the refusal line, got:"; cat err.txt; exit 1
           fi
           if [ -s out.txt ]; then
             echo "::error::stdout must stay empty on refusal:"; cat out.txt; exit 1

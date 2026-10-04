@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError, toolError } from '../../plugin/server/mcp/protocol.mts';
-import { MAX_RESULT_BYTES, MAX_TOOLS, createServer } from '../../plugin/server/mcp/server.mts';
+import { MAX_BATCH, MAX_RESULT_BYTES, MAX_TOOLS, createServer } from '../../plugin/server/mcp/server.mts';
 import type { Tool } from '../../plugin/server/mcp/server.mts';
 
 function tool(name: string, handler: Tool['handler']): Tool {
@@ -40,6 +40,38 @@ describe('built-in methods', () => {
       const reply = await handle(JSON.stringify({ jsonrpc: '2.0', id: 4, method }));
       expect(reply).toMatchObject({ error: { code: METHOD_NOT_FOUND } });
     }
+  });
+});
+
+describe('JSON-RPC batches (MCP 2025-03-26)', () => {
+  const handle = createServer([echo]);
+  const ping = (id: number): unknown => ({ jsonrpc: '2.0', id, method: 'ping' });
+  const note = { jsonrpc: '2.0', method: 'notifications/initialized' };
+
+  it('answers each request in order and skips notifications', async () => {
+    const reply = await handle(JSON.stringify([ping(1), note, { jsonrpc: '2.0', id: 2, method: 'nope' }, 'x']));
+    expect(reply).toEqual([
+      { jsonrpc: '2.0', id: 1, result: {} },
+      { jsonrpc: '2.0', id: 2, error: { code: METHOD_NOT_FOUND, message: 'Method not found' } },
+      { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid request' } },
+    ]);
+  });
+
+  it('owes no reply to a batch of notifications only', async () => {
+    expect(await handle(JSON.stringify([note, note]))).toBeNull();
+  });
+
+  it('rejects an empty batch and an oversized batch with one error', async () => {
+    expect(await handle('[]')).toMatchObject({ id: null, error: { code: -32600, message: 'Empty batch' } });
+    const many = Array.from({ length: MAX_BATCH + 1 }, (_, i) => ping(i));
+    expect(await handle(JSON.stringify(many))).toMatchObject({ error: { code: -32600 } });
+  });
+
+  it('refuses initialize inside a batch', async () => {
+    const init = { jsonrpc: '2.0', id: 5, method: 'initialize', params: { protocolVersion: '2025-03-26' } };
+    expect(await handle(JSON.stringify([init]))).toEqual([
+      { jsonrpc: '2.0', id: 5, error: { code: -32600, message: 'initialize must not be part of a batch' } },
+    ]);
   });
 });
 

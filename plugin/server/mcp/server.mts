@@ -7,13 +7,15 @@ import {
   INVALID_PARAMS,
   LATEST_PROTOCOL_VERSION,
   METHOD_NOT_FOUND,
+  INVALID_REQUEST,
   RpcError,
   SUPPORTED_PROTOCOL_VERSIONS,
+  decodeJson,
   errorResponse,
   isRecord,
-  parseRequest,
   successResponse,
   truncateUtf8,
+  validateRequest,
 } from './protocol.mts';
 import type { Id, Message, Request } from './protocol.mts';
 
@@ -21,6 +23,7 @@ export const SERVER_NAME = 'toto-wolff';
 export const SERVER_VERSION = '2.0.0-dev.1';
 export const MAX_TOOLS = 64;
 export const MAX_RESULT_BYTES = 1024 * 1024;
+export const MAX_BATCH = 64;
 const TOOL_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
 
 export interface ToolDefinition {
@@ -35,7 +38,8 @@ export interface Tool {
 }
 
 type Method = (params: unknown) => Promise<Message>;
-export type LineHandler = (line: string) => Promise<Message | null>;
+export type Reply = Message | Message[];
+export type LineHandler = (line: string) => Promise<Reply | null>;
 
 // Throws at startup on a bad registry: too many tools, a bad or duplicate name.
 function buildRegistry(tools: readonly Tool[]): ReadonlyMap<string, Tool> {
@@ -134,16 +138,46 @@ async function dispatch(methods: ReadonlyMap<string, Method>, request: Request):
   }
 }
 
+// Answers one decoded request object; null for a notification.
+async function handleOne(methods: ReadonlyMap<string, Method>, value: unknown, inBatch: boolean): Promise<Message | null> {
+  const parsed = validateRequest(value);
+  if (!parsed.ok) return errorResponse(parsed.id, parsed.error.code, parsed.error.message);
+  const request = parsed.request;
+  if (inBatch && request.method === 'initialize') {
+    return errorResponse(request.id, INVALID_REQUEST, 'initialize must not be part of a batch');
+  }
+  if (!request.hasId) return null;
+  return dispatch(methods, request);
+}
+
+// Answers a JSON-RPC batch in order; null when it held only notifications.
+async function handleBatch(methods: ReadonlyMap<string, Method>, batch: unknown[]): Promise<Reply | null> {
+  if (batch.length === 0) return errorResponse(null, INVALID_REQUEST, 'Empty batch');
+  if (batch.length > MAX_BATCH) return errorResponse(null, INVALID_REQUEST, `Batch exceeds ${String(MAX_BATCH)} requests`);
+  const replies: Message[] = [];
+  // Bound: batch.length <= MAX_BATCH (checked above).
+  for (const item of batch) {
+    const reply = await handleOne(methods, item, true);
+    if (reply !== null) replies.push(reply);
+  }
+  assert.ok(replies.length <= batch.length, 'at most one reply per batch entry');
+  return replies.length > 0 ? replies : null;
+}
+
 // Returns the handler for input lines. A null result means no reply is owed.
 export function createServer(tools: readonly Tool[]): LineHandler {
   const methods = buildMethods(buildRegistry(tools));
   assert.ok(methods.has('tools/call'), 'tools/call is always available');
-  return async (line: string): Promise<Message | null> => {
+  return async (line: string): Promise<Reply | null> => {
     const text = line.endsWith('\r') ? line.slice(0, -1) : line;
     if (text.trim() === '') return null;
-    const parsed = parseRequest(text);
-    if (!parsed.ok) return errorResponse(null, parsed.error.code, parsed.error.message);
-    if (!parsed.request.hasId) return null;
-    return dispatch(methods, parsed.request);
+    let value: unknown;
+    try {
+      value = decodeJson(text);
+    } catch (err) {
+      if (err instanceof RpcError) return errorResponse(null, err.code, err.message);
+      throw err;
+    }
+    return Array.isArray(value) ? handleBatch(methods, value) : handleOne(methods, value, false);
   };
 }

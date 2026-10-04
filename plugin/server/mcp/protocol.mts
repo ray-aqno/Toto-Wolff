@@ -29,7 +29,7 @@ export interface Request {
   params: unknown;
 }
 
-export type ParseResult = { ok: true; request: Request } | { ok: false; error: RpcError };
+export type ParseResult = { ok: true; request: Request } | { ok: false; id: Id; error: RpcError };
 
 export class RpcError extends Error {
   readonly code: number;
@@ -78,7 +78,9 @@ export function truncateUtf8(text: string, maxBytes: number): string {
   return cut;
 }
 
-function decodeJson(line: string): unknown {
+// Parses one line of JSON, or throws PARSE_ERROR.
+export function decodeJson(line: string): unknown {
+  assert.equal(typeof line, 'string', 'a line is a string');
   try {
     return JSON.parse(line);
   } catch {
@@ -86,30 +88,49 @@ function decodeJson(line: string): unknown {
   }
 }
 
-function toRequest(line: string): Request {
-  const value = decodeJson(line);
-  if (Array.isArray(value)) throw new RpcError(INVALID_REQUEST, 'Batch requests are not supported');
-  if (!isRecord(value) || value.jsonrpc !== '2.0' || typeof value.method !== 'string') {
-    throw new RpcError(INVALID_REQUEST, 'Invalid request');
-  }
-  const hasId = Object.hasOwn(value, 'id');
+// The request id if it can be read, so even an invalid request's error can
+// carry it (JSON-RPC 2.0, section 5); null otherwise.
+function readableId(value: unknown): Id {
+  if (!isRecord(value) || !Object.hasOwn(value, 'id')) return null;
   const rawId = value.id;
-  if (hasId && !isId(rawId)) throw new RpcError(INVALID_REQUEST, 'Invalid request id');
-  const id: Id = isId(rawId) ? rawId : null;
-  assert.ok(hasId || id === null, 'a notification carries no id');
-  return { hasId, id, method: value.method, params: value.params };
+  return isId(rawId) ? rawId : null;
 }
 
+function requestShapeError(value: Record<string, unknown>): string | null {
+  if (value.jsonrpc !== '2.0' || typeof value.method !== 'string') return 'Invalid request';
+  if (Object.hasOwn(value, 'id') && !isId(value.id)) return 'Invalid request id';
+  const params = value.params;
+  if (Object.hasOwn(value, 'params') && !isRecord(params) && !Array.isArray(params)) {
+    return 'params must be an object or an array';
+  }
+  return null;
+}
+
+// Validates one decoded JSON-RPC request object (not a batch).
+export function validateRequest(value: unknown): ParseResult {
+  const id = readableId(value);
+  if (!isRecord(value)) return { ok: false, id, error: new RpcError(INVALID_REQUEST, 'Invalid request') };
+  const problem = requestShapeError(value);
+  if (problem !== null) return { ok: false, id, error: new RpcError(INVALID_REQUEST, problem) };
+  const method = value.method;
+  assert.equal(typeof method, 'string', 'a valid request has a method');
+  const hasId = Object.hasOwn(value, 'id');
+  return { ok: true, request: { hasId, id, method: String(method), params: value.params } };
+}
+
+// Decodes and validates a single (non-batch) request line.
 export function parseRequest(line: string): ParseResult {
-  assert.equal(typeof line, 'string', 'a line is a string');
+  let value: unknown;
   try {
-    const request = toRequest(line);
-    assert.equal(typeof request.method, 'string', 'a parsed request has a method');
-    return { ok: true, request };
+    value = decodeJson(line);
   } catch (err) {
-    if (err instanceof RpcError) return { ok: false, error: err };
+    if (err instanceof RpcError) return { ok: false, id: null, error: err };
     throw err;
   }
+  if (Array.isArray(value)) {
+    return { ok: false, id: null, error: new RpcError(INVALID_REQUEST, 'A batch is not a single request') };
+  }
+  return validateRequest(value);
 }
 
 // A tool-level failure: the call itself worked, but the tool reports an error.

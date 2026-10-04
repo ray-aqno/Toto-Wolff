@@ -3,14 +3,25 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import process from 'node:process';
-import { INTERNAL_ERROR, INVALID_REQUEST, errorResponse } from './protocol.mts';
-import type { Message } from './protocol.mts';
-import type { LineHandler } from './server.mts';
+import { INTERNAL_ERROR, INVALID_REQUEST, PARSE_ERROR, errorResponse } from './protocol.mts';
+import type { LineHandler, Reply } from './server.mts';
 
 export const MAX_LINE_BYTES = 1024 * 1024;
 const NEWLINE_BYTE = 0x0a;
 
-export type LineEvent = { kind: 'line'; text: string } | { kind: 'oversized' };
+export type LineEvent = { kind: 'line'; text: string } | { kind: 'oversized' } | { kind: 'invalid-utf8' };
+
+// MCP messages are UTF-8: malformed bytes are rejected, never replaced with U+FFFD.
+const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
+
+function decodeLine(bytes: Buffer): LineEvent {
+  assert.ok(bytes.length <= MAX_LINE_BYTES, 'a complete line is within the cap');
+  try {
+    return { kind: 'line', text: STRICT_UTF8.decode(bytes) };
+  } catch {
+    return { kind: 'invalid-utf8' };
+  }
+}
 
 // Splits a byte stream into lines. Bytes are joined before decoding, so a
 // character split across chunks survives. A line over MAX_LINE_BYTES yields one
@@ -38,7 +49,7 @@ export async function* readLines(input: AsyncIterable<Buffer | string>): AsyncGe
         pendingBytes += piece.length;
       }
       if (newline === -1) break;
-      if (!discarding) yield { kind: 'line', text: Buffer.concat(pending, pendingBytes).toString('utf8') };
+      if (!discarding) yield decodeLine(Buffer.concat(pending, pendingBytes));
       pending.length = 0;
       pendingBytes = 0;
       discarding = false;
@@ -46,11 +57,12 @@ export async function* readLines(input: AsyncIterable<Buffer | string>): AsyncGe
     }
     assert.ok(pendingBytes <= MAX_LINE_BYTES, 'buffered bytes stay under the line cap');
   }
-  if (!discarding && pendingBytes > 0) yield { kind: 'line', text: Buffer.concat(pending, pendingBytes).toString('utf8') };
+  if (!discarding && pendingBytes > 0) yield decodeLine(Buffer.concat(pending, pendingBytes));
 }
 
-export async function writeMessage(message: Message): Promise<void> {
-  assert.equal(message.jsonrpc, '2.0', 'every message is JSON-RPC 2.0');
+export async function writeMessage(message: Reply): Promise<void> {
+  const messages = Array.isArray(message) ? message : [message];
+  assert.ok(messages.length > 0 && messages.every((m) => m.jsonrpc === '2.0'), 'every message is JSON-RPC 2.0');
   let line: string;
   try {
     line = JSON.stringify(message);
@@ -74,9 +86,13 @@ export async function runStdio(handle: LineHandler): Promise<void> {
     process.exitCode = 1;
   });
   const oversized = errorResponse(null, INVALID_REQUEST, `Message exceeds ${String(MAX_LINE_BYTES)} bytes`);
+  const badUtf8 = errorResponse(null, PARSE_ERROR, 'Parse error: message is not valid UTF-8');
   assert.equal(oversized.jsonrpc, '2.0', 'the oversized reply is JSON-RPC 2.0');
   for await (const event of readLines(process.stdin)) {
-    const response = event.kind === 'oversized' ? oversized : await handle(event.text);
+    let response: Reply | null;
+    if (event.kind === 'oversized') response = oversized;
+    else if (event.kind === 'invalid-utf8') response = badUtf8;
+    else response = await handle(event.text);
     if (response !== null) await writeMessage(response);
   }
 }

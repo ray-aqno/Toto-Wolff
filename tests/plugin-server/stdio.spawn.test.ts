@@ -13,7 +13,7 @@ const DEADLINE_MS = 20_000;
 type Write = string | Buffer | { waitFor: string } | { pauseMs: number };
 interface Run {
   code: number | null;
-  lines: Record<string, unknown>[];
+  lines: unknown[];
   stderr: string;
 }
 
@@ -36,7 +36,7 @@ function runServer(entry: string, writes: readonly Write[]): Promise<Run> {
     child.on('close', (code) => {
       clearTimeout(timer);
       const lines = out.split('\n').filter((l) => l !== '');
-      done({ code, lines: lines.map((l) => JSON.parse(l) as Record<string, unknown>), stderr: err });
+      done({ code, lines: lines.map((l): unknown => JSON.parse(l)), stderr: err });
     });
     void (async (): Promise<void> => {
       for (const w of writes) {
@@ -76,6 +76,7 @@ describe('plugin server over stdio (Node type stripping)', () => {
       `${req(10, 'constructor')}\n`,
       `${req(null, 'ping')}\n`,
       '{"jsonrpc":"2.0","id":{},"method":"ping"}\n',
+      Buffer.concat([Buffer.from('{"jsonrpc":"2.0","id":11,"method":"ping","params":{"x":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}}\n')]),
       { waitFor: 'Invalid request id' },
       split.subarray(0, splitAt),
       { pauseMs: 100 },
@@ -84,22 +85,23 @@ describe('plugin server over stdio (Node type stripping)', () => {
     ]);
     const r = run.lines;
     expect(run.code).toBe(0);
-    expect(r).toHaveLength(15);
+    expect(r).toHaveLength(16);
     expect(r[0]).toMatchObject({ id: 1, result: { protocolVersion: '2025-06-18', serverInfo: { name: 'toto-wolff' } } });
     expect(r[1]).toMatchObject({ id: 2, result: { protocolVersion: '2025-11-25' } });
     expect(r[2]).toMatchObject({ id: 3, result: { tools: [] } });
     expect(r[3]).toMatchObject({ id: 4, error: { code: -32602 } });
     expect(r[4]).toMatchObject({ id: null, error: { code: -32700 } });
     expect(r[5]).toMatchObject({ id: 5, error: { code: -32601 } });
-    expect(r[6]).toMatchObject({ id: null, error: { code: -32600, message: 'Batch requests are not supported' } });
+    expect(r[6]).toEqual([{ jsonrpc: '2.0', id: 6, result: {} }]);
     expect(r[7]).toMatchObject({ id: null, error: { code: -32600, message: 'Message exceeds 1048576 bytes' } });
     expect(r[8]).toEqual({ jsonrpc: '2.0', id: 8, result: {} });
     expect(r[9]).toEqual({ jsonrpc: '2.0', id: 9, result: {} });
     expect(r[10]).toMatchObject({ id: 10, error: { code: -32601 } });
     expect(r[11]).toEqual({ jsonrpc: '2.0', id: null, result: {} });
     expect(r[12]).toMatchObject({ id: null, error: { code: -32600, message: 'Invalid request id' } });
-    expect(r[13]).toMatchObject({ id: 13, error: { code: -32602, message: 'Unknown tool: café' } });
-    expect(r[14]).toEqual({ jsonrpc: '2.0', id: 0, result: {} });
+    expect(r[13]).toMatchObject({ id: null, error: { code: -32700, message: 'Parse error: message is not valid UTF-8' } });
+    expect(r[14]).toMatchObject({ id: 13, error: { code: -32602, message: 'Unknown tool: café' } });
+    expect(r[15]).toEqual({ jsonrpc: '2.0', id: 0, result: {} });
     expect(run.stderr).toBe('');
   }, DEADLINE_MS + 5_000);
 

@@ -2,14 +2,11 @@
 // MCP layer and by every tool. Nothing here touches stdio.
 import assert from 'node:assert/strict';
 
+// The initialize-handshake protocol, as Claude Code speaks it today (2.1.206
+// and 2.1.289 both request 2025-11-25). The stateless 2026-07-28 protocol is
+// a later 2.0 step. Neither has JSON-RPC batches.
 export const LATEST_PROTOCOL_VERSION = '2025-11-25';
-export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [
-  '2025-11-25',
-  '2025-06-18',
-  '2025-03-26',
-  '2024-11-05',
-  '2024-10-07',
-];
+export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25'];
 
 export const PARSE_ERROR = -32700;
 export const INVALID_REQUEST = -32600;

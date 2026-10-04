@@ -86,13 +86,13 @@ describe('plugin server over stdio (Node type stripping)', () => {
     const r = run.lines;
     expect(run.code).toBe(0);
     expect(r).toHaveLength(16);
-    expect(r[0]).toMatchObject({ id: 1, result: { protocolVersion: '2025-06-18', serverInfo: { name: 'toto-wolff' } } });
+    expect(r[0]).toMatchObject({ id: 1, result: { protocolVersion: '2025-11-25', serverInfo: { name: 'toto-wolff' } } });
     expect(r[1]).toMatchObject({ id: 2, result: { protocolVersion: '2025-11-25' } });
     expect(r[2]).toMatchObject({ id: 3, result: { tools: [] } });
     expect(r[3]).toMatchObject({ id: 4, error: { code: -32602 } });
     expect(r[4]).toMatchObject({ id: null, error: { code: -32700 } });
     expect(r[5]).toMatchObject({ id: 5, error: { code: -32601 } });
-    expect(r[6]).toMatchObject({ id: null, error: { code: -32600, message: 'Batch requests are not supported in protocol version 2025-11-25' } });
+    expect(r[6]).toEqual({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Batch requests are not supported' } });
     expect(r[7]).toMatchObject({ id: null, error: { code: -32600, message: 'Message exceeds 1048576 bytes' } });
     expect(r[8]).toEqual({ jsonrpc: '2.0', id: 8, result: {} });
     expect(r[9]).toEqual({ jsonrpc: '2.0', id: 9, result: {} });

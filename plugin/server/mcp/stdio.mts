@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import process from 'node:process';
 import { INTERNAL_ERROR, INVALID_REQUEST, PARSE_ERROR, errorResponse } from './protocol.mts';
-import type { LineHandler, Reply } from './server.mts';
+import type { Message } from './protocol.mts';
+import type { LineHandler } from './server.mts';
 
 export const MAX_LINE_BYTES = 1024 * 1024;
 const NEWLINE_BYTE = 0x0a;
@@ -60,9 +61,8 @@ export async function* readLines(input: AsyncIterable<Buffer | string>): AsyncGe
   if (!discarding && pendingBytes > 0) yield decodeLine(Buffer.concat(pending, pendingBytes));
 }
 
-export async function writeMessage(message: Reply): Promise<void> {
-  const messages = Array.isArray(message) ? message : [message];
-  assert.ok(messages.length > 0 && messages.every((m) => m.jsonrpc === '2.0'), 'every message is JSON-RPC 2.0');
+export async function writeMessage(message: Message): Promise<void> {
+  assert.equal(message.jsonrpc, '2.0', 'every message is JSON-RPC 2.0');
   let line: string;
   try {
     line = JSON.stringify(message);
@@ -89,7 +89,7 @@ export async function runStdio(handle: LineHandler): Promise<void> {
   const badUtf8 = errorResponse(null, PARSE_ERROR, 'Parse error: message is not valid UTF-8');
   assert.equal(oversized.jsonrpc, '2.0', 'the oversized reply is JSON-RPC 2.0');
   for await (const event of readLines(process.stdin)) {
-    let response: Reply | null;
+    let response: Message | null;
     if (event.kind === 'oversized') response = oversized;
     else if (event.kind === 'invalid-utf8') response = badUtf8;
     else response = await handle(event.text);

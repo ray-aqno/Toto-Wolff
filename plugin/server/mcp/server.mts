@@ -112,10 +112,10 @@ function buildMethods(registry: ReadonlyMap<string, Tool>): ReadonlyMap<string, 
   const definitions = [...registry.values()].map((tool) => tool.definition);
   assert.equal(definitions.length, registry.size, 'tools/list covers every tool');
   const methods = new Map<string, Method>([
-    ['initialize', (params) => Promise.resolve(initialize(params))],
-    ['ping', () => Promise.resolve({})],
-    ['tools/list', () => Promise.resolve({ tools: definitions })],
-    ['tools/call', (params) => callTool(registry, params)],
+    ['initialize', (params): Promise<Message> => Promise.resolve(initialize(params))],
+    ['ping', (): Promise<Message> => Promise.resolve({})],
+    ['tools/list', (): Promise<Message> => Promise.resolve({ tools: definitions })],
+    ['tools/call', (params): Promise<Message> => callTool(registry, params)],
   ]);
   assert.equal(methods.size, 4, 'four built-in methods');
   return methods;

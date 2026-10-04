@@ -1,13 +1,22 @@
 {
   "root": true,
-  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "*.config.ts", "*.config.js"],
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "*.config.ts",
+    "*.config.js"
+  ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "project": ["./packages/*/tsconfig.json"],
+    "project": [
+      "./packages/*/tsconfig.json"
+    ],
     "ecmaVersion": 2022,
     "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint"],
+  "plugins": [
+    "@typescript-eslint"
+  ],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
@@ -17,14 +26,83 @@
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/explicit-function-return-type": "error",
-    "max-lines-per-function": ["error", 60],
-    "no-console": ["error", { "allow": ["error", "warn"] }]
+    "max-lines-per-function": [
+      "error",
+      60
+    ],
+    "no-console": [
+      "error",
+      {
+        "allow": [
+          "error",
+          "warn"
+        ]
+      }
+    ]
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts"],
+      "files": [
+        "**/*.test.ts"
+      ],
       "rules": {
-        "max-lines-per-function": ["error", 150]
+        "max-lines-per-function": [
+          "error",
+          150
+        ]
+      }
+    },
+    {
+      "files": [
+        "plugin/server/**/*.mts",
+        "tests/plugin-server/**/*.ts"
+      ],
+      "parserOptions": {
+        "project": [
+          "./tests/plugin-server/tsconfig.json"
+        ]
+      }
+    },
+    {
+      "files": [
+        "plugin/server/**/*.mts"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "ImportDeclaration[source.value=/^(?!\\.{1,2}\\/|node:)/]",
+            "message": "plugin/server ships with no dependencies: import only relative .mts modules and node: built-ins."
+          },
+          {
+            "selector": "ExportNamedDeclaration[source.value=/^(?!\\.{1,2}\\/|node:)/]",
+            "message": "plugin/server ships with no dependencies: import only relative .mts modules and node: built-ins."
+          },
+          {
+            "selector": "ExportAllDeclaration[source.value=/^(?!\\.{1,2}\\/|node:)/]",
+            "message": "plugin/server ships with no dependencies: import only relative .mts modules and node: built-ins."
+          },
+          {
+            "selector": "ImportExpression",
+            "message": "plugin/server uses static imports only."
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "process",
+            "property": "stdout",
+            "message": "Only plugin/server/mcp/stdio.mts writes stdout; stray output corrupts the MCP stream."
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "plugin/server/mcp/stdio.mts"
+      ],
+      "rules": {
+        "no-restricted-properties": "off"
       }
     }
   ]

@@ -2,17 +2,24 @@
 // MCP layer and by every tool. Nothing here touches stdio.
 import assert from 'node:assert/strict';
 
-// The initialize-handshake protocol, as Claude Code speaks it today (2.1.206
-// and 2.1.289 both request 2025-11-25). The stateless 2026-07-28 protocol is
-// a later 2.0 step. Neither has JSON-RPC batches.
+// Two MCP eras are served. Legacy: the 2025-11-25 initialize handshake (Claude
+// Code 2.1.206 speaks only this). Modern: the stateless 2026-07-28 revision,
+// where each request names its version in params._meta (Claude Code 2.1.289
+// probes with server/discover first). Neither era has JSON-RPC batches.
 export const LATEST_PROTOCOL_VERSION = '2025-11-25';
 export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = ['2025-11-25'];
+export const MODERN_VERSIONS: readonly string[] = ['2026-07-28'];
+
+export const META_PROTOCOL_VERSION = 'io.modelcontextprotocol/protocolVersion';
+export const META_CLIENT_CAPABILITIES = 'io.modelcontextprotocol/clientCapabilities';
+export const META_SERVER_INFO = 'io.modelcontextprotocol/serverInfo';
 
 export const PARSE_ERROR = -32700;
 export const INVALID_REQUEST = -32600;
 export const METHOD_NOT_FOUND = -32601;
 export const INVALID_PARAMS = -32602;
 export const INTERNAL_ERROR = -32603;
+export const UNSUPPORTED_PROTOCOL_VERSION = -32022;
 
 const MAX_UTF8_CONTINUATION_BYTES = 3;
 
@@ -30,10 +37,12 @@ export type ParseResult = { ok: true; request: Request } | { ok: false; id: Id; 
 
 export class RpcError extends Error {
   readonly code: number;
+  readonly data: unknown;
 
-  constructor(code: number, message: string) {
+  constructor(code: number, message: string, data?: unknown) {
     super(message);
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -52,10 +61,13 @@ export function successResponse(id: Id, result: Message): Message {
   return { jsonrpc: '2.0', id, result };
 }
 
-export function errorResponse(id: Id, code: number, message: string): Message {
+// `data` is added only when defined, so errors without it keep their old shape.
+export function errorResponse(id: Id, code: number, message: string, data?: unknown): Message {
   assert.ok(isId(id), 'response id must be a string, number or null');
   assert.ok(Number.isInteger(code) && code < 0, 'error codes are negative integers');
-  return { jsonrpc: '2.0', id, error: { code, message } };
+  const error: Record<string, unknown> = { code, message };
+  if (data !== undefined) error.data = data;
+  return { jsonrpc: '2.0', id, error };
 }
 
 // Cuts text to at most maxBytes of UTF-8 without splitting a character.

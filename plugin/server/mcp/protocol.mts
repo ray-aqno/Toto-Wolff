@@ -90,7 +90,7 @@ export function decodeJson(line: string): unknown {
 
 // The request id if it can be read, so even an invalid request's error can
 // carry it (JSON-RPC 2.0, section 5); null otherwise.
-export function readableId(value: unknown): Id {
+function readableId(value: unknown): Id {
   if (!isRecord(value) || !Object.hasOwn(value, 'id')) return null;
   const rawId = value.id;
   return isId(rawId) ? rawId : null;

@@ -84,6 +84,12 @@ describe('JSON-RPC batches (MCP 2025-03-26 only)', () => {
     expect(await handle(JSON.stringify(Array.from({ length: MAX_BATCH + 1 }, () => note)))).toBeNull();
   });
 
+  it('answers a malformed entry in an oversized batch as an invalid request', async () => {
+    const handle = await session('2025-03-26');
+    const reply = await handle(JSON.stringify([{}, ...Array.from({ length: MAX_BATCH }, () => note)]));
+    expect(reply).toEqual([{ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid request' } }]);
+  });
+
   it('refuses initialize inside a batch', async () => {
     const handle = await session('2025-03-26');
     const inner = { jsonrpc: '2.0', id: 5, method: 'initialize', params: { protocolVersion: '2025-03-26' } };

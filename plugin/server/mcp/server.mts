@@ -13,7 +13,6 @@ import {
   decodeJson,
   errorResponse,
   isRecord,
-  readableId,
   successResponse,
   truncateUtf8,
   validateRequest,
@@ -159,14 +158,17 @@ async function handleOne(methods: ReadonlyMap<string, Method>, value: unknown, i
   return dispatch(methods, request);
 }
 
-// One error per request in a refused batch, under each request's own id;
-// notifications (objects without an id) get nothing, as JSON-RPC requires.
+// One error per entry in a refused batch, under each request's own id. Valid
+// notifications get nothing, as JSON-RPC requires; a malformed entry is never
+// a notification, so it gets an invalid-request error.
 function refuseEach(batch: unknown[], message: string): Message[] | null {
   assert.ok(batch.length > 0, 'a refused batch is not empty');
   const replies: Message[] = [];
   // Bound: batch.length entries, and the line holding the batch is capped at 1 MiB.
   for (const item of batch) {
-    if (!isRecord(item) || Object.hasOwn(item, 'id')) replies.push(errorResponse(readableId(item), INVALID_REQUEST, message));
+    const parsed = validateRequest(item);
+    if (parsed.ok && !parsed.request.hasId) continue;
+    replies.push(parsed.ok ? errorResponse(parsed.request.id, INVALID_REQUEST, message) : errorResponse(parsed.id, parsed.error.code, parsed.error.message));
   }
   assert.ok(replies.length <= batch.length, 'at most one reply per batch entry');
   return replies.length > 0 ? replies : null;

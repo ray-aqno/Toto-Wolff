@@ -1,12 +1,13 @@
 /**
  * Shared logic for the plugin/ folder: the Claude Code plugin ships only
- * plugin/ (its manifest, copies of the skills it lists, and one minified MCP
- * server bundle), never the whole repository.
+ * plugin/ (its manifest, copies of the skills it lists, and the readable .mts
+ * MCP server under plugin/server/), never the whole repository.
  *
- * Sources of truth stay where contributors edit them: skills in
- * .claude/skills/<name>/, server code in packages/. plugin/ is a generated
- * artifact. sync-plugin.ts regenerates it; check-plugin-sync.ts proves the
- * committed copy matches a fresh regeneration, failing closed on any
+ * Skills keep their source of truth in .claude/skills/<name>/ and are copied
+ * into plugin/; the server's source of truth is plugin/server/ itself (Node
+ * runs it directly, so there is nothing to build). sync-plugin.ts regenerates
+ * the skill copies; check-plugin-sync.ts proves the committed folder has the
+ * allowed shape and matches its sources, failing closed on any
  * difference in bytes or exec bit, on missing or extra files, and on symlinks
  * (a symlink pointing outside the plugin folder ships dangling in an
  * installed copy, so none are allowed anywhere in plugin/).
@@ -39,8 +40,12 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const PLUGIN_DIR = 'plugin';
 /** The plugin manifest, relative to the plugin folder. */
 export const MANIFEST_REL = join('.claude-plugin', 'plugin.json');
-/** The minified MCP server bundle, relative to the plugin folder. */
-export const BUNDLE_REL = join('server', 'index.mjs');
+/** The plugin's own README, the one other file allowed at the plugin root. */
+export const README_REL = 'README.md';
+/** The MCP server folder, relative to the plugin folder. Only .mts files may ship in it. */
+export const SERVER_DIR_REL = 'server';
+/** The MCP server entry Claude Code starts, relative to the plugin folder. */
+export const SERVER_ENTRY_REL = join(SERVER_DIR_REL, 'index.mts');
 /** Where the real skill files live, relative to the repo root. */
 export const SKILLS_SOURCE_DIR = join('.claude', 'skills');
 
@@ -50,13 +55,8 @@ export const MAX_SKILLS = 16;
 export const MAX_FILES = 500;
 /** Upper bound on directory depth walked in any one tree. */
 export const MAX_DEPTH = 8;
-/** The plugin directory's text-inspection limit: a larger file cannot be reviewed. */
-export const MAX_FILE_BYTES = 1024 * 1024;
-/** The esbuild banner, which must appear exactly once (twice means the bundle was bundled again). */
-export const BUNDLE_BANNER = 'import { createRequire as __totoCreateRequire }';
-
-/** Build order: mcp-server's tsc consumes core's emitted .d.ts files, so core builds first. */
-export const PACKAGES = ['core', 'mcp-server'] as const;
+/** The directory's pre-submission limit: every plugin file must be under 256 KiB. */
+export const MAX_FILE_BYTES = 256 * 1024;
 
 export type Result = { ok: true } | { ok: false; message: string };
 
@@ -209,33 +209,37 @@ export function diffTrees(expected: TreeEntry[], actual: TreeEntry[]): Finding[]
 }
 
 /**
- * Checks the plugin folder's shape: only the manifest, the bundle and the
- * listed skills may exist; no file may exceed MAX_FILE_BYTES; the bundle must
- * exist and carry the esbuild banner exactly once. Returns the problems found.
+ * Checks the plugin folder's shape: only the manifest, README.md, the listed
+ * skills and .mts files under server/ may exist; every file must be under MAX_FILE_BYTES;
+ * the server entry must exist. Symlinks already fail listTree. Returns the
+ * problems found.
  */
 export function checkPluginLayout(pluginRoot: string, skills: string[]): string[] {
   assert(isAbsolute(pluginRoot), `plugin root must be absolute: ${pluginRoot}`);
   assert(skills.length >= 1 && skills.length <= MAX_SKILLS, 'skill list out of range');
-  const allowedSkillDirs = new Set(skills.map((name) => join('skills', name)));
+  const allowedSkillDirs = skills.map((name) => join('skills', name) + sep);
   const problems: string[] = [];
   // Bounded: listTree returns at most MAX_FILES entries.
   for (const entry of listTree(pluginRoot)) {
-    const inSkill = [...allowedSkillDirs].some((d) => entry.rel.startsWith(d + sep));
-    if (entry.rel !== MANIFEST_REL && entry.rel !== BUNDLE_REL && !inSkill) {
-      problems.push(`not allowed in the plugin folder: ${entry.rel}`);
-    }
-    if (statSync(join(pluginRoot, entry.rel)).size > MAX_FILE_BYTES) {
-      problems.push(`over ${String(MAX_FILE_BYTES)} bytes (the directory cannot inspect it): ${entry.rel}`);
+    const problem = layoutProblem(entry.rel, allowedSkillDirs);
+    if (problem !== null) problems.push(problem);
+    if (statSync(join(pluginRoot, entry.rel)).size >= MAX_FILE_BYTES) {
+      problems.push(`not under ${String(MAX_FILE_BYTES)} bytes (the directory's per-file limit): ${entry.rel}`);
     }
   }
-  const bundle = join(pluginRoot, BUNDLE_REL);
-  if (!existsSync(bundle)) {
-    problems.push(`missing bundle: ${BUNDLE_REL}`);
-  } else {
-    const banners = readFileSync(bundle, 'utf-8').split(BUNDLE_BANNER).length - 1;
-    if (banners !== 1) problems.push(`bundle has ${String(banners)} esbuild banners, expected exactly 1 (bundled twice?)`);
-  }
+  if (!existsSync(join(pluginRoot, SERVER_ENTRY_REL))) problems.push(`missing server entry: ${SERVER_ENTRY_REL}`);
   return problems;
+}
+
+/** Why one plugin file is not allowed where it is, or null if it is fine. */
+function layoutProblem(rel: string, allowedSkillDirs: string[]): string | null {
+  assert(rel.length > 0, 'a plugin file has a path');
+  if (rel === MANIFEST_REL || rel === README_REL) return null;
+  if (allowedSkillDirs.some((dir) => rel.startsWith(dir))) return null;
+  if (rel.startsWith(SERVER_DIR_REL + sep)) {
+    return rel.endsWith('.mts') ? null : `only readable .mts files may ship under ${SERVER_DIR_REL}/: ${rel}`;
+  }
+  return `not allowed in the plugin folder: ${rel}`;
 }
 
 /** Compares every listed skill's source with its copy in the plugin folder. */
@@ -265,34 +269,6 @@ export function syncSkills(root: string, skills: string[]): void {
   for (const name of skills) {
     copySkill(root, join(root, SKILLS_SOURCE_DIR, name), join(root, PLUGIN_DIR, 'skills', name));
   }
-}
-
-/**
- * Deletes both packages' dist/ and tsconfig.tsbuildinfo and the plugin's
- * server/ folder, then builds core and mcp-server in that order. Deleting
- * tsbuildinfo matters: a stale one lets tsc skip emitting, which is how the
- * old in-place bundle ended up bundled twice.
- */
-export function rebuildBundle(root: string): Result {
-  assert(isAbsolute(root), `root must be absolute: ${root}`);
-  assert(PACKAGES[0] === 'core', 'core must build first');
-  // Bounded: PACKAGES has 2 entries.
-  for (const pkg of PACKAGES) {
-    removeTree(root, join('packages', pkg, 'dist'));
-    removeTree(root, join('packages', pkg, 'tsconfig.tsbuildinfo'));
-  }
-  removeTree(root, join(PLUGIN_DIR, 'server'));
-  // Bounded: PACKAGES has 2 entries.
-  for (const pkg of PACKAGES) {
-    const build = spawnSync('pnpm', ['-C', join('packages', pkg), 'build'], { cwd: root, encoding: 'utf-8' });
-    if (build.error) return { ok: false, message: `could not spawn the ${pkg} build: ${build.error.message}` };
-    if (build.status !== 0) return { ok: false, message: `${pkg} build failed (exit ${String(build.status)}):\n${build.stderr}` };
-  }
-  const bundle = join(root, PLUGIN_DIR, BUNDLE_REL);
-  if (!existsSync(bundle) || statSync(bundle).size === 0) {
-    return { ok: false, message: `the build did not produce ${join(PLUGIN_DIR, BUNDLE_REL)}` };
-  }
-  return { ok: true };
 }
 
 /**

@@ -49,13 +49,13 @@ pnpm -C packages/mcp-server build
 pnpm -C packages/mcp-server test
 ```
 
-Start the MCP server locally:
+Start the plugin's MCP server locally (Node 24, no build step):
 ```bash
-node plugin/server/index.mjs
-# Server binds to 127.0.0.1:3099
+node plugin/server/index.mts
+# Speaks MCP over stdio: one JSON-RPC message per line on stdin and stdout
 ```
 
-`pnpm build` rewrites `plugin/server/index.mjs` (the minified bundle the plugin ships); commit it with the source change. `pnpm sync:plugin` also refreshes the skill copies under `plugin/skills/`, and CI's `check:plugin-sync` fails if either is stale.
+`plugin/server/` is edited in place: Node runs the `.mts` files directly, so there is nothing to build or regenerate. The v1 server in `packages/mcp-server` still builds with `pnpm build` and runs with `node packages/mcp-server/dist/index.js` (binds 127.0.0.1:3099), but it is no longer part of the plugin. `pnpm sync:plugin` refreshes the skill copies under `plugin/skills/`, and CI's `check:plugin-sync` fails if they are stale or if `plugin/` breaks its layout rules (only `.mts` files under `server/`, every file under 256 KiB).
 
 Drive the full governance cycle end-to-end:
 ```bash

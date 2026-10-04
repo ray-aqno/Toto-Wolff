@@ -5,15 +5,20 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { createServer } from '../../plugin/server/mcp/server.mts';
 import type { Tool } from '../../plugin/server/mcp/server.mts';
+import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 const echo: Tool = {
   definition: { name: 'echo', description: 'echo tool', inputSchema: { type: 'object' } },
   handler: (args) => ({ content: [{ type: 'text', text: String(args.text) }] }),
 };
+
+// The six tools' definitions as the real entry lists them (#60), captured from
+// the server once and kept as a literal like everything else here.
+const SIX_TOOLS = "[{\"name\":\"vault_write\",\"description\":\"Write a record to the toto vault (path relative to the vault root)\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"path\",\"content\"]}},{\"name\":\"vault_search\",\"description\":\"Search vault records for literal, case-sensitive text\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\"}},\"required\":[\"query\"]}},{\"name\":\"drs_check\",\"description\":\"Check a tool call against DRS boundary rules\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"tool\":{\"type\":\"string\",\"enum\":[\"Write\",\"Edit\",\"NotebookEdit\",\"Bash\"]},\"target_path\":{\"type\":\"string\"},\"command\":{\"type\":\"string\"},\"message_before\":{\"type\":\"string\"}},\"required\":[\"tool\"]}},{\"name\":\"subagent_list\",\"description\":\"List available subagents\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"scope\":{\"type\":\"string\",\"enum\":[\"user\",\"project\",\"both\"]}}}},{\"name\":\"dashboard_status\",\"description\":\"Get current vault stats for the dashboard\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"score_confidence\",\"description\":\"Score confidence of a council ruling\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"ruling\":{\"type\":\"string\"}},\"required\":[\"ruling\"]}}]";
 
 const IN_PROCESS: readonly (readonly [string, string | null])[] = [
   ["{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"c\",\"version\":\"1\"}}}",
@@ -78,30 +83,32 @@ const SPAWN_INPUT: readonly string[] = [
 const SPAWN_OUTPUT: readonly string[] = [
   "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"toto-wolff\",\"version\":\"2.0.0-dev.1\"}}}",
   "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{}}",
-  "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"tools\":[]}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
   "{\"jsonrpc\":\"2.0\",\"id\":4,\"error\":{\"code\":-32602,\"message\":\"Unknown tool: echo\"}}",
   "{\"jsonrpc\":\"2.0\",\"id\":5,\"error\":{\"code\":-32602,\"message\":\"Unknown tool: nope\"}}",
   "{\"jsonrpc\":\"2.0\",\"id\":6,\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}",
   "{\"jsonrpc\":\"2.0\",\"id\":7,\"error\":{\"code\":-32602,\"message\":\"initialize needs a protocolVersion string\"}}",
   "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":{}}",
-  "{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":{\"tools\":[]}}",
-  "{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{\"tools\":[]}}",
-  "{\"jsonrpc\":\"2.0\",\"id\":10,\"result\":{\"tools\":[]}}",
-  "{\"jsonrpc\":\"2.0\",\"id\":11,\"result\":{\"tools\":[]}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":10,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":11,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
   "{\"jsonrpc\":\"2.0\",\"id\":12,\"error\":{\"code\":-32602,\"message\":\"Unknown tool: echo\"}}",
   "{\"jsonrpc\":\"2.0\",\"id\":13,\"error\":{\"code\":-32602,\"message\":\"Unknown tool: echo\"}}",
-  "{\"jsonrpc\":\"2.0\",\"id\":14,\"result\":{\"tools\":[]}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":14,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
   "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Batch requests are not supported\"}}",
 ];
 
 describe('legacy replies are byte-identical to fa40059', () => {
+  afterAll(removeIsolatedEnvs);
+
   it.each(IN_PROCESS.map(([input, output], i) => [i, input, output] as const))('case %i', async (_i, input, output) => {
     const reply = await createServer([echo])(input);
     expect(reply === null ? null : JSON.stringify(reply)).toBe(output);
   });
 
-  it('the real entry (empty tool registry) answers the same stream byte for byte', () => {
-    const run = spawnSync(process.execPath, [ENTRY], { input: `${SPAWN_INPUT.join('\n')}\n`, encoding: 'utf8', timeout: 20_000 });
+  it('the real entry (the six #60 tools) answers the same stream byte for byte', () => {
+    const run = spawnSync(process.execPath, [ENTRY], { input: `${SPAWN_INPUT.join('\n')}\n`, encoding: 'utf8', timeout: 20_000, env: isolatedEnv() });
     expect(run.status).toBe(0);
     expect(run.stderr).toBe('');
     expect(run.stdout).toBe(`${SPAWN_OUTPUT.join('\n')}\n`);

@@ -20,6 +20,10 @@ function validateInput(raw: unknown): VaultWriteInput {
   if (typeof input['path'] !== 'string' || input['path'].length === 0) {
     throw new MCPValidationError('path must be non-empty string');
   }
+  // The file backend's own checks, surfaced as input errors (not internal ones).
+  if (input['path'].includes('..') || input['path'].startsWith('/') || input['path'].includes('\0')) {
+    throw new MCPValidationError('path must be relative to the vault, without ".." or null bytes');
+  }
   if (typeof input['content'] !== 'string' || input['content'].length === 0) {
     throw new MCPValidationError('content must be non-empty string');
   }

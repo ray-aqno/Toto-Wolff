@@ -2,9 +2,11 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { createServer } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler, Tool } from '../../plugin/server/mcp/server.mts';
+import { DEFINITIONS } from '../../plugin/server/tools/index.mts';
+import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 const VERSION_KEY = 'io.modelcontextprotocol/protocolVersion';
@@ -181,19 +183,21 @@ describe('era routing', () => {
 });
 
 describe('the real entry serves both eras over stdio', () => {
+  afterAll(removeIsolatedEnvs);
+
   it('answers a modern discover and tools/list, then a legacy initialize', () => {
     const input = [
       modern('server/discover', {}, META),
       req('tools/list', { _meta: META }, 2),
       req('initialize', { protocolVersion: '2025-11-25' }, 3),
     ].join('\n');
-    const run = spawnSync(process.execPath, [ENTRY], { input: `${input}\n`, encoding: 'utf8', timeout: 20_000 });
+    const run = spawnSync(process.execPath, [ENTRY], { input: `${input}\n`, encoding: 'utf8', timeout: 20_000, env: isolatedEnv() });
     expect(run.status).toBe(0);
     expect(run.stderr).toBe('');
     const replies = run.stdout.trim().split('\n').map((line): unknown => JSON.parse(line));
     expect(replies).toEqual([
       { jsonrpc: '2.0', id: 1, result: expect.objectContaining({ supportedVersions: ['2026-07-28'], resultType: 'complete' }) as unknown },
-      { jsonrpc: '2.0', id: 2, result: { tools: [], ttlMs: 300000, cacheScope: 'public', resultType: 'complete', _meta: SERVER_INFO } },
+      { jsonrpc: '2.0', id: 2, result: { tools: Object.values(DEFINITIONS), ttlMs: 300000, cacheScope: 'public', resultType: 'complete', _meta: SERVER_INFO } },
       { jsonrpc: '2.0', id: 3, result: expect.objectContaining({ protocolVersion: '2025-11-25' }) as unknown },
     ]);
   });

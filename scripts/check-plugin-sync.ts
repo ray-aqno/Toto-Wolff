@@ -3,12 +3,12 @@
  * Fail-closed CI gate: the committed plugin/ folder must be exactly what
  * `pnpm sync:plugin` would produce from the current source.
  *
- * Rebuilds the bundle from clean (deleting dist/ and tsconfig.tsbuildinfo so
- * tsc cannot skip emitting), then fails on any of: a file outside the allowed
- * layout, a file over the directory's 1 MiB inspection limit, a missing or
- * double-bundled bundle, a skill copy that differs from its source in bytes
- * or exec bit, a missing or extra skill file, any symlink, or any modified,
- * deleted or untracked path under plugin/ versus the committed tree.
+ * Fails on any of: a file outside the allowed layout (manifest, listed
+ * skills, .mts files under server/), a file not under the directory's 256 KiB
+ * per-file limit, a missing server entry, a skill copy that differs from its
+ * source in bytes or exec bit, a missing or extra skill file, any symlink, or
+ * any modified, deleted or untracked path under plugin/ versus the committed
+ * tree.
  */
 
 import { join } from 'node:path';
@@ -21,16 +21,10 @@ import {
   checkSkillCopies,
   compareAgainstCommitted,
   readSkillList,
-  rebuildBundle,
 } from './plugin-sync-lib.js';
 
 function main(): number {
   const skills = readSkillList(join(REPO_ROOT, PLUGIN_DIR, MANIFEST_REL));
-  const rebuild = rebuildBundle(REPO_ROOT);
-  if (!rebuild.ok) {
-    console.error(`check-plugin-sync: ${rebuild.message}`);
-    return 1;
-  }
   const problems = [
     ...checkPluginLayout(join(REPO_ROOT, PLUGIN_DIR), skills),
     ...checkSkillCopies(REPO_ROOT, skills),
@@ -42,7 +36,7 @@ function main(): number {
     console.error('check-plugin-sync: run `pnpm sync:plugin` and commit the result.');
     return 1;
   }
-  process.stdout.write(`check-plugin-sync: ${PLUGIN_DIR}/ matches a fresh rebuild (${String(skills.length)} skills + bundle).\n`);
+  process.stdout.write(`check-plugin-sync: ${PLUGIN_DIR}/ matches its sources (${String(skills.length)} skills + server).\n`);
   return 0;
 }
 

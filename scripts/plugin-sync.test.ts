@@ -12,9 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  BUNDLE_BANNER,
   MAX_FILE_BYTES,
-  PACKAGES,
   assertNoSymlink,
   assertUnderRoot,
   checkPluginLayout,
@@ -29,7 +27,7 @@ import {
 const SKILLS = ['drs', 'p10'];
 let root: string;
 
-/** Builds a fixture repo: two source skills (drs has an executable script), a manifest and a bundle. */
+/** Builds a fixture repo: two source skills (drs has an executable script), a manifest and a server entry. */
 function makeFixture(): string {
   const dir = mkdtempSync(join(tmpdir(), 'plugin-sync-test-'));
   mkdirSync(join(dir, '.claude', 'skills', 'drs', 'bin'), { recursive: true });
@@ -41,7 +39,7 @@ function makeFixture(): string {
   mkdirSync(join(dir, 'plugin', '.claude-plugin'), { recursive: true });
   writeManifest(dir, SKILLS.map((s) => `./skills/${s}`));
   mkdirSync(join(dir, 'plugin', 'server'), { recursive: true });
-  writeFileSync(join(dir, 'plugin', 'server', 'index.mjs'), `${BUNDLE_BANNER} from "node:module";\nconsole.log(1);\n`);
+  writeFileSync(join(dir, 'plugin', 'server', 'index.mts'), "import process from 'node:process';\nvoid process;\n");
   return dir;
 }
 
@@ -98,17 +96,27 @@ describe('the plugin folder layout is enforced', () => {
     symlinkSync(join(root, '.claude', 'skills', 'p10'), join(root, 'plugin', 'skills', 'linked'));
     expect(() => problems()).toThrow(/symlink/);
   });
-  it('file over the 1 MiB inspection limit', () => {
-    writeFileSync(join(root, 'plugin', 'server', 'index.mjs'), `${BUNDLE_BANNER}\n${'x'.repeat(MAX_FILE_BYTES)}`);
-    expect(problems().some((p) => p.startsWith(`over ${String(MAX_FILE_BYTES)} bytes`))).toBe(true);
+  it('file at the 256 KiB per-file limit', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'index.mts'), 'x'.repeat(MAX_FILE_BYTES));
+    expect(problems()).toContain(`not under ${String(MAX_FILE_BYTES)} bytes (the directory's per-file limit): server/index.mts`);
   });
-  it('missing bundle', () => {
-    unlinkSync(join(root, 'plugin', 'server', 'index.mjs'));
-    expect(problems()).toContain('missing bundle: server/index.mjs');
+  it('a file just under the limit passes', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'index.mts'), 'x'.repeat(MAX_FILE_BYTES - 1));
+    expect(problems()).toEqual([]);
   });
-  it('bundle bundled twice (two banners)', () => {
-    writeFileSync(join(root, 'plugin', 'server', 'index.mjs'), `${BUNDLE_BANNER};\n${BUNDLE_BANNER};\n`);
-    expect(problems().some((p) => p.includes('2 esbuild banners'))).toBe(true);
+  it('missing server entry', () => {
+    unlinkSync(join(root, 'plugin', 'server', 'index.mts'));
+    expect(problems()).toContain('missing server entry: server/index.mts');
+  });
+  it.each(['index.mjs', 'package.json', 'helper.ts', 'mcp/util.js'])('non-.mts file under server/: %s', (name) => {
+    mkdirSync(join(root, 'plugin', 'server', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'server', name), 'x');
+    expect(problems()).toContain(`only readable .mts files may ship under server/: server/${name}`);
+  });
+  it('nested .mts modules under server/ are allowed', () => {
+    mkdirSync(join(root, 'plugin', 'server', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'server', 'mcp', 'protocol.mts'), 'export {};\n');
+    expect(problems()).toEqual([]);
   });
 });
 
@@ -155,11 +163,5 @@ describe('path guards', () => {
   it('diffTrees reports nothing for identical trees', () => {
     const tree = listTree(join(root, '.claude', 'skills', 'drs'));
     expect(diffTrees(tree, tree)).toEqual([]);
-  });
-});
-
-describe('PACKAGES', () => {
-  it('is core then mcp-server (core must build first)', () => {
-    expect(PACKAGES).toEqual(['core', 'mcp-server']);
   });
 });

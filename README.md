@@ -2,11 +2,11 @@
 
 This branch is a test, not a release. Do not install it.
 
-It checks that a Claude Code plugin kept at the root of an orphan branch passes the Claude plugin directory's Validate step. The plugin is one skill (`hello`) and a dependency-free MCP server (`server/index.ts`) with one tool, `echo`.
+It checks that a Claude Code plugin kept at the root of an orphan branch passes the Claude plugin directory's Validate step. The plugin is one skill (`hello`) and a dependency-free MCP server (`server/index.mts`) with one tool, `echo`.
 
 ## Requirements
 
-- Node 24 or newer. Claude Code starts the server with `node server/index.ts`, and Node runs the TypeScript file directly by stripping its types. Older Node releases cannot load a `.ts` file, so the server will not start there.
+- Node 24 or newer. Claude Code starts the server with `node server/index.mts`, and Node runs the TypeScript file directly by stripping its types. Older Node releases cannot load a `.ts` file, so the server will not start there.
 - No credentials, settings, or network access.
 
 ## Behavior

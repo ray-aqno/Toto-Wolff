@@ -1,5 +1,5 @@
 // toto-wolff 2.0 layout spike: a dependency-free MCP server over stdio.
-// Node 24 runs this file directly by stripping its types, so it must use only
+// Node 24 runs this file directly by stripping its types. The .mts extension makes it an ES module whatever any package.json above it says, so it must use only
 // erasable TypeScript and node: built-ins. Plan: vault
 // P10-Plans/2026-10-03-orphan-branch-plugin-spike.md (issue #57, child #0).
 import assert from 'node:assert/strict';
@@ -76,7 +76,9 @@ function truncateUtf8(text: string, maxBytes: number): string {
   if (bytes.length <= maxBytes) return text;
   let end = maxBytes;
   // Bound: a UTF-8 character has at most 3 continuation bytes (0b10xxxxxx).
-  for (let step = 0; step < MAX_UTF8_CONTINUATION_BYTES && (bytes[end] & 0xc0) === 0x80; step++) {
+  for (let step = 0; step < MAX_UTF8_CONTINUATION_BYTES; step++) {
+    const byte = bytes[end];
+    if (byte === undefined || (byte & 0xc0) !== 0x80) break;
     end--;
   }
   const cut = bytes.subarray(0, end).toString('utf8');

@@ -13,7 +13,7 @@
   "mcpServers": {
     "toto-wolff": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.ts"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.mts"]
     }
   }
 }

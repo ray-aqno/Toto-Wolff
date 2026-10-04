@@ -330,7 +330,7 @@ jobs:
           if [ "$code" -ne 1 ]; then
             echo "::error::expected exit 1 on Node 22.18, got $code"; cat err.txt; exit 1
           fi
-          if [ "$(cat err.txt)" != "toto-wolff needs Node 24+" ]; then
+          if ! printf 'toto-wolff needs Node 24+\n' | cmp -s - err.txt; then
             echo "::error::stderr must be exactly the refusal line, got:"; cat err.txt; exit 1
           fi
           if [ -s out.txt ]; then

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError, toolError } from '../../plugin/server/mcp/protocol.mts';
 import { MAX_BATCH, MAX_RESULT_BYTES, MAX_TOOLS, createServer } from '../../plugin/server/mcp/server.mts';
-import type { Tool } from '../../plugin/server/mcp/server.mts';
+import type { LineHandler, Tool } from '../../plugin/server/mcp/server.mts';
 
 function tool(name: string, handler: Tool['handler']): Tool {
   return { definition: { name, description: `${name} tool`, inputSchema: { type: 'object' } }, handler };
@@ -43,12 +43,19 @@ describe('built-in methods', () => {
   });
 });
 
-describe('JSON-RPC batches (MCP 2025-03-26)', () => {
-  const handle = createServer([echo]);
+describe('JSON-RPC batches (MCP 2025-03-26 only)', () => {
   const ping = (id: number): unknown => ({ jsonrpc: '2.0', id, method: 'ping' });
   const note = { jsonrpc: '2.0', method: 'notifications/initialized' };
+  const init = (version: string): string =>
+    JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: version } });
+  const session = async (version: string): Promise<LineHandler> => {
+    const handle = createServer([echo]);
+    await handle(init(version));
+    return handle;
+  };
 
   it('answers each request in order and skips notifications', async () => {
+    const handle = await session('2025-03-26');
     const reply = await handle(JSON.stringify([ping(1), note, { jsonrpc: '2.0', id: 2, method: 'nope' }, 'x']));
     expect(reply).toEqual([
       { jsonrpc: '2.0', id: 1, result: {} },
@@ -57,21 +64,43 @@ describe('JSON-RPC batches (MCP 2025-03-26)', () => {
     ]);
   });
 
-  it('owes no reply to a batch of notifications only', async () => {
-    expect(await handle(JSON.stringify([note, note]))).toBeNull();
+  it('owes no reply to a batch of notifications only, including an initialize notification', async () => {
+    const handle = await session('2025-03-26');
+    expect(await handle(JSON.stringify([note, { jsonrpc: '2.0', method: 'initialize' }]))).toBeNull();
   });
 
-  it('rejects an empty batch and an oversized batch with one error', async () => {
+  it('rejects an empty batch with one error', async () => {
+    const handle = await session('2025-03-26');
     expect(await handle('[]')).toMatchObject({ id: null, error: { code: -32600, message: 'Empty batch' } });
-    const many = Array.from({ length: MAX_BATCH + 1 }, (_, i) => ping(i));
-    expect(await handle(JSON.stringify(many))).toMatchObject({ error: { code: -32600 } });
+  });
+
+  it('answers an oversized batch per request, under each id, and never answers its notifications', async () => {
+    const handle = await session('2025-03-26');
+    const many = Array.from({ length: MAX_BATCH + 1 }, (_, i) => (i % 2 === 0 ? ping(i) : note));
+    const reply = await handle(JSON.stringify(many));
+    expect(Array.isArray(reply)).toBe(true);
+    const ids = Array.isArray(reply) ? reply.map((m) => m.id) : [];
+    expect(ids).toEqual(Array.from({ length: MAX_BATCH + 1 }, (_, i) => i).filter((i) => i % 2 === 0));
+    expect(await handle(JSON.stringify(Array.from({ length: MAX_BATCH + 1 }, () => note)))).toBeNull();
   });
 
   it('refuses initialize inside a batch', async () => {
-    const init = { jsonrpc: '2.0', id: 5, method: 'initialize', params: { protocolVersion: '2025-03-26' } };
-    expect(await handle(JSON.stringify([init]))).toEqual([
+    const handle = await session('2025-03-26');
+    const inner = { jsonrpc: '2.0', id: 5, method: 'initialize', params: { protocolVersion: '2025-03-26' } };
+    expect(await handle(JSON.stringify([inner]))).toEqual([
       { jsonrpc: '2.0', id: 5, error: { code: -32600, message: 'initialize must not be part of a batch' } },
     ]);
+  });
+
+  it.each([['2025-06-18'], ['2025-11-25'], ['2024-11-05']])('refuses batches after negotiating %s', async (version) => {
+    const handle = await session(version);
+    const reply = await handle(JSON.stringify([ping(1)]));
+    expect(reply).toMatchObject({ id: null, error: { code: -32600, message: `Batch requests are not supported in protocol version ${version}` } });
+  });
+
+  it('refuses batches before initialize', async () => {
+    const reply = await createServer([echo])(JSON.stringify([ping(1)]));
+    expect(reply).toMatchObject({ error: { code: -32600, message: 'Batch requests are not supported in protocol version (not initialized)' } });
   });
 });
 

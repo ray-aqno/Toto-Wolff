@@ -123,7 +123,30 @@ export function registerClient(res: ServerResponse, vaultPath: string): void {
   if (clients.size === 1) {
     assert(statsHandle === null, 'registerClient: statsHandle must be null before first client');
     assert(keepAliveHandle === null, 'registerClient: keepAliveHandle must be null before first client');
-    statsHandle = setInterval(() => void broadcastStats(vaultPath), 15_000);
-    keepAliveHandle = setInterval(() => broadcastKeepAlive(), 10_000);
+    // unref: open dashboard tabs never keep the MCP server process alive.
+    statsHandle = setInterval(() => void broadcastStats(vaultPath), 15_000).unref();
+    keepAliveHandle = setInterval(() => broadcastKeepAlive(), 10_000).unref();
   }
+}
+
+/**
+ * Close-down: ends every client, clears both timers and empties the Set.
+ * Called when the dashboard server stops, so the process can exit.
+ */
+export function closeAllClients(): void {
+  const open = [...clients];
+  clients.clear();
+  // LOOP BOUND: open.length <= MAX_CLIENTS = 50
+  for (const client of open) {
+    try {
+      client.end();
+    } catch {
+      // already gone
+    }
+  }
+  if (statsHandle !== null) clearInterval(statsHandle);
+  if (keepAliveHandle !== null) clearInterval(keepAliveHandle);
+  statsHandle = null;
+  keepAliveHandle = null;
+  assert(clients.size === 0, 'closeAllClients: no client remains');
 }

@@ -171,7 +171,7 @@ describe('graph errors are { error: { code, message } } results', () => {
 });
 
 describe('spec criterion 12: no shipped auto-allow for graph_approve', () => {
-  it('names graph_approve only in the server code, never in a manifest, setting or skill', () => {
+  it('names graph_approve only in the server code and the README, never in a manifest, setting or skill', () => {
     const hits: string[] = [];
     const stack = [PLUGIN];
     while (stack.length > 0) {
@@ -183,7 +183,8 @@ describe('spec criterion 12: no shipped auto-allow for graph_approve', () => {
       }
     }
     expect(hits.length).toBeGreaterThan(0);
-    expect(hits.every((h) => h.startsWith('server/') && h.endsWith('.mts'))).toBe(true);
+    // The README documents why gates are advisory; it grants nothing.
+    expect(hits.filter((h) => !(h.startsWith('server/') && h.endsWith('.mts')) && h !== 'README.md')).toEqual([]);
     expect(JSON.stringify(JSON.parse(readFileSync(join(PLUGIN, '.claude-plugin', 'plugin.json'), 'utf8')))).not.toMatch(/"permissions"|"allow"/);
   });
 

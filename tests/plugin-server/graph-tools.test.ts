@@ -103,8 +103,8 @@ describe('a full run through the tools', () => {
     expect(events.find((e) => e.nodeId === 'spec')).toMatchObject({ evidence: 'brief written', artifacts: ['docs/brief.md'] });
     expect(events.find((e) => e.type === 'approve')).toMatchObject({ decision: 'approve', note: 'user said yes' });
     const state = readFileSync(join(dir, 'state.json'), 'utf8');
-    expect(state).not.toContain('brief written');
-    expect(state).not.toContain('user said yes');
+    // No evidence or note from any step, including the last, is in the state.
+    for (const kept of ['brief written', 'adr fits', 'adr written', 'user said yes', 'all stages pass']) expect(state).not.toContain(kept);
     expect(JSON.parse(state)).toMatchObject({ eventSeq: events.length });
     expect(readFileSync(join(project, '.toto', 'runs', '.gitignore'), 'utf8')).toBe('*\n');
     expect(existsSync(join(dir, 'lock'))).toBe(false);

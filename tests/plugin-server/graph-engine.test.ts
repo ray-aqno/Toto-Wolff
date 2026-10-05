@@ -177,12 +177,12 @@ describe('gates, failure and the error order', () => {
   });
 
   it.each([
-    ['an unknown node', (s: RunState) => pass(s, 'nope'), 'UNKNOWN_NODE'],
-    ['a node that is not current', (s: RunState) => pass(s, 'j'), 'STALE_STEP'],
-    ['a report on a gate', (s: RunState) => pass(runTo(s, ['s', 'c', 'd', 'j']), 'g'), 'NOT_A_GATE'],
-    ['an approval of a non-gate', (s: RunState) => approveNode(s, 's', 'approve'), 'NOT_A_GATE'],
-    ['a report on a finished run', (s: RunState) => pass(reportNode(s, 's', 'fail').state, 'c'), 'RUN_FINISHED'],
-    ['a report while stopped at the target', (s: RunState) => pass(pass(createRun(FORK, 'r', 'i', 's', NOW).state, 's').state, 'c', 'adr'), 'STALE_STEP'],
+    ['an unknown node', (s: RunState): Transition => pass(s, 'nope'), 'UNKNOWN_NODE'],
+    ['a node that is not current', (s: RunState): Transition => pass(s, 'j'), 'STALE_STEP'],
+    ['a report on a gate', (s: RunState): Transition => pass(runTo(s, ['s', 'c', 'd', 'j']), 'g'), 'NOT_A_GATE'],
+    ['an approval of a non-gate', (s: RunState): Transition => approveNode(s, 's', 'approve'), 'NOT_A_GATE'],
+    ['a report on a finished run', (s: RunState): Transition => pass(reportNode(s, 's', 'fail').state, 'c'), 'RUN_FINISHED'],
+    ['a report while stopped at the target', (): Transition => pass(pass(createRun(FORK, 'r', 'i', 's', NOW).state, 's').state, 'c', 'adr'), 'STALE_STEP'],
   ])('%s -> %s', (_name, act, code) => {
     expect(() => act(start())).toThrow(expect.objectContaining({ code }) as Error);
   });

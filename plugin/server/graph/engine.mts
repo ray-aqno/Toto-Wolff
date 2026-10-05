@@ -213,7 +213,7 @@ function applyChoice(state: RunState, node: GraphNode, choice: string | undefine
 }
 
 /** graph_report for a skill, choice or loop node. */
-export function reportNode(prior: RunState, nodeId: string, outcome: 'pass' | 'fail', choice: string | undefined): Transition {
+export function reportNode(prior: RunState, nodeId: string, outcome: 'pass' | 'fail', choice?: string): Transition {
   if (checkTarget(prior, nodeId, false)) return { state: prior, events: [] };
   const state = begin(prior);
   const node = nodeOf(state, nodeId);

@@ -31,7 +31,7 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 | `dashboard_status` | none | vault record counts and recent items |
 | `score_confidence` | `ruling` | `{ "tier", "matchCount", "disqualifiers" }` |
 
-The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools are below (issue #61); loops that retry and the built-in idea-to-PR graph arrive in #62 and #63.
+The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools are below (issues #61 and #62); the built-in idea-to-PR graph arrives in #63.
 
 ### The vault
 
@@ -56,7 +56,7 @@ A graph is a DAG of steps that Claude works through one at a time, with the serv
 
 - `skill`: run a skill (`"skill": "/p10"`), then report pass or fail.
 - `choice`: pick one of its `options` (option name -> the node ids it enables); the nodes of the other options, and everything that only follows them, are skipped. An option node may follow only its choice, and every node that follows a choice must be in one of its options; a step that should always run goes after the branches join.
-- `loop`: like `skill`, with `maxIterations` (1 to 10, default 3). For now it runs once (`iteration: 1`); retries arrive in #62.
+- `loop`: like `skill`, retried until it passes: `maxIterations` attempts (1 to 10, default 3). The step carries `iteration`; a fail starts the next attempt, and a fail on the last attempt fails the run.
 - `human_gate`: a person approves or rejects.
 
 A graph is checked when it is loaded: a cycle, an unknown edge endpoint, more than 64 nodes, more or fewer than one start node, or a broken choice gets `INVALID_GRAPH` with a message that names the problem. At most 64 graph files are read, each at most 64 KiB.
@@ -69,12 +69,12 @@ A graph is checked when it is loaded: a cycle, an unknown edge endpoint, more th
 | `graph_template` | The RFC or ADR template (`kind`: `rfc` or `adr`), as Markdown. |
 | `graph_start` | Starts a run of `graph` with `input: { idea }` and an optional `stopAt` node; returns `runId` and the first step. |
 | `graph_next` | The current step (read-only; it never advances). |
-| `graph_report` | Reports the current skill, choice or loop step: `outcome` (`pass` or `fail`), `evidence`, optional `artifacts` and, for a choice, `choice`. A `fail` fails the run. |
+| `graph_report` | Reports the current skill, choice or loop step: `outcome` (`pass` or `fail`), `evidence`, optional `artifacts`, for a choice `choice`, and for a loop optionally `iteration`. A `fail` fails the run, except on a loop with attempts left. |
 | `graph_approve` | Records a person's `decision` (`approve` or `reject`) at a human gate, with an optional `note`. |
 | `graph_status` | The run's status and every node's state. |
 | `graph_resume` | Continues from the last checkpoint and returns the step in flight; an optional `stopAt` sets a new target (a node not yet completed). |
 
-The current step is the first ready node in `nodes` order. With `stopAt`, the run pauses (`stopped_at_target`) after that node completes, or before the next step if a choice skipped it; `graph_resume` continues it, to a new target or to the end. Reporting a step that is already complete returns the run as it is, so a retry after a crash is safe.
+The current step is the first ready node in `nodes` order. With `stopAt`, the run pauses (`stopped_at_target`) after that node completes, or before the next step if a choice skipped it; `graph_resume` continues it, to a new target or to the end. Reporting a step that is already complete returns the run as it is, so a retry after a crash is safe. For a loop, pass the step's `iteration` with each report: a report for an earlier attempt then changes nothing (even a different outcome: the `iteration` in the returned step is the attempt that counts), and a later one is `STALE_STEP`. Without `iteration`, a retried `fail` uses up another attempt. Once the run has failed, any further report is `RUN_FINISHED`.
 
 Graph failures come back as a tool result `{ "error": { "code", "message" } }` with `isError: true`. The codes: `UNKNOWN_GRAPH`, `UNKNOWN_RUN`, `UNKNOWN_NODE`, `INVALID_GRAPH`, `INVALID_CHOICE`, `RUN_BUSY`, `STALE_STEP` (not the current step, or the run is stopped at its target), `NOT_A_GATE` (`graph_approve` on a non-gate, or `graph_report` on a gate), `RUN_FINISHED`.
 

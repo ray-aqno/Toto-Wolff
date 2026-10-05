@@ -10,7 +10,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import process from 'node:process';
 import { INTERNAL_ERROR, RpcError, isRecord } from '../mcp/protocol.mts';
 import { GraphError, hasKey } from './model.mts';
-import type { EngineEvent, NodeRecord, NodeState, RunState, RunStatus } from './engine.mts';
+import type { NodeRecord, NodeState, RunState, RunStatus } from './engine.mts';
 import { parseGraph } from './validate.mts';
 
 export const RUN_ID_PATTERN = /^\d{8}-\d{6}-[0-9a-f]{6}$/;
@@ -167,7 +167,7 @@ async function endsMidLine(file: string): Promise<boolean> {
  * Appends events to events.jsonl, numbered from `firstSeq`. A failure is one
  * stderr warning: the transition already stands in state.json.
  */
-export async function appendEvents(projectDir: string, runId: string, events: readonly (EngineEvent & Record<string, unknown>)[], firstSeq: number, at: string): Promise<void> {
+export async function appendEvents(projectDir: string, runId: string, events: readonly object[], firstSeq: number, at: string): Promise<void> {
   assert.ok(Number.isSafeInteger(firstSeq) && firstSeq >= 1, 'event numbers start at 1');
   if (events.length === 0) return;
   const file = join(runDir(projectDir, runId), 'events.jsonl');

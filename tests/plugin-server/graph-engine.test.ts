@@ -39,7 +39,7 @@ describe('a run from start to done', () => {
   it('prunes the losing option, runs the join once, waits at the gate, runs the loop once, then is done', () => {
     let s = pass(start(), 's').state;
     const chose = pass(s, 'c', 'adr');
-    expect(chose.events).toEqual([{ type: 'report', nodeId: 'c', outcome: 'pass', choice: 'adr' }]);
+    expect(chose.events).toEqual([{ type: 'report', nodeId: 'c', outcome: 'pass', choice: 'adr' }, { type: 'skip', nodeIds: ['r'] }]);
     s = chose.state;
     expect(states(s)).toMatchObject({ r: 'skipped', d: 'pending' });
     expect(s.current).toBe('d');
@@ -81,7 +81,7 @@ describe('choices', () => {
     s = pass(s, 's').state;
     const t = pass(s, 'c', 'b');
     expect(states(t.state)).toMatchObject({ a1: 'skipped', a2: 'skipped', b1: 'pending' });
-    expect(t.events).toContainEqual({ type: 'skip', nodeIds: ['a2'] });
+    expect(t.events).toContainEqual({ type: 'skip', nodeIds: ['a1', 'a2'] });
   });
 });
 

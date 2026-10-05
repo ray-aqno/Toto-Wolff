@@ -52,7 +52,7 @@ beforeAll(() => {
   for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']) delete process.env[key];
   writeFileSync(join(root, 'drs.json'), JSON.stringify({ allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] }));
   process.env['TOTO_DRS_CONFIG'] = join(root, 'drs.json');
-  handle = createServer(createTools(createRuntime({ TOTO_VAULT_PATH: vault, HOME: join(root, 'home') })));
+  handle = createServer(createTools(createRuntime({ TOTO_VAULT_PATH: vault, HOME: join(root, 'home'), CLAUDE_PROJECT_DIR: join(root, 'project') })));
 });
 
 afterAll(() => {
@@ -90,7 +90,8 @@ describe('the six tools in both eras', () => {
     });
   });
 
-  it.each(TOOL_NAMES.map((name) => [name]))('%s answers in both eras', async (name) => {
+  // The #60 tools; the graph tools are covered in graph-tools.test.ts.
+  it.each(TOOL_NAMES.slice(0, 6).map((name) => [name]))('%s answers in both eras', async (name) => {
     const args: Record<string, unknown> = {
       vault_write: { path: 'Notes/each.md', content: 'x' },
       vault_search: { query: 'x' },

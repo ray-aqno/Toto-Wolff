@@ -14,6 +14,7 @@ import { handleScoreConfidence } from '../handlers/score_confidence_tool.mts';
 import { handleSubagentList } from '../handlers/subagent_list.mts';
 import { handleVaultSearch } from '../handlers/vault_search.mts';
 import { MCPValidationError, handleVaultWrite } from '../handlers/vault_write.mts';
+import { GRAPH_DEFINITIONS, createGraphTools } from '../graph/tools.mts';
 
 const STRING = { type: 'string' } as const;
 
@@ -24,6 +25,7 @@ export const DEFINITIONS: Readonly<Record<string, ToolDefinition>> = {
   subagent_list: { name: 'subagent_list', description: 'List available subagents', inputSchema: { type: 'object', properties: { scope: { type: 'string', enum: ['user', 'project', 'both'] } } } },
   dashboard_status: { name: 'dashboard_status', description: 'Get current vault stats for the dashboard', inputSchema: { type: 'object', properties: {} } },
   score_confidence: { name: 'score_confidence', description: 'Score confidence of a council ruling', inputSchema: { type: 'object', properties: { ruling: STRING }, required: ['ruling'] } },
+  ...Object.fromEntries(GRAPH_DEFINITIONS.map((d) => [d.name, d])),
 };
 
 function definition(name: string): ToolDefinition {
@@ -72,6 +74,7 @@ export function createTools(runtime: Runtime): Tool[] {
       requireRuling(args);
       return handleScoreConfidence(args, runtime.vaultPath);
     }),
+    ...createGraphTools(() => runtime.projectDir()),
   ];
   assert.equal(tools.length, Object.keys(DEFINITIONS).length, 'every definition has a tool');
   return tools;

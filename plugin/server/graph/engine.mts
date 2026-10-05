@@ -120,10 +120,11 @@ function advance(state: RunState, preds: ReadonlyMap<string, string[]>): EngineE
 // After a node completes: prune, advance, then stop if the target is now done
 // or skipped and a step remains (spec: pause after the target; a skipped
 // target pauses at the next step; with no step left the run is done).
-function settle(state: RunState): EngineEvent[] {
+function settle(state: RunState, pruned: readonly string[] = []): EngineEvent[] {
   const preds = predecessors(state.graph);
   const events: EngineEvent[] = [];
-  const skipped = propagateSkips(state, preds);
+  // A choice's own pruned options first, then what that pruning skips further.
+  const skipped = [...pruned, ...propagateSkips(state, preds)];
   if (skipped.length > 0) events.push({ type: 'skip', nodeIds: skipped });
   events.push(...advance(state, preds));
   const target = state.stopAt;
@@ -196,20 +197,26 @@ function fail(state: RunState, nodeId: string): EngineEvent[] {
   return [{ type: 'failed', nodeId }];
 }
 
-// A choice marks the nodes of every other option skipped.
-function applyChoice(state: RunState, node: GraphNode, choice: string | undefined): string {
+// A choice marks the nodes of every other option skipped; returns them.
+function applyChoice(state: RunState, node: GraphNode, choice: string | undefined): string[] {
   const options = node.options;
   assert.ok(options !== undefined, 'a choice node has options');
   if (choice === undefined || !hasKey(options, choice)) {
     throw new GraphError('INVALID_CHOICE', `node ${node.id} needs a choice, one of: ${Object.keys(options).join(', ')}`);
   }
+  const pruned: string[] = [];
+  // LOOP BOUND: option lists of one node, at most MAX_NODES ids in all.
   for (const key of Object.keys(options)) {
     if (key === choice) continue;
-    for (const id of options[key] ?? []) if (recordOf(state, id).state === 'pending') recordOf(state, id).state = 'skipped';
+    for (const id of options[key] ?? []) {
+      if (recordOf(state, id).state !== 'pending') continue;
+      recordOf(state, id).state = 'skipped';
+      pruned.push(id);
+    }
   }
   recordOf(state, node.id).choice = choice;
   assert.equal(recordOf(state, node.id).choice, choice, 'the choice is recorded');
-  return choice;
+  return pruned;
 }
 
 /** graph_report for a skill, choice or loop node. */
@@ -221,11 +228,14 @@ export function reportNode(prior: RunState, nodeId: string, outcome: 'pass' | 'f
   if (node.kind !== 'choice' && choice !== undefined) throw new GraphError('INVALID_CHOICE', `node ${nodeId} is not a choice node`);
   const reported: EngineEvent = { type: 'report', nodeId, outcome };
   if (outcome === 'fail') return { state, events: [reported, ...fail(state, nodeId)] };
+  let pruned: string[] = [];
   if (node.kind === 'choice') {
-    reported.choice = applyChoice(state, node, choice);
+    pruned = applyChoice(state, node, choice);
+    // applyChoice threw INVALID_CHOICE unless choice names an option.
+    if (choice !== undefined) reported.choice = choice;
   }
   recordOf(state, nodeId).state = 'done';
-  return { state, events: [reported, ...settle(state)] };
+  return { state, events: [reported, ...settle(state, pruned)] };
 }
 
 /** graph_approve for a human_gate node: approve completes it, reject fails the run. */

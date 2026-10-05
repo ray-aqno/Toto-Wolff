@@ -9,12 +9,16 @@ import type { AuditVault } from './core/DRSService.mts';
 import { SubagentService } from './core/SubagentService.mts';
 import type { VaultService } from './core/vault/VaultService.mts';
 import { getCachedVault } from './handlers/vault_cache.mts';
+import { resolveProjectDir } from './graph/store.mts';
 
 export interface Runtime {
   readonly vaultPath: string;
   vault(): Promise<VaultService>;
   drs(): DRSService;
   readonly subagents: SubagentService;
+  // The project the graph tools keep runs in, resolved on each call so the
+  // other tools never depend on it (Arbiter condition 8).
+  projectDir(): string;
 }
 
 /** TOTO_VAULT_PATH, else $HOME/.toto/vault; must be absolute (as v1). */
@@ -59,6 +63,7 @@ export function createRuntime(env: NodeJS.ProcessEnv): Runtime {
     vault,
     drs: () => (drs ??= new DRSService(undefined, auditVault)),
     subagents: new SubagentService(),
+    projectDir: () => resolveProjectDir(env, process.cwd()),
   };
   assert.ok(isAbsolute(runtime.vaultPath), 'the runtime holds an absolute vault path');
   return runtime;

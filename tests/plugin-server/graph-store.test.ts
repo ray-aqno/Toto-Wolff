@@ -3,7 +3,7 @@
 // stale-pid takeover (spec criterion 11).
 import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -75,6 +75,14 @@ describe('state.json', () => {
     const state = await readState(project, runId);
     expect(state).toMatchObject({ runId, status: 'running', current: 'a' });
     expect(Object.getPrototypeOf(state.nodes)).toBeNull();
+  });
+
+  it('replaces state.json by rename (a new file), never rewriting it in place', async () => {
+    const { dir, runId } = await newRun();
+    const before = statSync(join(dir, 'state.json')).ino;
+    await writeState(project, { ...(await readState(project, runId)), updatedAt: 'later' });
+    expect(statSync(join(dir, 'state.json')).ino).not.toBe(before);
+    expect(readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 
   it('ignores a stray temp file left by a killed write', async () => {

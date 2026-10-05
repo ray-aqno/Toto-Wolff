@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 const created: string[] = [];
 
-export const TOOL_NAMES = ['vault_write', 'vault_search', 'drs_check', 'subagent_list', 'dashboard_status', 'score_confidence'];
+export const TOOL_NAMES = ['vault_write', 'vault_search', 'drs_check', 'subagent_list', 'dashboard_status', 'score_confidence', 'graph_list', 'graph_template', 'graph_start', 'graph_next', 'graph_report', 'graph_approve', 'graph_status', 'graph_resume'];
 
 export function isolatedEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const dir = mkdtempSync(join(tmpdir(), 'toto-plugin-spawn-'));

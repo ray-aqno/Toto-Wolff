@@ -31,7 +31,7 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 | `dashboard_status` | none | vault record counts and recent items |
 | `score_confidence` | `ruling` | `{ "tier", "matchCount", "disqualifiers" }` |
 
-The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph and loop tools arrive in issues #61 to #63.
+The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools are below (issue #61); loops that retry and the built-in idea-to-PR graph arrive in #62 and #63.
 
 ### The vault
 
@@ -49,3 +49,43 @@ The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safet
 The dashboard HTTP server starts only when `TOTO_MCP_PORT` is set to a port from 1 to 65535 (every Claude session runs its own server, so there is no default port to fight over). It listens on `127.0.0.1` only and serves only GET routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. A request whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` gets 403, which blocks DNS rebinding from web pages. Any program on this machine can still read vault records through `/dashboard/record`, so turn the dashboard on only where that is acceptable. If the port is in use or not allowed, the server prints one warning and the MCP tools keep working. v1's POST tool routes (calling tools over HTTP) are removed.
 
 Tracking issue: https://github.com/ray-aqno/Toto-Wolff/issues/57
+
+## Task graphs
+
+A graph is a DAG of steps that Claude works through one at a time, with the server keeping the state. Graphs are JSON files in the project's `.toto/graphs/` folder: `{ "id", "version": 1, "nodes": [...], "edges": [[from, to], ...] }`, at most 64 nodes. A node has an `id` (`a-z`, `0-9` and `-`, up to 40 characters), a `kind`, and an `instruction`:
+
+- `skill`: run a skill (`"skill": "/p10"`), then report pass or fail.
+- `choice`: pick one of its `options` (option name -> the node ids it enables); the nodes of the other options, and everything that only follows them, are skipped. An option node may follow only its choice, and every node that follows a choice must be in one of its options; a step that should always run goes after the branches join.
+- `loop`: like `skill`, with `maxIterations` (1 to 10, default 3). For now it runs once (`iteration: 1`); retries arrive in #62.
+- `human_gate`: a person approves or rejects.
+
+A graph is checked when it is loaded: a cycle, an unknown edge endpoint, more than 64 nodes, more or fewer than one start node, or a broken choice gets `INVALID_GRAPH` with a message that names the problem. At most 64 graph files are read, each at most 64 KiB.
+
+### Tools
+
+| Tool | What it does |
+|---|---|
+| `graph_list` | The graphs in `.toto/graphs/`, and the files that are invalid, with the reason. |
+| `graph_template` | The RFC or ADR template (`kind`: `rfc` or `adr`), as Markdown. |
+| `graph_start` | Starts a run of `graph` with `input: { idea }` and an optional `stopAt` node; returns `runId` and the first step. |
+| `graph_next` | The current step (read-only; it never advances). |
+| `graph_report` | Reports the current skill, choice or loop step: `outcome` (`pass` or `fail`), `evidence`, optional `artifacts` and, for a choice, `choice`. A `fail` fails the run. |
+| `graph_approve` | Records a person's `decision` (`approve` or `reject`) at a human gate, with an optional `note`. |
+| `graph_status` | The run's status and every node's state. |
+| `graph_resume` | Continues from the last checkpoint and returns the step in flight; an optional `stopAt` sets a new target (a node not yet completed). |
+
+The current step is the first ready node in `nodes` order. With `stopAt`, the run pauses (`stopped_at_target`) after that node completes, or before the next step if a choice skipped it; `graph_resume` continues it, to a new target or to the end. Reporting a step that is already complete returns the run as it is, so a retry after a crash is safe.
+
+Graph failures come back as a tool result `{ "error": { "code", "message" } }` with `isError: true`. The codes: `UNKNOWN_GRAPH`, `UNKNOWN_RUN`, `UNKNOWN_NODE`, `INVALID_GRAPH`, `INVALID_CHOICE`, `RUN_BUSY`, `STALE_STEP` (not the current step, or the run is stopped at its target), `NOT_A_GATE` (`graph_approve` on a non-gate, or `graph_report` on a gate), `RUN_FINISHED`.
+
+### Run files
+
+Each run lives in `.toto/runs/<runId>/` in the project (`CLAUDE_PROJECT_DIR`, else the directory Claude Code started the server in). The server gives `.toto/runs/` its own `.gitignore`; it never edits yours.
+
+- `state.json` is the source of truth. It is rewritten after every change through a temporary file and a rename, so a crash or a killed session leaves either the old or the new state. A run uses the copy of the graph taken when it started; editing the graph file does not change a running run.
+- `events.jsonl` logs every change, with the evidence, artifacts and notes (which are kept out of `state.json`). Events are numbered; a crash at the wrong moment can leave a gap in the numbers, never a repeat.
+- `lock` holds the process id of a call that is changing the run. A second Claude session working on the same run gets `RUN_BUSY` until that call ends. A lock left by a process that no longer exists is taken over, so a crash never blocks a run. The lock needs a filesystem with hard links (any normal Linux or macOS filesystem, and WSL's `/mnt/c`). If a lock ever blocks a run with no session working on it (for example after the process id was reused, or when sessions run in separate containers sharing one project folder, which is not supported), delete `.toto/runs/<runId>/lock` by hand.
+
+### Human gates are advisory
+
+Every call comes from Claude, so the server cannot prove that a person approved a gate. The plugin grants no automatic permission for `graph_approve`, so in Claude Code's default permission mode the call shows a permission prompt. If you allow `graph_approve` (or `mcp__plugin_toto-wolff_toto-wolff__*`) in your settings, or run in auto or bypass mode, a human gate becomes a step Claude can pass on its own.

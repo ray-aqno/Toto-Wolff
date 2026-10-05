@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { INTERNAL_ERROR, RpcError, isRecord } from '../mcp/protocol.mts';
 import { GraphError } from './model.mts';
 import type { Graph } from './model.mts';
 import { parseGraph } from './validate.mts';
@@ -22,19 +23,26 @@ export interface UserGraphs {
   invalid: InvalidGraph[];
 }
 
+/** The project's user graph folder, `<project>/.toto/graphs`. */
 export function graphsDir(projectDir: string): string {
   const dir = join(projectDir, '.toto', 'graphs');
   assert.ok(dir.startsWith(projectDir), 'graphs live inside the project');
   return dir;
 }
 
+// The folder's *.json file names in name order. A missing folder means no
+// graphs; any other read failure is a readable error, not an empty list.
 async function jsonFiles(dir: string): Promise<string[]> {
+  assert.ok(dir.endsWith('graphs'), 'the graphs folder');
+  let entries;
   try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    return entries.filter((e) => e.isFile() && e.name.endsWith('.json')).map((e) => e.name).sort();
-  } catch {
-    return [];
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (isRecord(err) && err.code === 'ENOENT') return [];
+    const detail = isRecord(err) && typeof err.code === 'string' ? err.code : String(err);
+    throw new RpcError(INTERNAL_ERROR, `toto-wolff: cannot read ${dir} (${detail})`);
   }
+  return entries.filter((e) => e.isFile() && e.name.endsWith('.json')).map((e) => e.name).sort();
 }
 
 // Loads one file: a Graph, or the reason it is invalid.

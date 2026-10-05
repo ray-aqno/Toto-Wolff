@@ -13,6 +13,7 @@ import type { LineHandler } from '../../plugin/server/mcp/server.mts';
 import { createRuntime } from '../../plugin/server/runtime.mts';
 import { createTools } from '../../plugin/server/tools/index.mts';
 import { templateHeadings } from '../../plugin/server/graph/templates.mts';
+import { loadUserGraphs } from '../../plugin/server/graph/graphs.mts';
 
 const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin');
 const META = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} };
@@ -167,6 +168,20 @@ describe('graph errors are { error: { code, message } } results', () => {
     ['graph_resume', { runId: 'r', stopAt: '' }],
   ])('%s %j is invalid input (-32602)', async (name, args) => {
     expect(await call(name, args)).toMatchObject({ error: { code: -32602 } });
+  });
+});
+
+describe('the user graph folder', () => {
+  it('means no graphs when missing, and a readable error when it cannot be read', async () => {
+    const other = mkdtempSync(join(tmpdir(), 'toto-graphs-dir-'));
+    try {
+      expect(await loadUserGraphs(other)).toEqual({ graphs: [], invalid: [] });
+      mkdirSync(join(other, '.toto'));
+      writeFileSync(join(other, '.toto', 'graphs'), 'a file where the folder should be');
+      await expect(loadUserGraphs(other)).rejects.toMatchObject({ code: -32603, message: expect.stringContaining('cannot read') as unknown });
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
   });
 });
 

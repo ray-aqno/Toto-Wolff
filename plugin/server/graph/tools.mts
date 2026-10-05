@@ -127,9 +127,10 @@ function approve(projectDir: string, args: Record<string, unknown>): Promise<unk
 
 async function next(projectDir: string, args: Record<string, unknown>): Promise<unknown> {
   const runId = text('runId', args, 64);
-  const state = await readState(projectDir, runId);
+  // Lock first, then the state: a holder writes state.json before releasing,
+  // so a state read after a free lock includes every finished call.
   await assertNotBusy(runDir(projectDir, runId), runId);
-  return view(state);
+  return view(await readState(projectDir, runId));
 }
 
 async function status(projectDir: string, args: Record<string, unknown>): Promise<unknown> {

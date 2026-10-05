@@ -27,6 +27,7 @@ export function resolveProjectDir(env: NodeJS.ProcessEnv, cwd: string): string {
   return dir;
 }
 
+/** The project's run folder, `<project>/.toto/runs`. */
 export function runsDir(projectDir: string): string {
   assert.ok(isAbsolute(projectDir), 'the project directory is absolute');
   const dir = join(projectDir, '.toto', 'runs');

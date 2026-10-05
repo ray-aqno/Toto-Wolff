@@ -63,6 +63,7 @@ The decision, stated in one or two sentences, then the details that matter.
 What becomes easier, what becomes harder, and what must now be done because of this decision.
 `;
 
+/** Whether a value names a template (`rfc` or `adr`). */
 export function isTemplateKind(value: unknown): value is TemplateKind {
   return typeof value === 'string' && (TEMPLATE_KINDS as readonly string[]).includes(value);
 }

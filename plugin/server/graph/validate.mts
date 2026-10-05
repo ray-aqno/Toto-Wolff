@@ -207,7 +207,24 @@ function checkChoices(graph: Graph, preds: ReadonlyMap<string, string[]>): void 
       }
     }
   }
+  checkChoiceSuccessors(graph, owner);
   assert.ok(owner.size <= graph.nodes.length, 'each node has at most one option owner');
+}
+
+// Every direct successor of a choice is in one of its options (PR #69
+// review): an unlisted successor would run whatever is chosen, so a missing
+// option entry is a load-time error, not a branch that always runs.
+function checkChoiceSuccessors(graph: Graph, owner: ReadonlyMap<string, string>): void {
+  assert.ok(owner.size <= MAX_NODES, 'the owner map is bounded');
+  // LOOP BOUND: at most MAX_EDGES edges.
+  for (const [from, to] of graph.edges) {
+    const choice = graph.nodes.find((n) => n.id === from && n.kind === 'choice');
+    if (choice === undefined) continue;
+    if (!(owner.get(to) ?? '').startsWith(`${from}.`)) {
+      throw invalid(`node ${from}: successor ${to} is in none of its options; list it under one option, or put it after the branches join`);
+    }
+  }
+  assert.ok(graph.edges.length <= MAX_EDGES, 'the edges are bounded');
 }
 
 /** Validates unknown JSON as a Graph, or throws GraphError INVALID_GRAPH. */

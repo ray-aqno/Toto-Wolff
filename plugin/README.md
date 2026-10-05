@@ -55,7 +55,7 @@ Tracking issue: https://github.com/ray-aqno/Toto-Wolff/issues/57
 A graph is a DAG of steps that Claude works through one at a time, with the server keeping the state. Graphs are JSON files in the project's `.toto/graphs/` folder: `{ "id", "version": 1, "nodes": [...], "edges": [[from, to], ...] }`, at most 64 nodes. A node has an `id` (`a-z`, `0-9` and `-`, up to 40 characters), a `kind`, and an `instruction`:
 
 - `skill`: run a skill (`"skill": "/p10"`), then report pass or fail.
-- `choice`: pick one of its `options` (option name -> the node ids it enables); the nodes of the other options, and everything that only follows them, are skipped. An option node may follow only its choice.
+- `choice`: pick one of its `options` (option name -> the node ids it enables); the nodes of the other options, and everything that only follows them, are skipped. An option node may follow only its choice, and every node that follows a choice must be in one of its options; a step that should always run goes after the branches join.
 - `loop`: like `skill`, with `maxIterations` (1 to 10, default 3). For now it runs once (`iteration: 1`); retries arrive in #62.
 - `human_gate`: a person approves or rejects.
 

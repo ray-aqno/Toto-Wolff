@@ -214,7 +214,18 @@ export class FileStorage implements StorageBackend {
       return { committed: true };
     }
 
-    if (!(await this.isGitRepo())) {
+    let isRepo: boolean;
+    try {
+      isRepo = await this.isGitRepo();
+    } catch (err) {
+      // git itself failed (timeout, broken install): best effort, as for a
+      // failed commit below, so the queue never fills and rejects writes.
+      const reason = `git check failed: ${this.redactRootPath((err as Error).message)}`;
+      process.stderr.write(`toto-wolff: vault commit skipped (${String(this.queue.length)} queued file(s) kept on disk, uncommitted): ${reason}\n`);
+      this.queue.length = 0;
+      return { committed: false, reason };
+    }
+    if (!isRepo) {
       this.queue.length = 0;
       return { committed: false, reason: 'no-git-repo' };
     }

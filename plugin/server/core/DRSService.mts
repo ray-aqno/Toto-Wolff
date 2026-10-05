@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
 import type { DRSResult, DRSCheckInput, DRSConfig, DRSTool } from './types.mts';
 import type { HookExecutor, HookContext, HookResult } from './hooks/HookTypes.mts';
 // The one vault operation DRS needs: writing an override audit record. A
@@ -227,7 +228,9 @@ export class DRSService implements HookExecutor {
     if (this.vault === undefined) return false;
     const target = input.tool === 'Bash' ? (input.command ?? '') : (input.targetPath ?? '');
     const now = new Date();
-    const slug = `${now.toISOString().replace(/[:.]/g, '-')}-drs-override`;
+    // A random suffix: two overrides in the same millisecond (concurrent calls,
+    // or two sessions on one vault) must never share, and overwrite, a record.
+    const slug = `${now.toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}-drs-override`;
     const reason = result.overrideReason ?? '';
     const body = [
       '---',

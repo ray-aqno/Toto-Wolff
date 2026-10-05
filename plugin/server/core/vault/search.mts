@@ -95,8 +95,11 @@ export async function searchFiles(rootPath: string, query: string): Promise<Boun
       if (state.done) break;
       if (entry.name.startsWith('.')) continue;
       const full = join(current.dir, entry.name);
-      if (entry.isDirectory && current.depth < MAX_SEARCH_DEPTH) subdirs.push(full);
-      else if (entry.isFile) await searchFile(state, full, query);
+      if (entry.isDirectory) {
+        // Too deep to search: say so, since a match there would be missing.
+        if (current.depth < MAX_SEARCH_DEPTH) subdirs.push(full);
+        else state.truncated = true;
+      } else if (entry.isFile) await searchFile(state, full, query);
     }
     // Pushed in reverse so subdirectories are searched in name order.
     for (let i = subdirs.length - 1; i >= 0; i--) {

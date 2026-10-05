@@ -5,7 +5,8 @@ import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+import { TOOL_NAMES, isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
 
 const SERVER_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server');
 const DEADLINE_MS = 20_000;
@@ -24,7 +25,7 @@ const req = (id: unknown, method: string, params?: unknown): string =>
 // { pauseMs } just waits, so the next write arrives as a separate read.
 function runServer(entry: string, writes: readonly Write[]): Promise<Run> {
   return new Promise((done, fail) => {
-    const child = spawn(process.execPath, [entry], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [entry], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv() });
     let out = '';
     let err = '';
     child.stdout.on('data', (d: Buffer) => (out += d.toString('utf8')));
@@ -60,6 +61,8 @@ const split = Buffer.from(`${req(13, 'tools/call', { name: 'café' })}\n`, 'utf8
 const splitAt = split.indexOf(Buffer.from('é')) + 1;
 
 describe('plugin server over stdio (Node type stripping)', () => {
+  afterAll(removeIsolatedEnvs);
+
   it('answers hostile input line by line and exits 0 at end of input', async () => {
     const run = await runServer(join(SERVER_DIR, 'index.mts'), [
       `${req(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {} })}\n`,
@@ -88,7 +91,7 @@ describe('plugin server over stdio (Node type stripping)', () => {
     expect(r).toHaveLength(16);
     expect(r[0]).toMatchObject({ id: 1, result: { protocolVersion: '2025-11-25', serverInfo: { name: 'toto-wolff' } } });
     expect(r[1]).toMatchObject({ id: 2, result: { protocolVersion: '2025-11-25' } });
-    expect(r[2]).toMatchObject({ id: 3, result: { tools: [] } });
+    expect(r[2]).toMatchObject({ id: 3, result: { tools: TOOL_NAMES.map((name) => ({ name })) } });
     expect(r[3]).toMatchObject({ id: 4, error: { code: -32602 } });
     expect(r[4]).toMatchObject({ id: null, error: { code: -32700 } });
     expect(r[5]).toMatchObject({ id: 5, error: { code: -32601 } });

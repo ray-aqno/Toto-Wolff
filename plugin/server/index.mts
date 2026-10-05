@@ -4,13 +4,29 @@
 // whatever package.json sits above the install. Only erasable TypeScript,
 // relative .mts imports and node: built-ins are allowed under plugin/server.
 import process from 'node:process';
+import { dashboardPort, startDashboard } from './dashboard/http.mts';
 import { createServer } from './mcp/server.mts';
 import { runStdio } from './mcp/stdio.mts';
-import { TOOLS } from './tools/index.mts';
+import { createRuntime } from './runtime.mts';
+import { createTools } from './tools/index.mts';
 import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 
+// Builds the tools inside the promise, so a bad TOTO_VAULT_PATH is one stderr
+// line. The dashboard runs only when TOTO_MCP_PORT is set, and closes when
+// stdin ends, so the process exits with its client.
+async function start(): Promise<void> {
+  const runtime = createRuntime(process.env);
+  const port = dashboardPort(process.env);
+  const dashboard = port === null ? null : await startDashboard({ port, vaultPath: runtime.vaultPath });
+  try {
+    await runStdio(createServer(createTools(runtime)));
+  } finally {
+    await dashboard?.close();
+  }
+}
+
 if (checkNodeVersion(process.versions.node)) {
-  runStdio(createServer(TOOLS)).catch((err: unknown) => {
+  start().catch((err: unknown) => {
     process.stderr.write(`toto-wolff: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exitCode = 1;
   });

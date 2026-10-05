@@ -14,6 +14,9 @@ export type RunStatus = 'running' | 'awaiting_approval' | 'stopped_at_target' | 
 export interface NodeRecord {
   state: NodeState;
   choice?: string;
+  // Loop nodes only: the current attempt, written once a fail advances it
+  // (absent means 1, so a run that never retries saves what #61 saved).
+  iteration?: number;
 }
 
 export interface RunState {
@@ -46,6 +49,7 @@ export interface EngineEvent {
   outcome?: 'pass' | 'fail';
   decision?: 'approve' | 'reject';
   choice?: string;
+  iteration?: number;
   stopAt?: string | null;
 }
 
@@ -167,8 +171,7 @@ export function currentStep(state: RunState): Step | null {
   assert.ok(node !== undefined, 'the current node is in the graph');
   const step: Step = { nodeId: node.id, kind: node.kind, instruction: node.instruction };
   if (node.skill !== undefined) step.skill = node.skill;
-  // #61 runs a loop node once; #62 adds the further iterations.
-  if (node.kind === 'loop') step.iteration = 1;
+  if (node.kind === 'loop') step.iteration = recordOf(state, node.id).iteration ?? 1;
   assert.equal(step.nodeId, state.current, 'the step is the current node');
   return step;
 }
@@ -219,15 +222,44 @@ function applyChoice(state: RunState, node: GraphNode, choice: string | undefine
   return pruned;
 }
 
-/** graph_report for a skill, choice or loop node. */
-export function reportNode(prior: RunState, nodeId: string, outcome: 'pass' | 'fail', choice?: string): Transition {
+// A failed loop attempt: the next attempt while any remain, else the run fails.
+function failLoop(state: RunState, node: GraphNode, reported: EngineEvent): EngineEvent[] {
+  const record = recordOf(state, node.id);
+  const current = record.iteration ?? 1;
+  const max = node.maxIterations ?? 1;
+  assert.ok(Number.isSafeInteger(current) && current >= 1 && current <= max, 'the attempt is within the loop bound');
+  if (current >= max) return [reported, ...fail(state, node.id)];
+  record.iteration = current + 1;
+  assert.ok(record.state === 'pending' && state.current === node.id, 'a retried loop stays the current step');
+  return [reported];
+}
+
+// The loop's current attempt compared with the caller's (Arbiter condition 4):
+// an earlier attempt is an applied retry (no-op), a later one is STALE_STEP.
+function isEarlierAttempt(state: RunState, node: GraphNode, iteration: number | undefined): boolean {
+  if (node.kind !== 'loop' || iteration === undefined) return false;
+  const current = recordOf(state, node.id).iteration ?? 1;
+  assert.ok(current >= 1, 'an attempt number is positive');
+  if (iteration > current) throw new GraphError('STALE_STEP', `node ${node.id} is on iteration ${String(current)}, not ${String(iteration)}`);
+  return iteration < current;
+}
+
+/**
+ * graph_report for a skill, choice or loop node. For a loop, `iteration`
+ * (optional) names the attempt being reported, so a retried report is safe.
+ */
+export function reportNode(prior: RunState, nodeId: string, outcome: 'pass' | 'fail', choice?: string, iteration?: number): Transition {
   if (checkTarget(prior, nodeId, false)) return { state: prior, events: [] };
+  const target = nodeOf(prior, nodeId);
+  assert.ok(target !== undefined, 'checkTarget found the node');
+  if (isEarlierAttempt(prior, target, iteration)) return { state: prior, events: [] };
   const state = begin(prior);
   const node = nodeOf(state, nodeId);
-  assert.ok(node !== undefined, 'checkTarget found the node');
+  assert.ok(node !== undefined, 'the copy has the node');
   if (node.kind !== 'choice' && choice !== undefined) throw new GraphError('INVALID_CHOICE', `node ${nodeId} is not a choice node`);
   const reported: EngineEvent = { type: 'report', nodeId, outcome };
-  if (outcome === 'fail') return { state, events: [reported, ...fail(state, nodeId)] };
+  if (node.kind === 'loop') reported.iteration = recordOf(state, nodeId).iteration ?? 1;
+  if (outcome === 'fail') return { state, events: node.kind === 'loop' ? failLoop(state, node, reported) : [reported, ...fail(state, nodeId)] };
   let pruned: string[] = [];
   if (node.kind === 'choice') {
     pruned = applyChoice(state, node, choice);

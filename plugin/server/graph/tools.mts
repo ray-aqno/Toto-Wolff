@@ -11,7 +11,7 @@ import { approveNode, createRun, currentStep, reportNode, resumeRun } from './en
 import type { RunState, Step, Transition } from './engine.mts';
 import { findGraph, loadUserGraphs } from './graphs.mts';
 import { assertNotBusy, withRunLock } from './lock.mts';
-import { GraphError } from './model.mts';
+import { GraphError, MAX_ITERATIONS } from './model.mts';
 import { appendEvents, ensureRunsDir, newRunId, readState, runDir, writeState } from './store.mts';
 import { TEMPLATE_KINDS, isTemplateKind, templateFor } from './templates.mts';
 
@@ -28,7 +28,7 @@ export const GRAPH_DEFINITIONS: readonly ToolDefinition[] = [
   { name: 'graph_template', description: 'Get the RFC or ADR document template (Markdown)', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: [...TEMPLATE_KINDS] } }, required: ['kind'] } },
   { name: 'graph_start', description: 'Start a run of a graph; returns the run id and the first step', inputSchema: { type: 'object', properties: { graph: ID, input: { type: 'object', properties: { idea: ID }, required: ['idea'] }, stopAt: ID }, required: ['graph', 'input'] } },
   { name: 'graph_next', description: "Get a run's current step (read-only)", inputSchema: { type: 'object', properties: RUN, required: ['runId'] } },
-  { name: 'graph_report', description: 'Report the outcome of the current skill, choice or loop step', inputSchema: { type: 'object', properties: { ...RUN, nodeId: ID, outcome: { type: 'string', enum: ['pass', 'fail'] }, evidence: ID, artifacts: { type: 'array', items: ID }, choice: ID }, required: ['runId', 'nodeId', 'outcome', 'evidence'] } },
+  { name: 'graph_report', description: 'Report the outcome of the current skill, choice or loop step', inputSchema: { type: 'object', properties: { ...RUN, nodeId: ID, outcome: { type: 'string', enum: ['pass', 'fail'] }, evidence: ID, artifacts: { type: 'array', items: ID }, choice: ID, iteration: { type: 'integer' } }, required: ['runId', 'nodeId', 'outcome', 'evidence'] } },
   { name: 'graph_approve', description: "Record a person's decision at a human_gate step (ask the user first)", inputSchema: { type: 'object', properties: { ...RUN, nodeId: ID, decision: { type: 'string', enum: ['approve', 'reject'] }, note: ID }, required: ['runId', 'nodeId', 'decision'] } },
   { name: 'graph_status', description: "Get a run's status and the state of every node", inputSchema: { type: 'object', properties: RUN, required: ['runId'] } },
   { name: 'graph_resume', description: 'Continue a run from its last checkpoint; optionally set a new stop target', inputSchema: { type: 'object', properties: { ...RUN, stopAt: ID }, required: ['runId'] } },
@@ -49,6 +49,16 @@ function oneOf<T extends string>(name: string, args: Record<string, unknown>, al
   const found = allowed.find((a) => a === value);
   if (found === undefined) throw new RpcError(INVALID_PARAMS, `${name} must be one of: ${allowed.join(', ')}`);
   return found;
+}
+
+// A loop attempt number: absent, or an integer 1..MAX_ITERATIONS.
+function iterationOf(args: Record<string, unknown>): number | undefined {
+  const raw = args['iteration'];
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw < 1 || raw > MAX_ITERATIONS) {
+    throw new RpcError(INVALID_PARAMS, `iteration must be an integer from 1 to ${String(MAX_ITERATIONS)}`);
+  }
+  return raw;
 }
 
 function artifactsOf(args: Record<string, unknown>): string[] | undefined {
@@ -113,8 +123,9 @@ function report(projectDir: string, args: Record<string, unknown>): Promise<unkn
   const evidence = text('evidence', args, MAX_EVIDENCE);
   const artifacts = artifactsOf(args);
   const choice = optionalText('choice', args, 40);
+  const iteration = iterationOf(args);
   const extra = artifacts === undefined ? { evidence } : { evidence, artifacts };
-  return change(projectDir, runId, (s) => reportNode(s, nodeId, outcome, choice), extra);
+  return change(projectDir, runId, (s) => reportNode(s, nodeId, outcome, choice, iteration), extra);
 }
 
 function approve(projectDir: string, args: Record<string, unknown>): Promise<unknown> {

@@ -140,7 +140,7 @@ describe('the iteration argument (retry safety)', () => {
 
 describe('state files', () => {
   it('rejects an iteration outside 1..maxIterations, or on a non-loop node (Arbiter condition 1)', async () => {
-    for (const nodes of [{ k: { state: 'pending', iteration: 4 } }, { a: { state: 'done', iteration: 2 } }]) {
+    for (const nodes of [{ k: { state: 'pending', iteration: 4 } }, { k: { state: 'pending', iteration: 0 } }, { k: { state: 'pending', iteration: 1.5 } }, { k: { state: 'pending', iteration: '2' } }, { a: { state: 'done', iteration: 2 } }]) {
       const runId = await atLoop('loop3');
       const file = join(project, '.toto', 'runs', runId, 'state.json');
       const state = JSON.parse(readFileSync(file, 'utf8')) as { nodes: Record<string, unknown> };

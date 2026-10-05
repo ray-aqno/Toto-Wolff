@@ -125,8 +125,14 @@ describe('the six tools in both eras', () => {
 });
 
 describe('git is optional and best effort', () => {
-  it('writes without committing when the vault is not a git repository', async () => {
-    expect(await result('vault_write', { path: 'Notes/plain.md', content: 'plain\n' })).toEqual({ path: 'Notes/plain.md' });
+  it('writes without committing, or trying to, when the vault is not a git repository', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      expect(await result('vault_write', { path: 'Notes/plain.md', content: 'plain\n' })).toEqual({ path: 'Notes/plain.md' });
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
     expect(readFileSync(join(vault, 'Notes', 'plain.md'), 'utf8')).toBe('plain\n');
     expect(existsSync(join(vault, '.git'))).toBe(false);
   });

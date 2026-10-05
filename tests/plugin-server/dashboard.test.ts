@@ -1,14 +1,16 @@
 // The opt-in dashboard HTTP server (#60): off unless TOTO_MCP_PORT is set,
 // 127.0.0.1 only, GET routes only, Host allowlist, listen errors downgraded.
 import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request, createServer as createHttpServer } from 'node:http';
-import type { Server } from 'node:http';
+import type { Server, ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dashboardPort, startDashboard } from '../../plugin/server/dashboard/http.mts';
+import { closeAllClients, isAtCapacity, registerClient } from '../../plugin/server/handlers/sse_registry.mts';
 import type { Dashboard } from '../../plugin/server/dashboard/http.mts';
 import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
 
@@ -140,4 +142,24 @@ describe('the real entry with TOTO_MCP_PORT set', () => {
     child.stdin.end();
     expect(await exited).toBe(0);
   }, 20_000);
+});
+
+describe('SSE registry close-down (closeAllClients)', () => {
+  it('ends every client, empties the registry and clears both timers', () => {
+    vi.useFakeTimers();
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const clients = Array.from({ length: 50 }, () => Object.assign(new EventEmitter(), { destroyed: false, write: vi.fn(() => true), end: vi.fn() }));
+      for (const c of clients) registerClient(c as unknown as ServerResponse, vault);
+      expect(isAtCapacity()).toBe(true);
+      expect(vi.getTimerCount()).toBe(2);
+      closeAllClients();
+      expect(isAtCapacity()).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      for (const c of clients) expect(c.end).toHaveBeenCalledTimes(1);
+    } finally {
+      stderr.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });

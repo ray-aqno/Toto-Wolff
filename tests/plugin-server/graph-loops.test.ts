@@ -46,7 +46,7 @@ beforeAll(() => {
   mkdirSync(join(project, '.toto', 'graphs'), { recursive: true });
   writeFileSync(join(project, '.toto', 'graphs', 'loop3.json'), JSON.stringify(loopGraph('loop3')));
   writeFileSync(join(project, '.toto', 'graphs', 'loop1.json'), JSON.stringify(loopGraph('loop1', 1)));
-  handle = createServer(createTools(createRuntime({ TOTO_VAULT_PATH: join(project, 'vault'), HOME: project, CLAUDE_PROJECT_DIR: project })));
+  handle = createServer(createTools(createRuntime({ vault: join(project, 'vault'), project })));
 });
 
 afterAll(() => {

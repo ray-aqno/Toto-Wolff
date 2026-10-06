@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createServer } from '../../plugin/server/mcp/server.mts';
 import type { Tool } from '../../plugin/server/mcp/server.mts';
-import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
+import { isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 const echo: Tool = {
@@ -108,7 +108,7 @@ describe('legacy replies are byte-identical to fa40059', () => {
   });
 
   it('the real entry (the #60 and #61 tools) answers the same stream byte for byte', () => {
-    const run = spawnSync(process.execPath, [ENTRY], { input: `${SPAWN_INPUT.join('\n')}\n`, encoding: 'utf8', timeout: 20_000, env: isolatedEnv() });
+    const run = spawnSync(process.execPath, [ENTRY, ...serverArgs()], { input: `${SPAWN_INPUT.join('\n')}\n`, encoding: 'utf8', timeout: 20_000, env: isolatedEnv() });
     expect(run.status).toBe(0);
     expect(run.stderr).toBe('');
     expect(run.stdout).toBe(`${SPAWN_OUTPUT.join('\n')}\n`);

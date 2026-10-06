@@ -147,33 +147,8 @@ describe('DRSService, R3: resolution diagnostics from a non-standard cwd', () =>
     expect(result.ruleFired).toBe(2);
   });
 
-  it('TOTO_DRS_CONFIG overrides cwd-relative resolution when set, applying the real config instead of deny-all', async () => {
-    const fixtureDir = await mkdtemp(join(tmpdir(), 'toto-drs-fixture-'));
-    try {
-      const fixtureConfigPath = join(fixtureDir, 'drs-config.json');
-      await writeFile(fixtureConfigPath, JSON.stringify({
-        allowed_paths: ['allowed/'],
-        tenant_namespaces: [],
-        current_tenant: '',
-        halt_patterns: [],
-      }), 'utf8');
-
-      process.env['TOTO_DRS_CONFIG'] = fixtureConfigPath;
-      process.chdir(testDir); // cwd itself still has no .toto/, so the env var must win
-
-      const drs = new DRSService();
-      expect(drs.configSource).toBe('env:TOTO_DRS_CONFIG');
-
-      const inScope = await drs.check({ tool: 'Write', targetPath: 'allowed/file.ts' });
-      expect(inScope.allowed).toBe(true);
-
-      const outOfScope = await drs.check({ tool: 'Write', targetPath: 'elsewhere/file.ts' });
-      expect(outOfScope.allowed).toBe(false);
-      expect(outOfScope.ruleFired).toBe(2);
-    } finally {
-      await rm(fixtureDir, { recursive: true, force: true });
-    }
-  });
+  // 2.0.0: the TOTO_DRS_CONFIG override is removed (the server reads no
+  // environment variables); spec criterion 9 amended.
 });
 
 // Stage 5 (R1 v3, keep-and-harden): checkOverride() bypasses Rules 2/3/4

@@ -1,4 +1,4 @@
-// The opt-in dashboard HTTP server (#60): off unless TOTO_MCP_PORT is set,
+// The opt-in dashboard HTTP server (#60): off unless a port is configured,
 // 127.0.0.1 only, GET routes only, Host allowlist, listen errors downgraded.
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dashboardPort, startDashboard } from '../../plugin/server/dashboard/http.mts';
 import { closeAllClients, isAtCapacity, registerClient } from '../../plugin/server/handlers/sse_registry.mts';
 import type { Dashboard } from '../../plugin/server/dashboard/http.mts';
-import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
+import { isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 
@@ -56,20 +56,20 @@ afterAll(async () => {
   removeIsolatedEnvs();
 });
 
-describe('TOTO_MCP_PORT', () => {
+describe('the dashboard port', () => {
   it('leaves the dashboard off when unset or empty', () => {
     expect(dashboardPort({})).toBeNull();
-    expect(dashboardPort({ TOTO_MCP_PORT: '' })).toBeNull();
+    expect(dashboardPort({ port: '' })).toBeNull();
   });
 
   it.each([['3099', 3099], ['1', 1], ['65535', 65535], ['007', 7]])('accepts %j as port %i', (raw, port) => {
-    expect(dashboardPort({ TOTO_MCP_PORT: raw })).toBe(port);
+    expect(dashboardPort({ port: raw })).toBe(port);
   });
 
   it.each([['0'], ['65536'], ['99999'], ['abc'], ['3099x'], ['-1'], ['30 99'], ['123456']])('rejects %j with one warning', (raw) => {
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
-      expect(dashboardPort({ TOTO_MCP_PORT: raw })).toBeNull();
+      expect(dashboardPort({ port: raw })).toBeNull();
       expect(stderr).toHaveBeenCalledTimes(1);
     } finally {
       stderr.mockRestore();
@@ -121,13 +121,13 @@ describe('listen errors', () => {
   });
 });
 
-describe('the real entry with TOTO_MCP_PORT set', () => {
+describe('the real entry with a dashboard port', () => {
   it('serves the dashboard and exits when stdin ends, even with an SSE client connected', async () => {
     const probe = await listenOn(0);
     const address = probe.address();
     const port = address !== null && typeof address === 'object' ? address.port : 0;
     await new Promise((done) => probe.close(done));
-    const child = spawn(process.execPath, [ENTRY], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv({ TOTO_MCP_PORT: String(port) }) });
+    const child = spawn(process.execPath, [ENTRY, ...serverArgs({ port: String(port) })], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv() });
     let err = '';
     child.stderr.on('data', (d: Buffer) => (err += d.toString('utf8')));
     const exited = new Promise<number | null>((done) => child.on('exit', done));

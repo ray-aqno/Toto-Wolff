@@ -26,7 +26,7 @@ function project(fixture: string): { dir: string; handle: LineHandler } {
   const dir = mkdtempSync(join(tmpdir(), 'toto-idea-to-pr-'));
   projects.push(dir);
   cpSync(join(FIXTURES, fixture), dir, { recursive: true });
-  return { dir, handle: createServer(createTools(createRuntime({ TOTO_VAULT_PATH: join(dir, '.vault'), HOME: dir, CLAUDE_PROJECT_DIR: dir }))) };
+  return { dir, handle: createServer(createTools(createRuntime({ vault: join(dir, '.vault'), project: dir }))) };
 }
 
 async function call(handle: LineHandler, name: string, args: Record<string, unknown>): Promise<Reply> {

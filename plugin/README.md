@@ -33,20 +33,29 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 
 The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools, the built-in idea-to-PR graph and the `graph-run` skill that drives it are below (issues #61 to #63).
 
+### Settings
+
+The server reads no environment variables. Claude Code asks for its settings when you enable the plugin, and you can change them in `/plugin` (select toto-wolff on the **Installed** tab, then **Configure**):
+
+- **Vault folder** (`vault_path`, required): the absolute path of the folder the server keeps its records in. 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`; enter that folder to keep your records. Without it, the server stops with one line on stderr.
+- **Dashboard port** (`dashboard_port`): `0` (the default) for no dashboard, or a port from 1 to 65535.
+
+The git and search programs the server runs get only `PATH`, never your other variables. Vault commits are made as `toto-wolff <toto-wolff@localhost>`.
+
 ### The vault
 
-- **Location:** `TOTO_VAULT_PATH`, else `$HOME/.toto/vault`. It must be an absolute path, or the server stops with one line on stderr. One server process serves one vault.
-- **Git is optional.** If the vault is a git repository, each write is committed after it lands. Commits are best effort: if git is missing, the vault is not a repository, or the commit fails (for example, no `user.email`), the file stays written and uncommitted, and a failure prints one warning on stderr. Two Claude sessions writing to the same git vault can contend for git's lock, so one commit may be skipped or may include the other session's staged file.
+- **Location:** the configured vault folder. One server process serves one vault.
+- **Git is optional.** If the vault is a git repository, each write is committed after it lands. Commits are best effort: if git is missing, the vault is not a repository, or the commit fails (for example, another program holds git's lock), the file stays written and uncommitted, and a failure prints one warning on stderr. Two Claude sessions writing to the same git vault can contend for git's lock, so one commit may be skipped or may include the other session's staged file.
 - **Search is built in** (no ripgrep). It matches the query as literal, case-sensitive text, not a regular expression. When nothing matches and the query contains regex characters (`| [ ] ( ) * + ? ^ $ \`), the result carries a `note` saying so. Paths are absolute: the vault path as given, joined with the file's path inside it (symbolic links are not resolved). Entries whose name starts with `.` (`.git`, `.obsidian`) are skipped, and symbolic links inside the vault are not followed, so linked notes are not searched.
 - **Search caps:** at most 500 results, files over 1 MiB skipped, and at most 512 KiB of results. Folders more than 16 levels below the vault root are not searched. If any cap fires, or a folder is too deep, `truncated` is `true`. One file over 1 MiB in the vault therefore makes every search report `truncated: true`.
 
 ### DRS
 
-`drs_check` reads its config from `TOTO_DRS_CONFIG`, else `.toto/drs-config.json` under the server's working directory (the directory Claude Code starts it in). Without a config, DRS falls back to deny-all: every `Write`, `Edit` and `NotebookEdit` target is out of scope (Rule 2), and one warning is printed the first time `drs_check` runs. An override (`message_before: "override drs: <reason>"`) is honored only once its audit record is written to the vault's `DRS/` folder; the commit after it is best effort like any other.
+`drs_check` reads its config from the project's `.toto/drs-config.json`. Without a config, DRS falls back to deny-all: every `Write`, `Edit` and `NotebookEdit` target is out of scope (Rule 2), and one warning is printed the first time `drs_check` runs. An override (`message_before: "override drs: <reason>"`) is honored only once its audit record is written to the vault's `DRS/` folder; the commit after it is best effort like any other.
 
 ### Dashboard (off by default)
 
-The dashboard HTTP server starts only when `TOTO_MCP_PORT` is set to a port from 1 to 65535 (every Claude session runs its own server, so there is no default port to fight over). It listens on `127.0.0.1` only and serves only GET routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. A request whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` gets 403, which blocks DNS rebinding from web pages. Any program on this machine can still read vault records through `/dashboard/record`, so turn the dashboard on only where that is acceptable. If the port is in use or not allowed, the server prints one warning and the MCP tools keep working. v1's POST tool routes (calling tools over HTTP) are removed.
+The dashboard HTTP server starts only when the dashboard port is set to a port from 1 to 65535 (every Claude session runs its own server, so there is no default port to fight over). It listens on `127.0.0.1` only and serves only GET routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. A request whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` gets 403, which blocks DNS rebinding from web pages. Any program on this machine can still read vault records through `/dashboard/record`, so turn the dashboard on only where that is acceptable. If the port is in use or not allowed, the server prints one warning and the MCP tools keep working. v1's POST tool routes (calling tools over HTTP) are removed.
 
 Tracking issue: https://github.com/ray-aqno/Toto-Wolff/issues/57
 
@@ -80,7 +89,7 @@ Graph failures come back as a tool result `{ "error": { "code", "message" } }` w
 
 ### Run files
 
-Each run lives in `.toto/runs/<runId>/` in the project (`CLAUDE_PROJECT_DIR`, else the directory Claude Code started the server in). The server gives `.toto/runs/` its own `.gitignore`; it never edits yours.
+Each run lives in `.toto/runs/<runId>/` in the project (the project folder Claude Code passes the server, else the directory it started the server in). The server gives `.toto/runs/` its own `.gitignore`; it never edits yours.
 
 - `state.json` is the source of truth. It is rewritten after every change through a temporary file and a rename, so a crash or a killed session leaves either the old or the new state. A run uses the copy of the graph taken when it started; editing the graph file does not change a running run.
 - `events.jsonl` logs every change, with the evidence, artifacts and notes (which are kept out of `state.json`). Events are numbered; a crash at the wrong moment can leave a gap in the numbers, never a repeat.

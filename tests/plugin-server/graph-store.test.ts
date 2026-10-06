@@ -46,9 +46,9 @@ async function newRun(): Promise<{ dir: string; runId: string }> {
 }
 
 describe('paths', () => {
-  it('uses CLAUDE_PROJECT_DIR only when it is absolute (Safety Car S7)', () => {
-    expect(resolveProjectDir({ CLAUDE_PROJECT_DIR: '/p' }, '/cwd')).toBe('/p');
-    expect(resolveProjectDir({ CLAUDE_PROJECT_DIR: 'rel' }, '/cwd')).toBe('/cwd');
+  it('uses the configured project only when it is absolute (Safety Car S7)', () => {
+    expect(resolveProjectDir({ project: '/p' }, '/cwd')).toBe('/p');
+    expect(resolveProjectDir({ project: 'rel' }, '/cwd')).toBe('/cwd');
     expect(resolveProjectDir({}, '/cwd')).toBe('/cwd');
   });
 

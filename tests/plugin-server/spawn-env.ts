@@ -18,6 +18,15 @@ export function isolatedEnv(extra: Record<string, string> = {}): NodeJS.ProcessE
   return env;
 }
 
+// The server's arguments, as plugin.json passes them: a fresh temp vault, plus
+// any of vault, project and port in `extra`.
+export function serverArgs(extra: Partial<Record<'vault' | 'project' | 'port', string>> = {}): string[] {
+  const dir = mkdtempSync(join(tmpdir(), 'toto-plugin-args-'));
+  created.push(dir);
+  const config = { vault: join(dir, 'vault'), ...extra };
+  return Object.entries(config).flatMap(([name, value]) => [`--${name}`, value]);
+}
+
 export function removeIsolatedEnvs(): void {
   for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
 }

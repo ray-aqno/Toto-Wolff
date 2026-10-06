@@ -13,15 +13,16 @@ import { GraphError, hasKey } from './model.mts';
 import type { GraphNode } from './model.mts';
 import type { NodeRecord, NodeState, RunState, RunStatus } from './engine.mts';
 import { parseGraph } from './validate.mts';
+import type { ServerConfig } from '../runtime.mts';
 
 export const RUN_ID_PATTERN = /^\d{8}-\d{6}-[0-9a-f]{6}$/;
 export const MAX_STATE_BYTES = 256 * 1024;
 const NODE_STATES: readonly NodeState[] = ['pending', 'done', 'skipped', 'failed'];
 const RUN_STATUSES: readonly RunStatus[] = ['running', 'awaiting_approval', 'stopped_at_target', 'done', 'failed'];
 
-/** CLAUDE_PROJECT_DIR when it is absolute, else the working directory (Safety Car S7). */
-export function resolveProjectDir(env: NodeJS.ProcessEnv, cwd: string): string {
-  const fromEnv = env['CLAUDE_PROJECT_DIR'];
+/** The configured project folder when it is absolute, else the working directory (Safety Car S7). */
+export function resolveProjectDir(env: ServerConfig, cwd: string): string {
+  const fromEnv = env['project'];
   const dir = fromEnv !== undefined && isAbsolute(fromEnv) ? fromEnv : cwd;
   assert.ok(isAbsolute(dir), 'the working directory is absolute');
   assert.ok(dir.length > 0, 'the project directory is not empty');

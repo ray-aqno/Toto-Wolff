@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 toto-wolff 2.0: the plugin becomes a dependency-free MCP server and a state engine for task graphs. Claude runs every step; the server keeps the state, checks the evidence and stops at human gates. Breaking for 1.6 users: no credentials, five model-backed tools removed, Node 24 required (see Breaking, and the README's "Upgrading to 2.0.0").
 
 ### Breaking
+
+- **The server reads no environment variables.** Its settings come from the plugin's `userConfig`, asked when the plugin is enabled and changed in `/plugin` > Configure: **Vault folder** (`vault_path`, required; 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`) and **Dashboard port** (`dashboard_port`, `0` for none). `TOTO_VAULT_PATH`, `TOTO_MCP_PORT` and `TOTO_DRS_CONFIG` no longer reach the server: DRS reads the project's `.toto/drs-config.json`. The git and search subprocesses get only `PATH`, and vault commits are made as `toto-wolff <toto-wolff@localhost>`. The Claude plugin directory holds a plugin that reads the user's environment ("uses a credential from the user's machine").
 See the README's "Upgrading to 2.0.0" for what to do.
 - **The plugin's MCP server makes no model calls and takes no credentials.** The `userConfig` settings (API key, auth token, base URL) and every `ANTHROPIC_*` lookup are gone; Claude runs each workflow step itself.
 - **Five MCP tools are removed:** `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run` and `karpathy_check`. The matching skills run those workflows through Claude.

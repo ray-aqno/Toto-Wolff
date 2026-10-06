@@ -3,7 +3,7 @@
 // so a missing DRS config warns only when DRS is used) and the subagent list.
 import assert from 'node:assert/strict';
 import process from 'node:process';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { DRSService } from './core/DRSService.mts';
 import type { AuditVault } from './core/DRSService.mts';
 import { SubagentService } from './core/SubagentService.mts';
@@ -21,10 +21,34 @@ export interface Runtime {
   projectDir(): string;
 }
 
-/** TOTO_VAULT_PATH, else $HOME/.toto/vault; must be absolute (as v1). */
-export function resolveVaultPath(env: NodeJS.ProcessEnv): string {
-  const vaultPath = env['TOTO_VAULT_PATH'] ?? `${env['HOME'] ?? ''}/.toto/vault`;
-  assert.ok(isAbsolute(vaultPath), 'TOTO_VAULT_PATH must be an absolute path');
+// The server's settings come from its arguments, which plugin.json fills from
+// the plugin's userConfig and ${CLAUDE_PROJECT_DIR}; it reads nothing from the
+// user's environment.
+export type ServerConfig = Partial<Record<'vault' | 'project' | 'port', string>>;
+const FLAGS: Readonly<Record<string, keyof ServerConfig>> = { '--vault': 'vault', '--project': 'project', '--port': 'port' };
+const MAX_ARGS = 16;
+
+/** The settings in `argv`; an empty, unsubstituted or "0" (no dashboard) value is left out. */
+export function configFromArgs(argv: readonly string[]): ServerConfig {
+  if (argv.length > MAX_ARGS) throw new Error(`at most ${String(MAX_ARGS)} arguments`);
+  const config: ServerConfig = {};
+  // LOOP BOUND: at most MAX_ARGS / 2 flag and value pairs.
+  for (let i = 0; i < argv.length; i += 2) {
+    const name = FLAGS[argv[i] ?? ''];
+    const value = argv[i + 1];
+    if (name === undefined || value === undefined) throw new Error(`unknown argument: ${(argv[i] ?? '').slice(0, 40)}`);
+    if (value === '' || value.includes('${') || (name === 'port' && value === '0')) continue;
+    config[name] = value;
+  }
+  assert.ok(Object.keys(config).length <= 3, 'at most the three settings');
+  return config;
+}
+
+/** The configured vault folder (userConfig vault_path); it must be absolute. */
+export function resolveVaultPath(env: ServerConfig): string {
+  const vaultPath = env['vault'];
+  if (vaultPath === undefined) throw new Error('no vault folder: set it in /plugin > toto-wolff > Configure (Vault folder)');
+  assert.ok(isAbsolute(vaultPath), 'the vault folder must be an absolute path');
   assert.ok(vaultPath.length > 1, 'the vault path is not the filesystem root');
   return vaultPath;
 }
@@ -44,7 +68,7 @@ export async function drainQuietly(vault: VaultService): Promise<void> {
   }
 }
 
-export function createRuntime(env: NodeJS.ProcessEnv): Runtime {
+export function createRuntime(env: ServerConfig): Runtime {
   const vaultPath = resolveVaultPath(env);
   const vault = (): Promise<VaultService> => getCachedVault(vaultPath);
   // DRS override audit records: a rejected write reaches DRSService (the
@@ -61,7 +85,8 @@ export function createRuntime(env: NodeJS.ProcessEnv): Runtime {
   const runtime: Runtime = {
     vaultPath,
     vault,
-    drs: () => (drs ??= new DRSService(undefined, auditVault)),
+    // DRS reads the project's .toto/drs-config.json.
+    drs: () => (drs ??= new DRSService(join(resolveProjectDir(env, process.cwd()), '.toto', 'drs-config.json'), auditVault)),
     subagents: new SubagentService(),
     projectDir: () => resolveProjectDir(env, process.cwd()),
   };

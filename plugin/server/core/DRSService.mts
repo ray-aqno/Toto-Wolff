@@ -32,7 +32,7 @@ const AUTH_PATTERNS = [
 /** Where a resolved DRSConfig actually came from, surfaced so a resolution
  * failure (deny-all) is a visible signal, not an indistinguishable "everything
  * is blocked" state. */
-type ConfigSource = 'cwd-relative' | 'env:TOTO_DRS_CONFIG' | 'deny-all-fallback';
+type ConfigSource = 'cwd-relative' | 'deny-all-fallback';
 
 /** Where the parsed freezePaths list actually came from. */
 type FreezeSource = 'config' | 'freeze.json-fallback' | 'absent';
@@ -91,8 +91,8 @@ export class DRSService implements HookExecutor {
   private readonly vault: AuditVault | undefined;
 
   /**
-   * Resolves the active config (explicit path, then TOTO_DRS_CONFIG, then the
-   * cwd-relative .toto/drs-config.json). Never throws on a resolution failure:
+   * Resolves the active config (the explicit path, else the cwd-relative
+   * .toto/drs-config.json). Never throws on a resolution failure:
    * it falls back to deny-all and reports that through `configSource`, so a
    * bad working directory is a visible signal rather than a silent allow-all.
    * `vault` receives an audit record for each accepted override.
@@ -112,7 +112,7 @@ export class DRSService implements HookExecutor {
 
   /**
    * Resolves the active DRSConfig: an explicit configPath argument wins
-   * outright; otherwise TOTO_DRS_CONFIG (env escape hatch) is tried; otherwise
+   * outright (the plugin passes the project's); otherwise
    * `.toto/drs-config.json` relative to process.cwd(). A genuine resolution
    * failure at any of these falls back to DEFAULT_CONFIG's shape tagged
    * 'deny-all-fallback', never DEFAULT_CONFIG silently mislabeled as if it
@@ -122,14 +122,6 @@ export class DRSService implements HookExecutor {
     if (configPath !== undefined) {
       const loaded = this.loadConfig(configPath);
       return { config: loaded.config, source: loaded.resolved ? 'cwd-relative' : 'deny-all-fallback' };
-    }
-
-    const envPath = process.env['TOTO_DRS_CONFIG'];
-    if (envPath !== undefined && envPath.length > 0) {
-      const loaded = this.loadConfig(envPath);
-      return loaded.resolved
-        ? { config: loaded.config, source: 'env:TOTO_DRS_CONFIG' }
-        : { config: DEFAULT_CONFIG, source: 'deny-all-fallback' };
     }
 
     const cwdPath = path.join(process.cwd(), '.toto', 'drs-config.json');
@@ -152,7 +144,7 @@ export class DRSService implements HookExecutor {
         'DRSService: configuration resolution failed, falling back to deny-all ' +
         '(every Rule 2 check will block until this is fixed). Set permissive: true ' +
         'in your DRS config to opt into unrestricted mode instead, or ensure ' +
-        '.toto/drs-config.json / TOTO_DRS_CONFIG resolves correctly.\n',
+        'the project .toto/drs-config.json resolves correctly.\n',
       );
     }
   }

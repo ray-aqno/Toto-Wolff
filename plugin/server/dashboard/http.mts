@@ -1,4 +1,4 @@
-// The optional dashboard HTTP server. Off unless TOTO_MCP_PORT is set: every
+// The optional dashboard HTTP server. Off unless a dashboard port is configured: every
 // Claude session runs its own plugin server, so a fixed default port would be
 // raced by each one. Binds 127.0.0.1 only, serves GET routes only (v1's POST
 // tool routes are gone) and answers only requests whose Host header names
@@ -15,6 +15,7 @@ import { handleSseRequest } from '../handlers/sse_handler.mts';
 import { closeAllClients } from '../handlers/sse_registry.mts';
 import { handleVaultReversed } from '../handlers/vault_reversed.mts';
 import { handleVaultSignal } from '../handlers/vault_signal.mts';
+import type { ServerConfig } from '../runtime.mts';
 
 const HOST = '127.0.0.1';
 const PORT_PATTERN = /^\d{1,5}$/;
@@ -25,15 +26,15 @@ export interface Dashboard {
 }
 
 /**
- * The dashboard port from TOTO_MCP_PORT, or null when it is unset. An
+ * The configured dashboard port, or null when it is unset. An
  * invalid value is one stderr warning and no dashboard.
  */
-export function dashboardPort(env: NodeJS.ProcessEnv): number | null {
-  const raw = env['TOTO_MCP_PORT'];
+export function dashboardPort(env: ServerConfig): number | null {
+  const raw = env['port'];
   if (raw === undefined || raw === '') return null;
   const port = PORT_PATTERN.test(raw) ? Number(raw) : Number.NaN;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    process.stderr.write('toto-wolff: TOTO_MCP_PORT must be a port number from 1 to 65535; dashboard disabled\n');
+    process.stderr.write('toto-wolff: the dashboard port must be a number from 1 to 65535; dashboard disabled\n');
     return null;
   }
   assert.ok(port >= 1 && port <= 65535, 'the port is in range');

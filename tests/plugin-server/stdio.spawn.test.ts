@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { TOOL_NAMES, isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
+import { TOOL_NAMES, isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
 
 const SERVER_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server');
 const DEADLINE_MS = 20_000;
@@ -25,7 +25,7 @@ const req = (id: unknown, method: string, params?: unknown): string =>
 // { pauseMs } just waits, so the next write arrives as a separate read.
 function runServer(entry: string, writes: readonly Write[]): Promise<Run> {
   return new Promise((done, fail) => {
-    const child = spawn(process.execPath, [entry], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv() });
+    const child = spawn(process.execPath, [entry, ...serverArgs()], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv() });
     let out = '';
     let err = '';
     child.stdout.on('data', (d: Buffer) => (out += d.toString('utf8')));

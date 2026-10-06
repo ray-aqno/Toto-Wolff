@@ -8,7 +8,14 @@
   "homepage": "https://github.com/ray-aqno/Toto-Wolff",
   "repository": "https://github.com/ray-aqno/Toto-Wolff",
   "license": "MIT",
-  "keywords": ["governance", "p10", "council", "vault", "planning", "mcp"],
+  "keywords": [
+    "governance",
+    "p10",
+    "council",
+    "vault",
+    "planning",
+    "mcp"
+  ],
   "skills": [
     "./skills/drs",
     "./skills/karpathy",
@@ -23,8 +30,30 @@
     "toto-wolff": {
       "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/server/index.mts"
+        "${CLAUDE_PLUGIN_ROOT}/server/index.mts",
+        "--vault",
+        "${user_config.vault_path}",
+        "--project",
+        "${CLAUDE_PROJECT_DIR}",
+        "--port",
+        "${user_config.dashboard_port}"
       ]
+    }
+  },
+  "userConfig": {
+    "vault_path": {
+      "type": "directory",
+      "title": "Vault folder",
+      "description": "Absolute path of the folder toto-wolff keeps its records in (1.x used ~/.toto/vault).",
+      "required": true
+    },
+    "dashboard_port": {
+      "type": "number",
+      "title": "Dashboard port",
+      "description": "Port for the local dashboard on 127.0.0.1, or 0 for no dashboard.",
+      "default": 0,
+      "min": 0,
+      "max": 65535
     }
   }
 }

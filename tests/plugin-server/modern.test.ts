@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import { createServer } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler, Tool } from '../../plugin/server/mcp/server.mts';
 import { DEFINITIONS } from '../../plugin/server/tools/index.mts';
-import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
+import { isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 const VERSION_KEY = 'io.modelcontextprotocol/protocolVersion';
@@ -191,7 +191,7 @@ describe('the real entry serves both eras over stdio', () => {
       req('tools/list', { _meta: META }, 2),
       req('initialize', { protocolVersion: '2025-11-25' }, 3),
     ].join('\n');
-    const run = spawnSync(process.execPath, [ENTRY], { input: `${input}\n`, encoding: 'utf8', timeout: 20_000, env: isolatedEnv() });
+    const run = spawnSync(process.execPath, [ENTRY, ...serverArgs()], { input: `${input}\n`, encoding: 'utf8', timeout: 20_000, env: isolatedEnv() });
     expect(run.status).toBe(0);
     expect(run.stderr).toBe('');
     const replies = run.stdout.trim().split('\n').map((line): unknown => JSON.parse(line));

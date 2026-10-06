@@ -65,7 +65,7 @@ beforeAll(() => {
   writeFileSync(join(project, '.toto', 'graphs', 'demo.json'), JSON.stringify(GRAPH));
   writeFileSync(join(project, '.toto', 'graphs', 'broken.json'), JSON.stringify({ ...GRAPH, id: 'broken', edges: [...GRAPH.edges, ['build', 'spec']] }));
   writeFileSync(join(project, '.toto', 'graphs', 'notjson.json'), '{');
-  handle = createServer(createTools(createRuntime({ TOTO_VAULT_PATH: join(project, 'vault'), HOME: project, CLAUDE_PROJECT_DIR: project })));
+  handle = createServer(createTools(createRuntime({ vault: join(project, 'vault'), project })));
   live = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
 });
 

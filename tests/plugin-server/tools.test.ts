@@ -50,9 +50,9 @@ beforeAll(() => {
   process.env['XDG_CONFIG_HOME'] = join(root, 'home');
   process.env['GIT_CONFIG_NOSYSTEM'] = '1';
   for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']) delete process.env[key];
-  writeFileSync(join(root, 'drs.json'), JSON.stringify({ allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] }));
-  process.env['TOTO_DRS_CONFIG'] = join(root, 'drs.json');
-  handle = createServer(createTools(createRuntime({ TOTO_VAULT_PATH: vault, HOME: join(root, 'home'), CLAUDE_PROJECT_DIR: join(root, 'project') })));
+  mkdirSync(join(root, 'project', '.toto'), { recursive: true });
+  writeFileSync(join(root, 'project', '.toto', 'drs-config.json'), JSON.stringify({ allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] }));
+  handle = createServer(createTools(createRuntime({ vault, project: join(root, 'project') })));
 });
 
 afterAll(() => {
@@ -148,9 +148,10 @@ describe('git is optional and best effort', () => {
     expect(git('log', '--format=%s')).toContain('committed.md');
   });
 
-  it('keeps a write when the commit fails (no git identity), warns once, and does not wedge later writes', async () => {
-    git('config', '--unset', 'user.email');
-    git('config', '--unset', 'user.name');
+  // The server commits under its own identity (2.0.0), so a stale index lock
+  // is what makes the commit fail here.
+  it('keeps a write when the commit fails (index locked), warns once, and does not wedge later writes', async () => {
+    writeFileSync(join(vault, '.git', 'index.lock'), '');
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(await result('vault_write', { path: 'Notes/no-identity.md', content: 'n\n' })).toEqual({ path: 'Notes/no-identity.md' });
@@ -159,8 +160,7 @@ describe('git is optional and best effort', () => {
     } finally {
       stderr.mockRestore();
     }
-    git('config', 'user.email', 't@example.com');
-    git('config', 'user.name', 't');
+    rmSync(join(vault, '.git', 'index.lock'));
     await result('vault_write', { path: 'Notes/after.md', content: 'a\n' });
     expect(git('log', '-1', '--format=%s')).toContain('after.md');
   });
@@ -196,14 +196,14 @@ describe('git is optional and best effort', () => {
 describe('drs_check override audit', () => {
   const override = { tool: 'Write', target_path: 'outside/file.ts', message_before: 'override drs: test' };
 
-  it('honors an override once its audit file is on disk, even when the commit fails (no git identity)', async () => {
-    git('config', '--unset', 'user.email');
+  it('honors an override once its audit file is on disk, even when the commit fails (index locked)', async () => {
+    writeFileSync(join(vault, '.git', 'index.lock'), '');
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(await result('drs_check', override)).toMatchObject({ allowed: true, override: true, overrideReason: 'test' });
     } finally {
       stderr.mockRestore();
-      git('config', 'user.email', 't@example.com');
+      rmSync(join(vault, '.git', 'index.lock'));
     }
     expect(readdirSync(join(vault, 'DRS')).some((f) => f.endsWith('-drs-override.md'))).toBe(true);
   });

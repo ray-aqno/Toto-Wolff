@@ -5,6 +5,7 @@
 
 import { writeFile, mkdir, readdir, readFile, stat, rm } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
+import { GIT_IDENTITY, childEnv } from '../childEnv.mts';
 import { promisify } from 'node:util';
 import { join, isAbsolute, dirname, relative } from 'node:path';
 import assert from 'node:assert';
@@ -239,8 +240,8 @@ export class FileStorage implements StorageBackend {
       const filename = absPath.split('/').pop() ?? 'file';
       const commitMsg = `${message} ${filename}`;
       try {
-        await execFileAsync('git', ['-C', this.rootPath, 'add', absPath], { timeout: GIT_TIMEOUT_MS });
-        await execFileAsync('git', ['-C', this.rootPath, 'commit', '-m', commitMsg], { timeout: GIT_TIMEOUT_MS });
+        await execFileAsync('git', ['-C', this.rootPath, 'add', absPath], { timeout: GIT_TIMEOUT_MS, env: childEnv() });
+        await execFileAsync('git', [...GIT_IDENTITY, '-C', this.rootPath, 'commit', '-m', commitMsg], { timeout: GIT_TIMEOUT_MS, env: childEnv() });
       } catch (err) {
         committed = false;
         reason = `git commit failed: ${this.redactRootPath((err as Error).message)}`;
@@ -280,7 +281,7 @@ export class FileStorage implements StorageBackend {
     let lastCommit: string | undefined;
     if (await this.isGitRepo()) {
       try {
-        const { stdout } = await execFileAsync('git', ['-C', this.rootPath, 'log', '-1', '--format=%H %s'], { timeout: GIT_TIMEOUT_MS });
+        const { stdout } = await execFileAsync('git', ['-C', this.rootPath, 'log', '-1', '--format=%H %s'], { timeout: GIT_TIMEOUT_MS, env: childEnv() });
         lastCommit = stdout.trim();
       } catch {
         // ignore
@@ -319,7 +320,7 @@ export class FileStorage implements StorageBackend {
 
   private async isGitRepo(): Promise<boolean> {
     try {
-      await execFileAsync('git', ['-C', this.rootPath, 'rev-parse', '--git-dir'], { timeout: GIT_TIMEOUT_MS });
+      await execFileAsync('git', ['-C', this.rootPath, 'rev-parse', '--git-dir'], { timeout: GIT_TIMEOUT_MS, env: childEnv() });
       return true;
     } catch (err) {
       const e = err as { code?: number | string; stderr?: string };

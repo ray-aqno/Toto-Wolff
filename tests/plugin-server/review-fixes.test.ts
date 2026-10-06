@@ -12,7 +12,6 @@ import { searchFiles } from '../../plugin/server/core/vault/search.mts';
 
 let dir: string;
 const savedPath = process.env['PATH'];
-const savedConfig = process.env['TOTO_DRS_CONFIG'];
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'toto-review-'));
@@ -20,8 +19,6 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env['PATH'] = savedPath;
-  if (savedConfig === undefined) delete process.env['TOTO_DRS_CONFIG'];
-  else process.env['TOTO_DRS_CONFIG'] = savedConfig;
   vi.useRealTimers();
   vi.restoreAllMocks();
   rmSync(dir, { recursive: true, force: true });
@@ -30,7 +27,6 @@ afterEach(() => {
 describe('DRS override audit records', () => {
   it('gives two overrides in the same millisecond two records', async () => {
     writeFileSync(join(dir, 'drs.json'), JSON.stringify({ allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] }));
-    process.env['TOTO_DRS_CONFIG'] = join(dir, 'drs.json');
     const records = new Map<string, string>();
     const vault: AuditVault = {
       write: (relPath, content) => {
@@ -39,7 +35,7 @@ describe('DRS override audit records', () => {
       },
     };
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-05T12:00:00.000Z') });
-    const drs = new DRSService(undefined, vault);
+    const drs = new DRSService(join(dir, 'drs.json'), vault);
     const call = { tool: 'Write', targetPath: 'outside/x.ts', messageBefore: 'override drs: same instant' } as const;
     const results = await Promise.all([drs.check(call), drs.check(call)]);
     expect(results.every((r) => r.allowed && r.override === true)).toBe(true);

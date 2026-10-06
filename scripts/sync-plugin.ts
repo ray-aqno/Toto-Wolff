@@ -17,15 +17,19 @@ import {
   checkPluginLayout,
   checkSkillCopies,
   readSkillList,
+  checkLicenseAndIcon,
+  syncLicense,
   syncSkills,
 } from './plugin-sync-lib.js';
 
 function main(): number {
   const skills = readSkillList(join(REPO_ROOT, PLUGIN_DIR, MANIFEST_REL));
   syncSkills(REPO_ROOT, skills);
+  syncLicense(REPO_ROOT);
   const problems = [
     ...checkPluginLayout(join(REPO_ROOT, PLUGIN_DIR), skills),
     ...checkSkillCopies(REPO_ROOT, skills),
+    ...checkLicenseAndIcon(REPO_ROOT),
   ];
   if (problems.length > 0) {
     console.error(`sync-plugin: the regenerated plugin folder is not valid:\n  ${problems.join('\n  ')}`);

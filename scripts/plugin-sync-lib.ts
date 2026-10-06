@@ -57,6 +57,31 @@ export const MAX_FILES = 500;
 export const MAX_DEPTH = 8;
 /** The directory's pre-submission limit: every plugin file must be under 256 KiB. */
 export const MAX_FILE_BYTES = 256 * 1024;
+/** The plugin icon, the one binary file allowed (its own source of truth). */
+export const ICON_REL = join('.claude-plugin', 'icon.png');
+/** The plugin's copy of the repository LICENSE, written by sync:plugin. */
+export const LICENSE_REL = 'LICENSE';
+/** Spec criterion 2's minified-file guard: no text line may be longer. */
+export const MAX_LINE_CHARS = 2000;
+/** Spec criterion 2: no package manifest or lockfile may ship (exact names, so lock.mts is fine). */
+const FORBIDDEN_NAMES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb'];
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// A PNG's last chunk: zero length, "IEND", and its fixed CRC.
+const PNG_IEND = Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
+
+/**
+ * A whole PNG, not only its first bytes (PR #72 review): the signature, an
+ * IHDR chunk first with a non-zero width and height, and IEND last.
+ */
+export function isCompletePng(bytes: Buffer): boolean {
+  assert(Buffer.isBuffer(bytes), 'a byte buffer');
+  if (bytes.length < PNG_SIGNATURE.length + 25 + PNG_IEND.length) return false;
+  if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return false;
+  const ihdrOk = bytes.readUInt32BE(8) === 13 && bytes.toString('latin1', 12, 16) === 'IHDR' && bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0;
+  const complete = ihdrOk && bytes.subarray(bytes.length - PNG_IEND.length).equals(PNG_IEND);
+  assert(typeof complete === 'boolean', 'a yes or no');
+  return complete;
+}
 
 export type Result = { ok: true } | { ok: false; message: string };
 
@@ -223,6 +248,7 @@ export function checkPluginLayout(pluginRoot: string, skills: string[]): string[
   for (const entry of listTree(pluginRoot)) {
     const problem = layoutProblem(entry.rel, allowedSkillDirs);
     if (problem !== null) problems.push(problem);
+    problems.push(...contentProblems(pluginRoot, entry));
     if (statSync(join(pluginRoot, entry.rel)).size >= MAX_FILE_BYTES) {
       problems.push(`not under ${String(MAX_FILE_BYTES)} bytes (the directory's per-file limit): ${entry.rel}`);
     }
@@ -234,12 +260,64 @@ export function checkPluginLayout(pluginRoot: string, skills: string[]): string[
 /** Why one plugin file is not allowed where it is, or null if it is fine. */
 function layoutProblem(rel: string, allowedSkillDirs: string[]): string | null {
   assert(rel.length > 0, 'a plugin file has a path');
-  if (rel === MANIFEST_REL || rel === README_REL) return null;
+  if (rel === MANIFEST_REL || rel === README_REL || rel === ICON_REL || rel === LICENSE_REL) return null;
   if (allowedSkillDirs.some((dir) => rel.startsWith(dir))) return null;
   if (rel.startsWith(SERVER_DIR_REL + sep)) {
     return rel.endsWith('.mts') ? null : `only readable .mts files may ship under ${SERVER_DIR_REL}/: ${rel}`;
   }
   return `not allowed in the plugin folder: ${rel}`;
+}
+
+/**
+ * Spec criterion 2 per file: no package manifest or lockfile (exact names)
+ * and no minified file anywhere; the icon must be a non-executable PNG and
+ * is the only file exempt from the line scan (by exact path).
+ */
+function contentProblems(pluginRoot: string, entry: TreeEntry): string[] {
+  assert(entry.rel.length > 0, 'a plugin file has a path');
+  const name = entry.rel.split(sep).pop() ?? '';
+  const problems: string[] = [];
+  if (FORBIDDEN_NAMES.includes(name)) problems.push(`no package manifest or lockfile may ship: ${entry.rel}`);
+  if (/\.min\./i.test(name)) problems.push(`no minified file may ship: ${entry.rel}`);
+  const bytes = readFileSync(join(pluginRoot, entry.rel));
+  if (entry.rel === ICON_REL) {
+    if (!isCompletePng(bytes)) problems.push(`not a complete PNG file: ${entry.rel}`);
+    if (entry.exec) problems.push(`the icon must not be executable: ${entry.rel}`);
+    return problems;
+  }
+  // Bounded: one pass over a file under MAX_FILE_BYTES.
+  const longest = bytes.toString('utf-8').split('\n').reduce((m, line) => Math.max(m, line.length), 0);
+  if (longest > MAX_LINE_CHARS) problems.push(`a line of ${String(longest)} characters looks minified (limit ${String(MAX_LINE_CHARS)}): ${entry.rel}`);
+  assert(problems.length <= 4, 'at most four problems per file');
+  return problems;
+}
+
+/** Writes the plugin's LICENSE as a byte copy of the repository root's. */
+export function syncLicense(root: string): void {
+  assert(isAbsolute(root), `root must be absolute: ${root}`);
+  const src = join(root, LICENSE_REL);
+  assert(existsSync(src), `missing ${src}`);
+  copyFileSync(src, assertUnderRoot(root, join(PLUGIN_DIR, LICENSE_REL)));
+  assert(readFileSync(src).equals(readFileSync(join(root, PLUGIN_DIR, LICENSE_REL))), 'the LICENSE copy matches');
+}
+
+/** The plugin's LICENSE must equal the root LICENSE; the icon must be 100644 in git's index. */
+export function checkLicenseAndIcon(root: string): string[] {
+  assert(isAbsolute(root), `root must be absolute: ${root}`);
+  const problems: string[] = [];
+  const copy = join(root, PLUGIN_DIR, LICENSE_REL);
+  if (!existsSync(copy) || !readFileSync(copy).equals(readFileSync(join(root, LICENSE_REL)))) {
+    problems.push(`${PLUGIN_DIR}/${LICENSE_REL} must be a byte copy of the root LICENSE`);
+  }
+  // The icon must exist (PR #72 review): a committed deletion has no index
+  // mode to check, and publishing would remove it from branch plugin.
+  if (!existsSync(join(root, PLUGIN_DIR, ICON_REL))) problems.push(`${PLUGIN_DIR}/${ICON_REL} is missing`);
+  // The index mode, not the filesystem's (exec bits on some mounts are synthetic).
+  const ls = spawnSync('git', ['ls-files', '-s', '--', join(PLUGIN_DIR, ICON_REL)], { cwd: root, encoding: 'utf-8' });
+  const mode = ls.status === 0 ? ls.stdout.trim().split(/\s+/)[0] : undefined;
+  if (mode !== undefined && mode !== '' && mode !== '100644') problems.push(`${PLUGIN_DIR}/${ICON_REL} must be mode 100644 in git, not ${mode}`);
+  assert(problems.length <= 3, 'at most three problems');
+  return problems;
 }
 
 /** Compares every listed skill's source with its copy in the plugin folder. */

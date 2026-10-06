@@ -3,8 +3,10 @@
  * Fail-closed CI gate: the committed plugin/ folder must be exactly what
  * `pnpm sync:plugin` would produce from the current source.
  *
- * Fails on any of: a file outside the allowed layout (manifest, listed
- * skills, .mts files under server/), a file not under the directory's 256 KiB
+ * Fails on any of: a file outside the allowed layout (manifest, README,
+ * icon, LICENSE, listed skills, .mts files under server/), a package
+ * manifest or lockfile, a minified file (a line over 2,000 characters), an
+ * icon that is not a 100644 PNG, a LICENSE that is not the root's, a file not under the directory's 256 KiB
  * per-file limit, a missing server entry, a skill copy that differs from its
  * source in bytes or exec bit, a missing or extra skill file, any symlink, or
  * any modified, deleted or untracked path under plugin/ versus the committed
@@ -18,6 +20,7 @@ import {
   PLUGIN_DIR,
   REPO_ROOT,
   checkPluginLayout,
+  checkLicenseAndIcon,
   checkSkillCopies,
   compareAgainstCommitted,
   readSkillList,
@@ -28,6 +31,7 @@ function main(): number {
   const problems = [
     ...checkPluginLayout(join(REPO_ROOT, PLUGIN_DIR), skills),
     ...checkSkillCopies(REPO_ROOT, skills),
+    ...checkLicenseAndIcon(REPO_ROOT),
   ];
   const drift = compareAgainstCommitted(REPO_ROOT, PLUGIN_DIR);
   if (!drift.ok) problems.push(drift.message);

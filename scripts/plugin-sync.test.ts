@@ -26,6 +26,7 @@ import {
   readSkillList,
   removeTree,
   checkLicenseAndIcon,
+  isCompletePng,
   syncLicense,
   syncSkills,
 } from './plugin-sync-lib.js';
@@ -183,7 +184,12 @@ describe('path guards', () => {
   });
 });
 
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+// A minimal complete PNG: signature, a 1x1 IHDR, IEND (CRCs are not checked).
+const PNG = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.from([0, 0, 0, 13]), Buffer.from('IHDR', 'latin1'), Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]), Buffer.alloc(4),
+  Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]),
+]);
 
 describe('spec criterion 2 and the shipped icon and LICENSE (#64)', () => {
   it('allows a PNG icon and a LICENSE at their paths', () => {
@@ -193,7 +199,11 @@ describe('spec criterion 2 and the shipped icon and LICENSE (#64)', () => {
   });
   it('refuses an icon that is not a PNG, or is executable', () => {
     writeFileSync(join(root, 'plugin', ICON_REL), 'not a png');
-    expect(problems()).toContain(`not a PNG file: ${ICON_REL}`);
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG.subarray(0, PNG.length - 12));
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG.subarray(0, 13));
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
     writeFileSync(join(root, 'plugin', ICON_REL), PNG);
     chmodSync(join(root, 'plugin', ICON_REL), 0o755);
     expect(problems()).toContain(`the icon must not be executable: ${ICON_REL}`);
@@ -225,9 +235,22 @@ describe('spec criterion 2 and the shipped icon and LICENSE (#64)', () => {
   it('syncs LICENSE from the root and flags a copy that differs', () => {
     writeFileSync(join(root, 'LICENSE'), 'MIT License\n');
     syncLicense(root);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG);
     expect(checkLicenseAndIcon(root)).toEqual([]);
     writeFileSync(join(root, 'plugin', 'LICENSE'), 'changed\n');
     expect(checkLicenseAndIcon(root)).toEqual(['plugin/LICENSE must be a byte copy of the root LICENSE']);
+  });
+});
+
+describe('the icon (PR #72 review)', () => {
+  it('must exist: a deleted icon is a problem', () => {
+    writeFileSync(join(root, 'LICENSE'), 'MIT License\n');
+    syncLicense(root);
+    expect(checkLicenseAndIcon(root)).toEqual(['plugin/.claude-plugin/icon.png is missing']);
+  });
+  it('the real icon is a complete PNG', () => {
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    expect(isCompletePng(readFileSync(join(repo, 'plugin', ICON_REL)))).toBe(true);
   });
 });
 

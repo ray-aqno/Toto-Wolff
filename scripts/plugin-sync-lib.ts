@@ -66,6 +66,22 @@ export const MAX_LINE_CHARS = 2000;
 /** Spec criterion 2: no package manifest or lockfile may ship (exact names, so lock.mts is fine). */
 const FORBIDDEN_NAMES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb'];
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// A PNG's last chunk: zero length, "IEND", and its fixed CRC.
+const PNG_IEND = Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
+
+/**
+ * A whole PNG, not only its first bytes (PR #72 review): the signature, an
+ * IHDR chunk first with a non-zero width and height, and IEND last.
+ */
+export function isCompletePng(bytes: Buffer): boolean {
+  assert(Buffer.isBuffer(bytes), 'a byte buffer');
+  if (bytes.length < PNG_SIGNATURE.length + 25 + PNG_IEND.length) return false;
+  if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return false;
+  const ihdrOk = bytes.readUInt32BE(8) === 13 && bytes.toString('latin1', 12, 16) === 'IHDR' && bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0;
+  const complete = ihdrOk && bytes.subarray(bytes.length - PNG_IEND.length).equals(PNG_IEND);
+  assert(typeof complete === 'boolean', 'a yes or no');
+  return complete;
+}
 
 export type Result = { ok: true } | { ok: false; message: string };
 
@@ -265,7 +281,7 @@ function contentProblems(pluginRoot: string, entry: TreeEntry): string[] {
   if (/\.min\./i.test(name)) problems.push(`no minified file may ship: ${entry.rel}`);
   const bytes = readFileSync(join(pluginRoot, entry.rel));
   if (entry.rel === ICON_REL) {
-    if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) problems.push(`not a PNG file: ${entry.rel}`);
+    if (!isCompletePng(bytes)) problems.push(`not a complete PNG file: ${entry.rel}`);
     if (entry.exec) problems.push(`the icon must not be executable: ${entry.rel}`);
     return problems;
   }
@@ -293,11 +309,14 @@ export function checkLicenseAndIcon(root: string): string[] {
   if (!existsSync(copy) || !readFileSync(copy).equals(readFileSync(join(root, LICENSE_REL)))) {
     problems.push(`${PLUGIN_DIR}/${LICENSE_REL} must be a byte copy of the root LICENSE`);
   }
+  // The icon must exist (PR #72 review): a committed deletion has no index
+  // mode to check, and publishing would remove it from branch plugin.
+  if (!existsSync(join(root, PLUGIN_DIR, ICON_REL))) problems.push(`${PLUGIN_DIR}/${ICON_REL} is missing`);
   // The index mode, not the filesystem's (exec bits on some mounts are synthetic).
   const ls = spawnSync('git', ['ls-files', '-s', '--', join(PLUGIN_DIR, ICON_REL)], { cwd: root, encoding: 'utf-8' });
   const mode = ls.status === 0 ? ls.stdout.trim().split(/\s+/)[0] : undefined;
   if (mode !== undefined && mode !== '' && mode !== '100644') problems.push(`${PLUGIN_DIR}/${ICON_REL} must be mode 100644 in git, not ${mode}`);
-  assert(problems.length <= 2, 'at most two problems');
+  assert(problems.length <= 3, 'at most three problems');
   return problems;
 }
 

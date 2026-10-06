@@ -2,40 +2,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { getPiAgentDir, SubagentService } from '../../../plugin/server/core/SubagentService.mts';
+import { SubagentService } from '../../../plugin/server/core/SubagentService.mts';
 
-describe('getPiAgentDir', () => {
-  const home = '/home/tester';
-
-  it('defaults to ~/.pi/agent', () => {
-    expect(getPiAgentDir({}, home)).toBe(path.join(home, '.pi', 'agent'));
-  });
-
-  it('uses PI_CODING_AGENT_DIR when set', () => {
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '/opt/pi' }, home)).toBe('/opt/pi');
-  });
-
-  it('expands a leading ~/ in PI_CODING_AGENT_DIR', () => {
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~/custom/agent' }, home)).toBe(path.join(home, 'custom', 'agent'));
-  });
-
-  it('expands a bare ~ in PI_CODING_AGENT_DIR', () => {
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~' }, home)).toBe(home);
-  });
-
-  it('expands a leading ~\\ on Windows only', () => {
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~\\agent' }, home, 'win32')).toBe(path.join(home, 'agent'));
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '~\\agent' }, home, 'linux')).toBe('~\\agent');
-  });
-
-  it('converts a file:// URL to a path', () => {
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: 'file:///tmp/pi-agents' }, home, 'linux')).toBe('/tmp/pi-agents');
-  });
-
-  it('ignores an empty PI_CODING_AGENT_DIR', () => {
-    expect(getPiAgentDir({ PI_CODING_AGENT_DIR: '' }, home)).toBe(path.join(home, '.pi', 'agent'));
-  });
-});
+// 2.0.0: getPiAgentDir and user-scope discovery are removed (the plugin
+// directory refuses reading the pi agent folder); spec criterion 9 amended.
 
 describe('SubagentService.discoverAgents', () => {
   const originalEnv = process.env['PI_CODING_AGENT_DIR'];
@@ -56,7 +26,7 @@ describe('SubagentService.discoverAgents', () => {
     );
   }
 
-  it('finds user agents under PI_CODING_AGENT_DIR and project agents under .pi/agents', () => {
+  it('finds project agents under .pi/agents and never user agents (2.0.0)', () => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'toto-subagent-'));
     const userDir = path.join(tmp, 'user-agent-dir');
     const projectDir = path.join(tmp, 'project');
@@ -66,6 +36,6 @@ describe('SubagentService.discoverAgents', () => {
 
     const agents = new SubagentService().discoverAgents(projectDir, 'both');
 
-    expect([...agents.keys()].sort()).toEqual(['project-scout', 'user-scout']);
+    expect([...agents.keys()].sort()).toEqual(['project-scout']);
   });
 });

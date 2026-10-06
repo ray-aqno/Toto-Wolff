@@ -1,5 +1,5 @@
 // subagent_list never reads the home folder (2.0.0, plugin directory review):
-// user agents come only from an explicit PI_CODING_AGENT_DIR.
+// it lists project agents only.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,8 +35,9 @@ describe('subagent discovery', () => {
     expect([...new SubagentService().discoverAgents(join(root, 'project'), 'both').keys()]).toEqual(['project-agent']);
   });
 
-  it('reads user agents from an explicit PI_CODING_AGENT_DIR', () => {
+  it('ignores PI_CODING_AGENT_DIR too: no user scope at all', () => {
     process.env['PI_CODING_AGENT_DIR'] = join(root, 'home', '.pi', 'agent');
-    expect([...new SubagentService().discoverAgents(join(root, 'project'), 'both').keys()].sort()).toEqual(['home-agent', 'project-agent']);
+    expect([...new SubagentService().discoverAgents(join(root, 'project'), 'both').keys()]).toEqual(['project-agent']);
+    expect([...new SubagentService().discoverAgents(join(root, 'project'), 'user').keys()]).toEqual([]);
   });
 });

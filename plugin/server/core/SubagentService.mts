@@ -1,6 +1,5 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { AgentConfig } from './types.mts';
 
 const CONFIG_DIR_NAME = '.pi';
@@ -30,21 +29,10 @@ export class SubagentService {
   ): Map<string, AgentConfig> {
     const agents = new Map<string, AgentConfig>();
 
-    // User agents only from an explicit PI_CODING_AGENT_DIR: the server never
-    // falls back to the home folder (~/.pi/agent also holds pi's credentials;
-    // the plugin directory flags a read there, PR #73).
-    if ((scope === 'user' || scope === 'both') && process.env['PI_CODING_AGENT_DIR']) {
-      const userAgentsDir = path.join(getPiAgentDir(), 'agents');
-      if (fs.existsSync(userAgentsDir)) {
-        for (const file of fs.readdirSync(userAgentsDir)) {
-          if (file.endsWith('.md')) {
-            const config = this.parseAgentFile(path.join(userAgentsDir, file), 'user');
-            if (config) agents.set(config.name, config);
-          }
-        }
-      }
-    }
-
+    // The server reads no agent folder outside the project: a user-level pi
+    // agent folder also holds pi's credentials, and the plugin directory
+    // refuses a plugin that reads it (MCP_FORWARDS_CREDENTIAL_ENV). So scope
+    // 'user' finds nothing; 'both' is the project's agents.
     if (scope === 'project' || scope === 'both') {
       const projectAgentsDir = path.join(cwd, CONFIG_DIR_NAME, 'agents');
       if (fs.existsSync(projectAgentsDir)) {
@@ -102,29 +90,4 @@ export class SubagentService {
       filePath: a.filePath,
     }));
   }
-}
-
-/**
- * The pi coding agent's user config directory: $PI_CODING_AGENT_DIR if set,
- * otherwise ~/.pi/agent. Mirrors getAgentDir() from
- * @earendil-works/pi-coding-agent 0.83.0 (dist/config.js), including its
- * normalizePath() defaults (dist/utils/paths.js): a bare `~`, a leading `~/`
- * (or `~\` on Windows) expands to the home directory, and a `file://` URL is
- * converted to a path. Reimplemented here because importing that package
- * pulled its whole multi-provider AI stack into the bundled MCP server (about
- * 10 MB of a 12.9 MB bundle), past the plugin directory's 5 MiB per-file limit.
- */
-export function getPiAgentDir(
-  env: NodeJS.ProcessEnv = process.env,
-  home: string = env['HOME'] ?? '',
-  platform: NodeJS.Platform = process.platform,
-): string {
-  const envDir = env['PI_CODING_AGENT_DIR'];
-  if (!envDir) return path.join(home, '.pi', 'agent');
-  if (envDir === '~') return home;
-  if (envDir.startsWith('~/') || (platform === 'win32' && envDir.startsWith('~\\'))) {
-    return path.join(home, envDir.slice(2));
-  }
-  if (/^file:\/\//.test(envDir)) return fileURLToPath(envDir);
-  return envDir;
 }

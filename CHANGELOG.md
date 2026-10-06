@@ -15,7 +15,7 @@ See the README's "Upgrading to 2.0.0" for what to do.
 - **The plugin's MCP server makes no model calls and takes no credentials.** The `userConfig` settings (API key, auth token, base URL) and every `ANTHROPIC_*` lookup are gone; Claude runs each workflow step itself.
 - **Five MCP tools are removed:** `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run` and `karpathy_check`. The matching skills run those workflows through Claude.
 - **Node 24 is required.** The server is readable `.mts` files that Node runs directly (no bundle, no build).
-- **`subagent_list` no longer reads `~/.pi/agent`.** User agents are listed only from `PI_CODING_AGENT_DIR` when it is set; project agents (`.pi/agents`) as before. The server reads nothing in your home folder (the plugin directory flagged the home-folder read).
+- **`subagent_list` lists project agents only** (`.pi/agents`). It no longer reads `~/.pi/agent` or `PI_CODING_AGENT_DIR`, the pi agent folder that also holds pi's credentials (the plugin directory refuses a plugin that reads it); `scope: "user"` finds nothing.
 - **The Claude plugin directory installs from branch `plugin`**, which `.github/workflows/publish-plugin.yml` fills from each release tag as a forward commit. Marketplace installs still update from `main`'s `plugin/`.
 
 These change v1.6 behavior of the six tools carried into the 2.0 plugin (issue #60). Details in `plugin/README.md`.

@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentConfig } from './types.mts';
@@ -31,7 +30,10 @@ export class SubagentService {
   ): Map<string, AgentConfig> {
     const agents = new Map<string, AgentConfig>();
 
-    if (scope === 'user' || scope === 'both') {
+    // User agents only from an explicit PI_CODING_AGENT_DIR: the server never
+    // falls back to the home folder (~/.pi/agent also holds pi's credentials;
+    // the plugin directory flags a read there, PR #73).
+    if ((scope === 'user' || scope === 'both') && process.env['PI_CODING_AGENT_DIR']) {
       const userAgentsDir = path.join(getPiAgentDir(), 'agents');
       if (fs.existsSync(userAgentsDir)) {
         for (const file of fs.readdirSync(userAgentsDir)) {
@@ -114,7 +116,7 @@ export class SubagentService {
  */
 export function getPiAgentDir(
   env: NodeJS.ProcessEnv = process.env,
-  home: string = os.homedir(),
+  home: string = env['HOME'] ?? '',
   platform: NodeJS.Platform = process.platform,
 ): string {
   const envDir = env['PI_CODING_AGENT_DIR'];

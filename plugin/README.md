@@ -27,7 +27,7 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 | `vault_write` | `path` (relative to the vault, no `..`), `content` | `{ "path": ... }` |
 | `vault_search` | `query` (1 to 500 characters) | `{ "results": [{ "file", "line", "text" }], "truncated": false }` |
 | `drs_check` | `tool` (`Write`, `Edit`, `NotebookEdit`, `Bash`), `target_path` or `command`, optional `message_before` | the DRS verdict |
-| `subagent_list` | optional `scope` (`user`, `project`, `both`) | the subagents found |
+| `subagent_list` | optional `scope` (`user`, `project`, `both`) | the subagents found: project agents in `.pi/agents`, and user agents only from `PI_CODING_AGENT_DIR` when it is set (the server never reads your home folder) |
 | `dashboard_status` | none | vault record counts and recent items |
 | `score_confidence` | `ruling` | `{ "tier", "matchCount", "disqualifiers" }` |
 

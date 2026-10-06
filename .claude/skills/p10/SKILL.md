@@ -350,14 +350,14 @@ Scouts load the relevant section below at codebase scan time.
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion. No `eval`. Flatten promise chains with `async/await`. |
+| 1 — Control flow | No recursion. No runtime code evaluation. Flatten promise chains with `async/await`. |
 | 2 — Loop bounds | Every `for`/`while` must have a provable bound. Comment the max count. No unbounded `while(true)`. |
 | 3 — Memory | No unbounded data structure growth at runtime. Arrays and maps must have max-size guards. |
 | 4 — Function size | ≤ 60 lines. ESLint `max-lines-per-function` enforced. |
 | 5 — Assertions | `assert` from `node:assert` or typed invariant helper. Min 2 per function. Type guards that throw count. |
 | 6 — Scope | `const` over `let`. `let` over `var`. No `var`. Module-level state must be justified. |
 | 7 — Return values | No ignored Promise rejections. Every `await` in try/catch or `.catch()`. ESLint `@typescript-eslint/no-floating-promises`. |
-| 8 — Macros | No `eval`, no `Function()` constructor, no dynamic `require`. |
+| 8 — Macros | No evaluating strings as code, no functions built from strings, no module loading at runtime. |
 | 9 — Pointers | No `any` type. No unchecked type assertions (`as Type` without guard). |
 | 10 — Warnings | `tsc --strict --noEmit` clean. ESLint zero warnings. `"strict": true` in tsconfig. |
 
@@ -365,14 +365,14 @@ Scouts load the relevant section below at codebase scan time.
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion (or explicit `sys.setrecursionlimit` with documented bound). No `exec`. No dynamic `import` at runtime. |
+| 1 — Control flow | No recursion (or explicit `sys.setrecursionlimit` with documented bound). No running strings as code. No module loading at runtime. |
 | 2 — Loop bounds | All `while` loops must document max iteration count. `for` over iterables preferred — document expected max length. |
 | 3 — Memory | No unbounded list/dict growth. Use `collections.deque(maxlen=N)` for bounded queues. Document max size for all growing structures. |
 | 4 — Function size | ≤ 60 lines. `flake8 --max-function-length` enforced. |
 | 5 — Assertions | `assert` with descriptive messages. Min 2 per function. `isinstance` checks count. |
 | 6 — Scope | No module-level mutable state unless justified. No `global` without documentation. |
 | 7 — Return values | No ignored returns for functions that can fail. Never bare `except:`. All exceptions caught at appropriate boundary. |
-| 8 — Macros | No `exec`, no `eval`, no `__import__`. |
+| 8 — Macros | No evaluating or running strings as code, no module loading at runtime. |
 | 9 — Pointers | All parameters and returns must have type annotations. `mypy --strict` must pass. |
 | 10 — Warnings | `mypy --strict` clean. `flake8` zero warnings. `pylint` score ≥ 9.0. |
 

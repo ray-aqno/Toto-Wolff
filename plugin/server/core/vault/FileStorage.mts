@@ -1,5 +1,5 @@
 /**
- * FileStorage — filesystem-backed storage backend for VaultService.
+ * FileStorage: filesystem-backed storage backend for VaultService.
  * Uses the same write/search/commit logic as the original VaultService.
  */
 
@@ -49,7 +49,7 @@ export class FileStorage implements StorageBackend {
     // Checked before writing: a full-queue rejection must never leave the
     // file changed on disk with no record of that change ever queued.
     if (this.queue.length >= this.queueMaxSize) {
-      throw new Error('queue full — drain backlogged');
+      throw new Error('queue full: drain backlogged');
     }
 
     const absPath = join(this.rootPath, path);
@@ -59,7 +59,7 @@ export class FileStorage implements StorageBackend {
     // Deduplicated: `git add` + `git commit` at drain time always picks up
     // whatever content is currently on disk for a path, so a second entry
     // for the same path can never commit anything beyond what the first
-    // entry's commit already captured — it can only fail as an empty commit
+    // entry's commit already captured: it can only fail as an empty commit
     // and wedge the queue at that entry forever (nothing after it drains).
     if (!this.queue.includes(absPath)) {
       this.queue.push(absPath);
@@ -129,7 +129,7 @@ export class FileStorage implements StorageBackend {
 
   /**
    * Lists file entries (not subdirectories) of a single directory,
-   * non-recursively — matches the pre-VaultServiceV2 raw `readdir(dir)`
+   * non-recursively: matches the pre-VaultServiceV2 raw `readdir(dir)`
    * contract every call site was built against. `list()` above is a
    * recursive whole-vault walk and is NOT a substitute for this: a caller
    * that wants "immediate children of one directory" must use `listDir()`.
@@ -154,14 +154,14 @@ export class FileStorage implements StorageBackend {
 
     const results: string[] = [];
     for (const entry of entries) {
-      if (results.length >= maxResults) break; // P10 Rule 2 — hard cap, see MAX_LIST_RESULTS
+      if (results.length >= maxResults) break; // P10 Rule 2: hard cap, see MAX_LIST_RESULTS
       if (entry.isFile()) results.push(entry.name);
     }
     return results;
   }
 
   /**
-   * Like `listDir()`, but with no cap — see the StorageBackend interface
+   * Like `listDir()`, but with no cap: see the StorageBackend interface
    * doc for when this is (and isn't) the right choice over `listDir()`.
    */
   async listDirAll(dir: string): Promise<string[]> {
@@ -308,7 +308,7 @@ export class FileStorage implements StorageBackend {
 
   /**
    * Replaces any occurrence of the vault's absolute root path in an error
-   * message with a placeholder, before it's surfaced to a caller — git's own
+   * message with a placeholder, before it's surfaced to a caller: git's own
    * error text can carry `this.rootPath` verbatim (e.g. "fatal: not a git
    * repository: <rootPath>/.git"), which shouldn't leak the real filesystem
    * location into a commit-failure reason string.

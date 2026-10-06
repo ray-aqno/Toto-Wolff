@@ -1,5 +1,5 @@
 /**
- * VaultService — unified vault interface with pluggable storage backends.
+ * VaultService: unified vault interface with pluggable storage backends.
  * Delegates all operations to the active StorageBackend.
  * Supports hot-swapping backends at runtime via switchBackend().
  */
@@ -35,7 +35,7 @@ export class VaultService {
   /**
    * Set once close() has actually released this service's reference.
    * Without it, a second close() call would release a second reference it
-   * was never granted — fatal for a backend shared with other VaultService
+   * was never granted: fatal for a backend shared with other VaultService
    * instances, since it can evict the backend while they still use it.
    */
   private closed = false;
@@ -51,7 +51,7 @@ export class VaultService {
    * can execute against a backend reference a later-queued switchBackend()
    * has already closed. The chain-advancement continuation swallows
    * rejections so one failed operation doesn't jam the queue for everyone
-   * queued after it — the caller still sees the real result/rejection via
+   * queued after it: the caller still sees the real result/rejection via
    * `result`.
    */
   private enqueue<T>(op: () => Promise<T>): Promise<T> {
@@ -62,13 +62,13 @@ export class VaultService {
 
   /**
    * Throws if this service has already been closed. After the last owner
-   * releases a shared backend, VaultFactory may evict and close it — a
+   * releases a shared backend, VaultFactory may evict and close it: a
    * closed-but-still-called service must not go on reading, writing, or
    * committing through that reference (a later, unrelated create() for the
    * same vault would then get a fresh backend with its own queue, and the
    * two could race against the same git working tree). Called from inside
    * each enqueued operation, not before enqueueing, so it sees `closed` as
-   * of when the operation actually runs — correct even if a queued close()
+   * of when the operation actually runs: correct even if a queued close()
    * ahead of it hasn't executed yet at call time.
    */
   private assertOpen(): void {
@@ -79,7 +79,7 @@ export class VaultService {
 
   /**
    * Release this service's reference to its current backend, using the
-   * config that acquired it — NOT `this.backend.close()` directly. Backends
+   * config that acquired it: NOT `this.backend.close()` directly. Backends
    * obtained through VaultFactory.create() are config-keyed and may be
    * shared by other VaultService instances against the same vault; only
    * VaultFactory itself knows when the last reference has gone and it's
@@ -108,7 +108,7 @@ export class VaultService {
 
     // VaultFactory.create() already granted this reference; if initialize()
     // rejects, no VaultService is ever constructed to eventually release it
-    // — roll the acquisition back here or it leaks (a phantom reference that
+    //: roll the acquisition back here or it leaks (a phantom reference that
     // survives every real owner, so the backend can never actually evict).
     try {
       await backend.initialize();
@@ -144,7 +144,7 @@ export class VaultService {
         throw new Error(`Unknown backend: ${config.backend}`);
       }
 
-      // Same rollback as create() above — a rejected initialize() must not
+      // Same rollback as create() above: a rejected initialize() must not
       // leave the just-granted reference to newBackend uncounted-for.
       try {
         await newBackend.initialize();
@@ -158,7 +158,7 @@ export class VaultService {
       }
 
       // Release this service's reference to the old backend (see
-      // releaseBackend()) before this.config is overwritten below — it
+      // releaseBackend()) before this.config is overwritten below: it
       // still describes the outgoing backend at this point.
       await this.releaseBackend();
 
@@ -172,7 +172,7 @@ export class VaultService {
    *
    * Deliberate escape hatch, NOT routed through the serialization queue:
    * callers needing direct backend access get a synchronous reference.
-   * Do not hold this reference or use it across an `await` boundary — a
+   * Do not hold this reference or use it across an `await` boundary: a
    * concurrent switchBackend() can close it out from under you. This is a
    * known, accepted gap, not an oversight.
    */
@@ -188,7 +188,7 @@ export class VaultService {
   }
 
   /**
-   * Read a file from the vault. Returns `null` if the path does not exist —
+   * Read a file from the vault. Returns `null` if the path does not exist:
    * callers must check `=== null`, not catch ENOENT.
    */
   async read(path: string): Promise<string | null> {
@@ -219,7 +219,7 @@ export class VaultService {
 
   /**
    * List file entries (not subdirectories) of a single directory,
-   * non-recursively — capped at `limit`. Use this, not `list()`, for a
+   * non-recursively: capped at `limit`. Use this, not `list()`, for a
    * "readdir this one directory" need; `list()` walks the whole vault.
    */
   async listDir(dir: string, limit = MAX_LIST_RESULTS): Promise<string[]> {
@@ -337,11 +337,11 @@ export class VaultService {
 
   /**
    * Close the vault and release this service's reference to its backend.
-   * Idempotent — a second call is a no-op, since this service already gave
+   * Idempotent: a second call is a no-op, since this service already gave
    * up its one reference on the first call and holds no claim to release
    * again (releasing twice would evict a backend still in use by whichever
    * other VaultService instances share it). The terminal `closed` state is
-   * only set once release actually succeeds — if it rejects (a pluggable
+   * only set once release actually succeeds: if it rejects (a pluggable
    * backend's close() can fail), this service is NOT marked closed, so a
    * caller can call close() again to retry the cleanup instead of every
    * later call silently no-op'ing over a cleanup that never happened.

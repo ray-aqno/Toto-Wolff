@@ -11,7 +11,7 @@ function toSignalResponse(record: SignalRecord): { id: string; content_hash: str
 }
 
 /**
- * GET /vault/signal — returns active signal records as a JSON array via SignalIndex.
+ * GET /vault/signal: returns active signal records as a JSON array via SignalIndex.
  * 200+[] on empty (cold-start is a first-class state, not an error).
  * 500 only on index load failure.
  */

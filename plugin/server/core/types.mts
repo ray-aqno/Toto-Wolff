@@ -191,7 +191,7 @@ export interface AgentConfig {
 
 /**
  * Closed enum of valid pattern values for SignalRecord.
- * Adding a new pattern requires a code change — this is intentional (write-path enforcement).
+ * Adding a new pattern requires a code change: this is intentional (write-path enforcement).
  * Per council ruling 2026-06-23-toto-wolff-v1-confidence-scoring-contract.
  */
 export const SIGNAL_PATTERNS = [
@@ -202,15 +202,15 @@ export const SIGNAL_PATTERNS = [
 
 export type SignalPattern = typeof SIGNAL_PATTERNS[number];
 
-/** Typed governance signal record — core fields plus optional scoring fields. */
+/** Typed governance signal record: core fields plus optional scoring fields. */
 export interface SignalRecord {
   id: string;
   content_hash: string;
   valid_until: string;
   verdict: 'approved' | 'blocked' | 'conditional-approve' | 'revision-required';
-  /** Closed enum value from SIGNAL_PATTERNS — absent on legacy records. */
+  /** Closed enum value from SIGNAL_PATTERNS: absent on legacy records. */
   pattern?: string;
-  /** Exact-membership tag set for Jaccard scoring — absent on legacy records. */
+  /** Exact-membership tag set for Jaccard scoring: absent on legacy records. */
   topic_tags?: string[];
 }
 

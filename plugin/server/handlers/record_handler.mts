@@ -42,7 +42,7 @@ function resolveRecordPath(
   }
   const resolved = resolve(join(vaultPath, subDir, filename));
   if (!isInsideVault(resolved, vaultPath)) return null;
-  assert(resolved.startsWith(vaultPath), 'resolveRecordPath: post-check — resolved must be inside vault');
+  assert(resolved.startsWith(vaultPath), 'resolveRecordPath: post-check: resolved must be inside vault');
   return resolved;
 }
 

@@ -1,5 +1,5 @@
 /**
- * VaultFactory — manages storage backend registration and instantiation.
+ * VaultFactory: manages storage backend registration and instantiation.
  * Single instance per backend type (singleton per backend ID).
  */
 
@@ -14,7 +14,7 @@ export class VaultFactoryImpl {
    * Auto-constructed instances from create(), cached by id+config so two
    * distinct rootPaths (or other config) never collide. Distinct from
    * `backends`, which holds explicitly register()'d instances that always
-   * win regardless of config — that precedence is unchanged.
+   * win regardless of config: that precedence is unchanged.
    */
   private createdInstances = new Map<string, StorageBackend>();
   /**
@@ -22,7 +22,7 @@ export class VaultFactoryImpl {
    * a `createdInstances` entry from `create()`. `release()` only actually
    * closes and evicts the backend once its count reaches zero, so a backend
    * shared by several VaultService instances (same id+config) survives
-   * until every one of them has released it — closing one no longer clears
+   * until every one of them has released it: closing one no longer clears
    * the queue out from under the others.
    */
   private refCounts = new Map<string, number>();
@@ -32,7 +32,7 @@ export class VaultFactoryImpl {
    * instance per key: a fresh `create()` can hand out a new instance under
    * the same key while an older one from that same key is still parked here
    * failing to close, so more than one instance can be mid-close under one
-   * key at once — a single-slot map would let a second instance's own
+   * key at once: a single-slot map would let a second instance's own
    * teardown overwrite (and so lose track of) the first's parked, retryable
    * state. Kept separate from `createdInstances` so `create()` never hands
    * one of these back out to a new caller while teardown is in progress or
@@ -49,7 +49,7 @@ export class VaultFactoryImpl {
   /**
    * Register an already-constructed backend instance under its own `id`.
    * `create(id)` returns this exact instance from then on, regardless of
-   * config, and its lifecycle is the caller's to manage — `release()` never
+   * config, and its lifecycle is the caller's to manage: `release()` never
    * closes it. Throws if `id` is already registered.
    */
   register(backend: StorageBackend): void {
@@ -74,13 +74,13 @@ export class VaultFactoryImpl {
   /**
    * Get (or construct) a backend for `id`. An explicitly `register()`'d
    * instance always wins, ignoring `config`. Otherwise constructs a new
-   * instance of the class registered under `id` — caching and
+   * instance of the class registered under `id`: caching and
    * reference-counting it by `id`+`config.options` so repeated calls with
-   * matching config share one instance (see `release()`) — or reuses one
+   * matching config share one instance (see `release()`): or reuses one
    * already cached for that same id+config. If a prior instance for this
    * id+config is currently being closed (or stuck failing to close), this
    * always builds a genuinely new instance rather than handing that one
-   * back out — see `closingInstances`. `config` is required the first time
+   * back out: see `closingInstances`. `config` is required the first time
    * a given id+config pair is constructed; throws if missing then. Returns
    * `undefined` if no class or instance is registered for `id`.
    */
@@ -111,14 +111,14 @@ export class VaultFactoryImpl {
   /**
    * Release one reference to `backend`, previously obtained from `create()`
    * with this exact id+config. `backend` must be the caller's own instance
-   * (not just the id+config it was obtained with) — a cache key alone isn't
+   * (not just the id+config it was obtained with): a cache key alone isn't
    * enough to identify which call this is, since a failed-to-close instance
    * can stay parked (see `closingInstances`) while a concurrent `create()`
    * hands a *different*, fresh instance under the same key to someone else;
    * matching by instance keeps a release of the fresh one from being
    * misattributed as a retry of the stale one's close (or vice versa). If
    * `backend` isn't the currently-live or currently-parked instance for
-   * this key, this is a no-op — it's already been superseded or evicted.
+   * this key, this is a no-op: it's already been superseded or evicted.
    *
    * Once the reference count reaches zero, the instance is moved out of
    * `createdInstances` (so no concurrent `create()` can hand it back out)
@@ -126,7 +126,7 @@ export class VaultFactoryImpl {
    * parked in `closingInstances` rather than being discarded, so a retried
    * `release()` with that same instance finds it there and retries closing
    * it instead of silently no-op'ing. A no-op for an explicitly
-   * `register()`'d backend (id-only, not config-cached) — its lifecycle is
+   * `register()`'d backend (id-only, not config-cached): its lifecycle is
    * the registering caller's to manage, unaffected by this accounting.
    */
   async release(id: string, config: StorageConfig, backend: StorageBackend): Promise<void> {
@@ -143,7 +143,7 @@ export class VaultFactoryImpl {
       return;
     }
 
-    // Not the currently-live instance for this key either — already
+    // Not the currently-live instance for this key either: already
     // superseded by a fresher create() or otherwise evicted. Nothing to do.
     if (this.createdInstances.get(cacheKey) !== backend) return;
 
@@ -154,10 +154,10 @@ export class VaultFactoryImpl {
     }
 
     // Moved to closingInstances (not just decremented in place) before
-    // awaiting close() — a concurrent create() for this same id+config must
+    // awaiting close(): a concurrent create() for this same id+config must
     // never receive an instance that's being torn down; it gets a fresh one
     // instead (create() only ever reads createdInstances). Added to the
-    // existing set, if any, rather than overwriting it — an older instance
+    // existing set, if any, rather than overwriting it: an older instance
     // under this same key may already be parked there, itself mid-retry.
     this.refCounts.delete(cacheKey);
     this.createdInstances.delete(cacheKey);

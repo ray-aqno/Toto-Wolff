@@ -1,5 +1,5 @@
 /**
- * StorageBackend — pluggable storage interface for VaultService.
+ * StorageBackend: pluggable storage interface for VaultService.
  * All backends implement this interface for hot-swappable storage.
  */
 
@@ -26,10 +26,10 @@ export interface StorageBackend {
   listDir(dir: string, limit?: number): Promise<string[]>;
 
   /**
-   * Like `listDir()`, but with NO cap — every file in the directory. `[]` on
+   * Like `listDir()`, but with NO cap: every file in the directory. `[]` on
    * ENOENT. Deliberately uncapped for callers needing an accurate total
    * count or a correctly-ordered "N most recent" (sort full list, then
-   * truncate) over a single, bounded-by-design directory — a governance
+   * truncate) over a single, bounded-by-design directory: a governance
    * vault subdirectory, not user-supplied or attacker-controlled input.
    * Capping before sorting silently produces a wrong count and picks the
    * "recent N" from an arbitrary filesystem-order subset instead of the

@@ -4,8 +4,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { VaultService as VaultServiceV2 } from '../core/vault/VaultService.mts';
 import { getCachedVault } from './vault_cache.mts';
 
-const MAX_PLAN_FILES = 500; // P10 Rule 2 — upper bound on P10-Plans/ scan
-const MAX_FILE_BYTES = 10_240; // P10 Rule 3 — skip oversized plan files
+const MAX_PLAN_FILES = 500; // P10 Rule 2: upper bound on P10-Plans/ scan
+const MAX_FILE_BYTES = 10_240; // P10 Rule 3: skip oversized plan files
 
 function getVault(vaultPath: string): Promise<VaultServiceV2> {
   return getCachedVault(vaultPath);
@@ -13,7 +13,7 @@ function getVault(vaultPath: string): Promise<VaultServiceV2> {
 
 /**
  * Lists P10-Plans/ .md files for this vaultPath, or null if the directory
- * is missing or unreadable — this endpoint's contract treats a missing dir
+ * is missing or unreadable: this endpoint's contract treats a missing dir
  * as a failure (500), not an empty match list.
  */
 async function listPlanFiles(

@@ -3,7 +3,7 @@ import type { SignalRecord } from '../core/types.mts';
 import { scoreConfidence } from './scoreConfidence.mts';
 import { SignalIndex } from './signal_index.mts';
 
-const COLD_START_DISQUALIFIER = "Signal store is empty — run 'toto backfill' to seed from your council and p10 history";
+const COLD_START_DISQUALIFIER = "Signal store is empty: run 'toto backfill' to seed from your council and p10 history";
 
 /** Escapes regex metacharacters so a topic tag can be embedded in a RegExp literal. */
 function escapeRegExp(s: string): string {
@@ -14,7 +14,7 @@ function escapeRegExp(s: string): string {
 /**
  * Selects the active SignalRecords relevant to a ruling: a record is relevant
  * when any of its topic_tags occurs in the ruling text as a whole word/phrase.
- * Word-boundary (\b) matching — not bare substring — is deliberate: a substring
+ * Word-boundary (\b) matching: not bare substring: is deliberate: a substring
  * test lets a short tag like "or" match "order"/"explore" and drag unrelated
  * records into the scored set, where their divergent tags fail scoreConfidence's
  * pairwise Jaccard check and silently degrade a valid HIGH to LOW.
@@ -41,9 +41,9 @@ function selectRelevant(records: SignalRecord[], ruling: string): SignalRecord[]
  * MCP tool handler for score_confidence.
  * Takes a free-text council `ruling`, loads the vault's active SignalRecords,
  * selects those topically relevant to the ruling (whole-word tag match), and
- * scores that set as of today. When no active records exist at all — dir
+ * scores that set as of today. When no active records exist at all: dir
  * absent, empty, or holding only expired/invalid files (SignalIndex.load drops
- * all three) — returns LOW with cold-start guidance. Having records but none
+ * all three): returns LOW with cold-start guidance. Having records but none
  * relevant falls to LOW via scoreConfidence's distinct-record floor.
  */
 export async function handleScoreConfidence(
@@ -68,6 +68,6 @@ export async function handleScoreConfidence(
   }
 
   const relevant = selectRelevant(all, ruling);
-  const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD — same clock SignalIndex.load uses
+  const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD: same clock SignalIndex.load uses
   return scoreConfidence(relevant, now);
 }

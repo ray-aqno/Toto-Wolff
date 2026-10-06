@@ -33,6 +33,6 @@ function validateInput(raw: unknown): VaultWriteInput {
 export async function handleVaultWrite(input: unknown, vault: VaultService): Promise<{ path: string }> {
   const { path, content } = validateInput(input);
   await vault.write(path, content);
-  // CSO: return caller's relative path — not the absolute disk path (info disclosure)
+  // CSO: return caller's relative path: not the absolute disk path (info disclosure)
   return { path };
 }

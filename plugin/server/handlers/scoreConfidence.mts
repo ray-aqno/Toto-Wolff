@@ -3,7 +3,7 @@ import { SIGNAL_PATTERNS } from '../core/types.mts';
 import { jaccardSimilarity, JACCARD_MATCH_THRESHOLD } from '../core/utils/jaccard.mts';
 import type { SignalRecord } from '../core/types.mts';
 
-/** Hard constant — changing requires a council record. */
+/** Hard constant: changing requires a council record. */
 const N_DISTINCT = 2;
 
 /**
@@ -17,7 +17,7 @@ function canonicalizePattern(p: string): string {
 
 /**
  * Returns true if the pattern value is in the closed enum.
- * Novel patterns — never seen in the enum — must not reach HIGH.
+ * Novel patterns: never seen in the enum: must not reach HIGH.
  */
 function isKnownPattern(pattern: string): boolean {
   assert(typeof pattern === 'string', 'pattern must be a string');
@@ -68,7 +68,7 @@ export function scoreConfidence(
     }
   }
 
-  // Pairwise Jaccard check on topic_tags — any pair below threshold disqualifies
+  // Pairwise Jaccard check on topic_tags: any pair below threshold disqualifies
   for (let i = 0; i < records.length - 1; i++) { // P10 Rule 2: bounded by records.length
     for (let j = i + 1; j < records.length; j++) { // P10 Rule 2: inner bound
       const ra = records[i];

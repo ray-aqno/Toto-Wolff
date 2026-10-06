@@ -32,7 +32,7 @@ function buildStatsPayload(vaultPath: string): Promise<DashboardStats> {
 /**
  * Writes a single SSE frame to one client.
  * Checks res.destroyed before write. On backpressure (write returns false), removes client.
- * Must never throw — a dead socket must not abort the broadcast loop.
+ * Must never throw: a dead socket must not abort the broadcast loop.
  */
 function writeSseToClient(client: ServerResponse, event: string, data: string): void {
   assert(typeof event === 'string' && event.length > 0, 'writeSseToClient: event must be non-empty string');
@@ -92,9 +92,9 @@ export function isAtCapacity(): boolean {
 export function unregisterClient(res: ServerResponse): void {
   assert(res !== null, 'unregisterClient: res must not be null');
   clients.delete(res);
-  console.error(`[SSE] client disconnected — total: ${clients.size}`);
+  console.error(`[SSE] client disconnected: total: ${clients.size}`);
   if (clients.size === 0) {
-    assert(clients.size === 0, 'unregisterClient: teardown invariant — clients must be empty');
+    assert(clients.size === 0, 'unregisterClient: teardown invariant: clients must be empty');
     clearInterval(statsHandle!);
     clearInterval(keepAliveHandle!);
     statsHandle = null;
@@ -104,19 +104,19 @@ export function unregisterClient(res: ServerResponse): void {
 
 /**
  * Registers a new SSE client. Starts broadcast intervals on first connection.
- * Caller must check isAtCapacity() before calling — capacity is enforced at the
+ * Caller must check isAtCapacity() before calling: capacity is enforced at the
  * HTTP handler layer (handleSseRequest) so headers are not yet sent here.
  */
 export function registerClient(res: ServerResponse, vaultPath: string): void {
   assert(typeof res === 'object' && res !== null, 'registerClient: res must be a ServerResponse');
   assert(isAbsolute(vaultPath), 'registerClient: vaultPath must be absolute');
-  assert(!isAtCapacity(), 'registerClient: called at capacity — check isAtCapacity() first');
+  assert(!isAtCapacity(), 'registerClient: called at capacity: check isAtCapacity() first');
 
   if (res.destroyed) return;
 
   clients.add(res);
   assert(clients.size <= MAX_CLIENTS, 'registerClient: clients exceeded MAX_CLIENTS after add');
-  console.error(`[SSE] client connected — total: ${clients.size}`);
+  console.error(`[SSE] client connected: total: ${clients.size}`);
 
   res.on('close', () => unregisterClient(res));
 

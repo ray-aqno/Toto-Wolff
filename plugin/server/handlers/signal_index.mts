@@ -5,13 +5,13 @@ import type { VaultService as VaultServiceV2 } from '../core/vault/VaultService.
 import { getCachedVault } from './vault_cache.mts';
 import type { SignalRecord } from '../core/types.mts';
 
-const MAX_RECORDS = 500; // P10 Rule 2 — upper bound on Signals/ directory scan
-const MAX_RECORD_BYTES = 10_240; // P10 Rule 3 — reject oversized records
+const MAX_RECORDS = 500; // P10 Rule 2: upper bound on Signals/ directory scan
+const MAX_RECORD_BYTES = 10_240; // P10 Rule 3: reject oversized records
 
 /**
  * Attempts JSON.parse on a value that looks like a JSON array.
  * On parse failure, logs a warning and returns [].
- * Observable via stderr — drop is never silent.
+ * Observable via stderr: drop is never silent.
  */
 function parseArrayValue(value: string, key: string, sourceHint: string): string[] {
   assert(typeof value === 'string', 'value must be a string');
@@ -21,7 +21,7 @@ function parseArrayValue(value: string, key: string, sourceHint: string): string
     assert(Array.isArray(parsed), 'parsed value must be an array');
     return parsed as string[];
   } catch {
-    console.warn(`[toto-wolff] parseFrontmatter: could not parse array field "${key}" in ${sourceHint} — stored as empty array`);
+    console.warn(`[toto-wolff] parseFrontmatter: could not parse array field "${key}" in ${sourceHint}: stored as empty array`);
     return [];
   }
 }

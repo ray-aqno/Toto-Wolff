@@ -1,5 +1,5 @@
 /**
- * dashboard_html.ts — renders the Toto Wolff paddock interface.
+ * dashboard_html.ts: renders the Toto Wolff paddock interface.
  * F1 timing-screen aesthetic: near-black canvas, Mercedes teal accents,
  * monospace data values, SVG charts, click-to-detail slide panel.
  */
@@ -245,7 +245,7 @@ function sectorBadge(type: 'council' | 'p10' | 'cabinet' | 'safety-car' | 'karpa
 
 /**
  * Role Adoption card (T9 empty-state copy). Always renders in its empty
- * state — no `toto persona` CLI command or persona field on DashboardResult
+ * state: no `toto persona` CLI command or persona field on DashboardResult
  * exists yet, so there is nothing to make this dynamic. Wire real data when
  * `toto persona add` ships; until then this is intentionally hardcoded.
  */
@@ -255,22 +255,22 @@ function buildRoleAdoptionCard(): string {
       <span class="card-label">Role Adoption</span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
     </div>
-    <div class="stat-unit">No personas active — run toto persona add</div>
+    <div class="stat-unit">No personas active: run toto persona add</div>
   </div>`;
 }
 
-// T9 remainder (card empty states): the 4 helpers below return card BODY only —
+// T9 remainder (card empty states): the 4 helpers below return card BODY only:
 // each card's header stays inline in renderDashboardHtml because its sector-dot
 // styling is tied to live percentage values, unlike buildRoleAdoptionCard's
 // static full-card return above. Each keys its zero-check off the exact field
 // its non-empty branch renders, per P10-Plans/2026-07-07-toto-wolff-t9-remainder-
-// card-empty-states.md Arbiter Condition 1 — a mismatched predicate would
+// card-empty-states.md Arbiter Condition 1: a mismatched predicate would
 // reproduce the "0 approved of 0 recent" bug this task exists to fix.
 
 /** Body of card-velocity. Empty-check keys off `count`, the same field rendered as stat-big. */
 function buildVelocityCard(count: number, recent: DashboardItem[]): string {
   if (count === 0) {
-    return `<div class="panel-empty">No sessions yet — run /council to start</div>`;
+    return `<div class="panel-empty">No sessions yet: run /council to start</div>`;
   }
   return `<div class="stat-big" data-count="${count}">0</div>
     <div class="stat-unit">Council Sessions</div>
@@ -316,7 +316,7 @@ function buildCabinetCard(count: number, recent: DashboardItem[]): string {
       <span class="card-label">Cabinet Gates</span>
       <span style="display:flex;align-items:center;gap:.5rem"><span class="sector-dot"></span><span class="card-chevron">▶</span></span>
     </div>
-    <div class="panel-empty">No cabinet gates yet — run /cabinet to start</div>
+    <div class="panel-empty">No cabinet gates yet: run /cabinet to start</div>
   </div>`;
   }
   return `<div class="card" id="card-cabinet" data-panel="cabinet" style="--delay:.22s">
@@ -584,7 +584,7 @@ function buildPanelDispatchScript(): string {
       case 'karpathy': return buildKarpathyPanel();
       case 'drs':      return buildDrsPanel();
       case 'subagent': return buildSubagentPanel();
-      case 'roles':    return '<div class="panel-empty">No personas active — run toto persona add</div>';
+      case 'roles':    return '<div class="panel-empty">No personas active: run toto persona add</div>';
       case 'history':  return buildHistoryPanel();
       case 'blocked':  return buildBlockedPanel();
       case 'rulings':  return buildRulingsPanel();
@@ -611,7 +611,7 @@ function buildVelocityP10PanelsScript(): string {
     html += '<div class="pstat"><span class="pstat-k">Recent sessions</span><span class="pstat-v">' + sessions.length + '</span></div>';
     html += '<div class="pstat"><span class="pstat-k">Clean ruling rate</span><span class="pstat-v" style="color:#00D2BE">' + cleanRate + '%</span></div>';
     html += '</div><div class="psec"><div class="psec-label">Session Log</div>';
-    if (!sessions.length) { html += '<div class="panel-empty">No sessions yet — run /council to start your first.</div>'; }
+    if (!sessions.length) { html += '<div class="panel-empty">No sessions yet: run /council to start your first.</div>'; }
     sessions.slice().reverse().forEach((item) => {
       html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
@@ -627,7 +627,7 @@ function buildVelocityP10PanelsScript(): string {
     html += '<div class="pstat"><span class="pstat-k">Recent plans</span><span class="pstat-v">' + plans.length + '</span></div>';
     html += '<div class="pstat"><span class="pstat-k">Approved (recent)</span><span class="pstat-v" style="color:#00D2BE">' + approved + '</span></div>';
     html += '</div><div class="psec"><div class="psec-label">Plan Log</div>';
-    if (!plans.length) { html += '<div class="panel-empty">No plans yet — run /p10 to start.</div>'; }
+    if (!plans.length) { html += '<div class="panel-empty">No plans yet: run /p10 to start.</div>'; }
     plans.slice().reverse().forEach((item) => {
       html += '<div class="prec"><div class="prec-meta">' + pill(item.status) + '<span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
@@ -673,7 +673,7 @@ function buildComplianceReversalPanelsScript(): string {
     html += '<div class="pstat"><span class="pstat-k">Reversal rate</span><span class="pstat-v" style="color:' + (pct > 30 ? '#e03030' : pct > 15 ? '#e09020' : '#00D2BE') + '">' + pct + '%</span></div>';
     html += '</div><div class="psec"><div class="psec-label">Revisions</div>';
     const revItems = sessions.filter((i) => i.status === 'revision-required');
-    if (!revItems.length) { html += '<div class="panel-empty" style="color:#00D2BE">No reversals — all rulings clean</div>'; }
+    if (!revItems.length) { html += '<div class="panel-empty" style="color:#00D2BE">No reversals: all rulings clean</div>'; }
     revItems.forEach((item) => {
       html += '<div class="prec"><div class="prec-meta"><span class="prec-pill" style="background:#e0303020;color:#e03030;border:1px solid #e0303040">REVISE</span><span class="prec-date">' + escHtml(item.date.slice(0, 10)) + '</span></div><div class="prec-text">' + escHtml(item.excerpt) + '</div></div>';
     });
@@ -710,7 +710,7 @@ function buildHistoryBlockedPanelsScript(): string {
     const items = D.blockedItems;
     let html = '<div class="psec"><div class="psec-label">Blocked Items (' + items.length + ')</div>';
     if (!items.length) {
-      html += '<div class="panel-empty" style="color:#00D2BE">PIT LANE CLEAR — no blocked items</div>';
+      html += '<div class="panel-empty" style="color:#00D2BE">PIT LANE CLEAR: no blocked items</div>';
     } else {
       items.forEach((b) => {
         const c = b.type === 'council' ? '#00D2BE' : '#C0C0C0';
@@ -930,7 +930,7 @@ function buildHeadMeta(): string {
   return `<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TOTO — Paddock Interface</title>
+<title>TOTO: Paddock Interface</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -1139,11 +1139,11 @@ function buildMiscStyles(): string {
   #panel-spinner { display: none; padding: 1rem; text-align: center }
   #panel-spinner.visible { display: block }
 
-  /* ── Mobile overlay — 768–1024px ─────────────────────────────────────── */
+  /* ── Mobile overlay: 768–1024px ─────────────────────────────────────── */
   @media (min-width: 768px) and (max-width: 1024px) {
     #panel { position: fixed; right: 0; top: 0; width: 40vw; height: 100vh; z-index: 100; overflow-y: auto; backdrop-filter: blur(4px); background: rgba(13,13,13,.92) }
   }
-  /* ── Mobile overlay — <768px ─────────────────────────────────────────── */
+  /* ── Mobile overlay: <768px ─────────────────────────────────────────── */
   @media (max-width: 767px) {
     #panel { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100; overflow-y: auto; background: rgba(13,13,13,.97) }
   }
@@ -1159,7 +1159,7 @@ function buildDashboardHead(): string {
 
 /**
  * Computes the derived stats (reversal/compliance percentages, colors, empty
- * flag) shared by the header, cards, and client-side panel. Pure — no HTML.
+ * flag) shared by the header, cards, and client-side panel. Pure: no HTML.
  */
 function computeDashboardMetrics(data: DashboardResult): {
   empty: boolean;
@@ -1205,7 +1205,7 @@ function buildDashboardHeader(data: DashboardResult): string {
 /** Renders the blocked-items list, or the ALL CLEAR empty state. */
 function buildBlockedSection(blockedItems: DashboardResult['blockedItems']): string {
   return blockedItems.length === 0
-    ? `<div class="blocked-empty">ALL CLEAR — no blocked items</div>`
+    ? `<div class="blocked-empty">ALL CLEAR: no blocked items</div>`
     : blockedItems.map((b) => `<div class="blocked-row" tabindex="0">${sectorBadge(b.type)} <span class="blocked-date">${esc(b.date)}</span> <span class="blocked-excerpt">${esc(b.excerpt)}</span></div>`).join('');
 }
 
@@ -1224,7 +1224,7 @@ function buildMainSection(data: DashboardResult, m: ReturnType<typeof computeDas
     return `<main class="main" id="main">
   <div class="empty-state">
     <div class="empty-heading">PIT LANE CLEAR</div>
-    <div class="empty-sub">No sessions recorded — run /council to start</div>
+    <div class="empty-sub">No sessions recorded: run /council to start</div>
   </div>
 </main>`;
   }
@@ -1304,13 +1304,13 @@ function buildWideCardsSection(data: DashboardResult, blockedRows: string, recen
   </div>` : ''}`;
 }
 
-/** Renders the static slide-in detail panel shell. Takes no dashboard data — content is filled client-side. */
+/** Renders the static slide-in detail panel shell. Takes no dashboard data: content is filled client-side. */
 function buildDetailPanelAside(): string {
   return `<!-- ── Detail panel ─────────────────────────────────────────────────────── -->
 <aside class="panel" id="panel" role="dialog" aria-modal="true" aria-label="Detail view">
   <div class="panel-header">
     <div>
-      <div class="panel-title" id="panel-title">—</div>
+      <div class="panel-title" id="panel-title">-</div>
       <div class="panel-sub" id="panel-sub"></div>
     </div>
     <button class="panel-close" id="panel-close" aria-label="Close panel">ESC</button>

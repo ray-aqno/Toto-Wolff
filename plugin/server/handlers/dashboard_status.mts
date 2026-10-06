@@ -68,7 +68,7 @@ export function extractStatus(content: string): string {
  * Returns empty arrays if the directory does not exist.
  * Loop bound: at most Math.min(files.length, limit) iterations; limit ≤ 200.
  * Uses listDirAll() (uncapped), not listDir(), because these governance
- * subdirectories are append-oriented with no 1000-file invariant — sorting
+ * subdirectories are append-oriented with no 1000-file invariant: sorting
  * a pre-capped, filesystem-order subset would both undercount and pick "most
  * recent" from an arbitrary slice rather than the true tail.
  */
@@ -96,7 +96,7 @@ export async function readRecentItems(
     try {
       content = (await vault.read(relPath)) ?? '';
     } catch {
-      // unreadable file — skip gracefully
+      // unreadable file: skip gracefully
     }
     items.push({
       date: extractDate(filename),

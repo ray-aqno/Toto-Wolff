@@ -25,7 +25,7 @@ import { checkMeta, discoverResult, isModern, toolsListResult, withComplete } fr
 import type { ServerInfo } from './modern.mts';
 
 export const SERVER_NAME = 'toto-wolff';
-export const SERVER_VERSION = '2.0.0-dev.1';
+export const SERVER_VERSION = '2.0.0';
 export const MAX_TOOLS = 64;
 export const MAX_RESULT_BYTES = 1024 * 1024;
 const SERVER_INFO: ServerInfo = Object.freeze({ name: SERVER_NAME, version: SERVER_VERSION });

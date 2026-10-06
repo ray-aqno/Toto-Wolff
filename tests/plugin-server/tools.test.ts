@@ -14,7 +14,7 @@ import { createTools } from '../../plugin/server/tools/index.mts';
 import { TOOL_NAMES } from './spawn-env.ts';
 
 const META = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} };
-const SERVER_INFO = { 'io.modelcontextprotocol/serverInfo': { name: 'toto-wolff', version: '2.0.0-dev.1' } };
+const SERVER_INFO = { 'io.modelcontextprotocol/serverInfo': { name: 'toto-wolff', version: '2.0.0' } };
 const ENV_KEYS = ['HOME', 'XDG_CONFIG_HOME', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL', 'TOTO_DRS_CONFIG', 'PATH'];
 
 let root: string;

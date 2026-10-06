@@ -1,6 +1,6 @@
-# toto-wolff plugin (2.0, in development)
+# toto-wolff plugin (2.0)
 
-This folder is the Claude Code plugin. On the `v2` branch it is a work in progress for toto-wolff 2.0: do not install from `v2`. Released versions ship from `main` (1.6.x) and, from 2.0.0 on, from the `plugin` branch.
+This folder is the Claude Code plugin. The marketplace (`claude plugin marketplace add ray-aqno/Toto-Wolff`) installs it from this folder on `main`; the Claude plugin directory installs it from branch `plugin`, which the publish workflow fills from each release tag.
 
 ## Requirements
 

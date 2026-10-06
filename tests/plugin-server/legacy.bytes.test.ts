@@ -22,7 +22,7 @@ const SIX_TOOLS = "[{\"name\":\"vault_write\",\"description\":\"Write a record t
 
 const IN_PROCESS: readonly (readonly [string, string | null])[] = [
   ["{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"c\",\"version\":\"1\"}}}",
-   "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"toto-wolff\",\"version\":\"2.0.0-dev.1\"}}}"],
+   "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"toto-wolff\",\"version\":\"2.0.0\"}}}"],
   ["{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}",
    "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{}}"],
   ["{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/list\"}",
@@ -81,7 +81,7 @@ const SPAWN_INPUT: readonly string[] = [
 ];
 
 const SPAWN_OUTPUT: readonly string[] = [
-  "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"toto-wolff\",\"version\":\"2.0.0-dev.1\"}}}",
+  "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"toto-wolff\",\"version\":\"2.0.0\"}}}",
   "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{}}",
   "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"tools\":" + SIX_TOOLS + "}}",
   "{\"jsonrpc\":\"2.0\",\"id\":4,\"error\":{\"code\":-32602,\"message\":\"Unknown tool: echo\"}}",

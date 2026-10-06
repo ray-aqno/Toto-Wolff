@@ -11,7 +11,7 @@ import { isolatedEnv, removeIsolatedEnvs } from './spawn-env.ts';
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 const VERSION_KEY = 'io.modelcontextprotocol/protocolVersion';
 const CAPS_KEY = 'io.modelcontextprotocol/clientCapabilities';
-const SERVER_INFO = { 'io.modelcontextprotocol/serverInfo': { name: 'toto-wolff', version: '2.0.0-dev.1' } };
+const SERVER_INFO = { 'io.modelcontextprotocol/serverInfo': { name: 'toto-wolff', version: '2.0.0' } };
 const META = { [VERSION_KEY]: '2026-07-28', [CAPS_KEY]: {} };
 
 const echo: Tool = {

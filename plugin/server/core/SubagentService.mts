@@ -29,10 +29,8 @@ export class SubagentService {
   ): Map<string, AgentConfig> {
     const agents = new Map<string, AgentConfig>();
 
-    // The server reads no agent folder outside the project: a user-level pi
-    // agent folder also holds pi's credentials, and the plugin directory
-    // refuses a plugin that reads it (MCP_FORWARDS_CREDENTIAL_ENV). So scope
-    // 'user' finds nothing; 'both' is the project's agents.
+    // Only the project's own agents (.pi/agents): scope 'user' finds
+    // nothing, and 'both' is the project's agents.
     if (scope === 'project' || scope === 'both') {
       const projectAgentsDir = path.join(cwd, CONFIG_DIR_NAME, 'agents');
       if (fs.existsSync(projectAgentsDir)) {

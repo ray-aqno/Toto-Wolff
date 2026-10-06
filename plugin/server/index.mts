@@ -14,9 +14,21 @@ import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 // Builds the tools inside the promise, so a bad TOTO_VAULT_PATH is one stderr
 // line. The dashboard runs only when TOTO_MCP_PORT is set, and closes when
 // stdin ends, so the process exits with its client.
+// The server sees only the variables it uses, never the user's whole
+// environment.
+const USED_ENV = ['TOTO_VAULT_PATH', 'HOME', 'CLAUDE_PROJECT_DIR', 'TOTO_MCP_PORT'] as const;
+
+function usedEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  // LOOP BOUND: USED_ENV's 4 names.
+  for (const name of USED_ENV) if (process.env[name] !== undefined) env[name] = process.env[name];
+  return env;
+}
+
 async function start(): Promise<void> {
-  const runtime = createRuntime(process.env);
-  const port = dashboardPort(process.env);
+  const env = usedEnv();
+  const runtime = createRuntime(env);
+  const port = dashboardPort(env);
   const dashboard = port === null ? null : await startDashboard({ port, vaultPath: runtime.vaultPath });
   try {
     await runStdio(createServer(createTools(runtime)));

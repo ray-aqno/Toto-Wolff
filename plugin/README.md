@@ -7,7 +7,7 @@ This folder is the Claude Code plugin. The marketplace (`claude plugin marketpla
 - **Node 24 or newer.** Claude Code starts the MCP server with `node ${CLAUDE_PLUGIN_ROOT}/server/index.mts`, and Node runs the TypeScript files directly by stripping their types. There is no build step and nothing to install.
 - On Node 22.18 to 23.x the server stops at once with `toto-wolff needs Node 24+`.
 - Below Node 22.18, Node cannot load a TypeScript file at all, so the server fails before that message can print. This README is the only warning there.
-- No API key, token or other credential. The server makes no model calls: Claude runs the governance workflows through the plugin's skills.
+- Nothing to sign in to. The server makes no model calls and no network calls: Claude runs the governance workflows through the plugin's skills.
 
 ## The MCP server
 

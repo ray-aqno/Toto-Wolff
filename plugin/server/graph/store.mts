@@ -10,6 +10,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import process from 'node:process';
 import { INTERNAL_ERROR, RpcError, isRecord } from '../mcp/protocol.mts';
 import { GraphError, hasKey } from './model.mts';
+import type { GraphNode } from './model.mts';
 import type { NodeRecord, NodeState, RunState, RunStatus } from './engine.mts';
 import { parseGraph } from './validate.mts';
 
@@ -70,18 +71,26 @@ export async function ensureRunsDir(projectDir: string): Promise<string> {
   return dir;
 }
 
-function parseNodes(raw: unknown, ids: readonly string[]): Record<string, NodeRecord> | null {
+function parseNodes(raw: unknown, graphNodes: readonly GraphNode[]): Record<string, NodeRecord> | null {
+  const ids = graphNodes.map((n) => n.id);
   if (!isRecord(raw) || Array.isArray(raw)) return null;
   const keys = Object.keys(raw);
   if (keys.length !== ids.length || !keys.every((k) => ids.includes(k))) return null;
   const nodes: Record<string, NodeRecord> = Object.create(null) as Record<string, NodeRecord>;
   // LOOP BOUND: one entry per graph node (at most MAX_NODES).
-  for (const id of ids) {
-    const entry = raw[id];
+  for (const node of graphNodes) {
+    const entry = raw[node.id];
     if (!isRecord(entry) || !(NODE_STATES as readonly unknown[]).includes(entry.state)) return null;
     const record: NodeRecord = { state: entry.state as NodeState };
     if (typeof entry.choice === 'string') record.choice = entry.choice;
-    nodes[id] = record;
+    // A loop's attempt: only on loop nodes, an integer in 1..maxIterations.
+    const { iteration } = entry;
+    if (iteration !== undefined) {
+      const max = node.kind === 'loop' ? (node.maxIterations ?? 1) : 0;
+      if (typeof iteration !== 'number' || !Number.isSafeInteger(iteration) || iteration < 1 || iteration > max) return null;
+      record.iteration = iteration;
+    }
+    nodes[node.id] = record;
   }
   assert.equal(Object.keys(nodes).length, ids.length, 'every node has a record');
   return nodes;
@@ -92,7 +101,7 @@ function parseState(raw: unknown, runId: string): RunState | null {
   if (!isRecord(raw) || raw.version !== 1 || raw.runId !== runId) return null;
   const graph = parseGraph(raw.graph);
   const ids = graph.nodes.map((n) => n.id);
-  const nodes = parseNodes(raw.nodes, ids);
+  const nodes = parseNodes(raw.nodes, graph.nodes);
   const { status, current, stopAt, eventSeq, updatedAt, input } = raw;
   if (nodes === null || !(RUN_STATUSES as readonly unknown[]).includes(status)) return null;
   if (current !== null && (typeof current !== 'string' || !ids.includes(current))) return null;

@@ -9,6 +9,7 @@ import { INTERNAL_ERROR, RpcError, isRecord } from '../mcp/protocol.mts';
 import { GraphError } from './model.mts';
 import type { Graph } from './model.mts';
 import { parseGraph } from './validate.mts';
+import { builtinGraphs } from './builtin.mts';
 
 export const MAX_GRAPH_FILES = 64;
 export const MAX_GRAPH_BYTES = 64 * 1024;
@@ -70,10 +71,12 @@ export async function loadUserGraphs(projectDir: string): Promise<UserGraphs> {
   const dir = graphsDir(projectDir);
   const files = await jsonFiles(dir);
   const out: UserGraphs = { graphs: [], invalid: [] };
+  const reserved = new Set(builtinGraphs().map((g) => g.id));
   // LOOP BOUND: at most MAX_GRAPH_FILES files.
   for (const file of files.slice(0, MAX_GRAPH_FILES)) {
     const loaded = await loadOne(dir, file);
     if (typeof loaded === 'string') out.invalid.push({ file, error: loaded });
+    else if (reserved.has(loaded.id)) out.invalid.push({ file, error: `reserved id: ${loaded.id} is built in` });
     else if (out.graphs.some((g) => g.graph.id === loaded.id)) out.invalid.push({ file, error: `duplicate graph id ${loaded.id}` });
     else out.graphs.push({ graph: loaded, file });
   }
@@ -84,8 +87,10 @@ export async function loadUserGraphs(projectDir: string): Promise<UserGraphs> {
   return out;
 }
 
-/** The user graph with this id, or UNKNOWN_GRAPH / INVALID_GRAPH. */
+/** The built-in or user graph with this id, or UNKNOWN_GRAPH / INVALID_GRAPH. */
 export async function findGraph(projectDir: string, id: string): Promise<Graph> {
+  const builtin = builtinGraphs().find((g) => g.id === id);
+  if (builtin !== undefined) return builtin;
   const { graphs, invalid } = await loadUserGraphs(projectDir);
   const found = graphs.find((g) => g.graph.id === id);
   if (found !== undefined) return found.graph;

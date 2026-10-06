@@ -77,7 +77,7 @@ afterAll(() => {
 describe('a full run through the tools', () => {
   it('lists valid and invalid user graphs', async () => {
     const { body } = await tool('graph_list', {});
-    expect(body.graphs).toEqual([{ id: 'demo', nodes: 6, source: '.toto/graphs/demo.json' }]);
+    expect(body.graphs).toEqual([{ id: 'idea-to-pr', nodes: 12, source: 'built-in' }, { id: 'demo', nodes: 6, source: '.toto/graphs/demo.json' }]);
     expect(body.invalid).toEqual([
       { file: 'broken.json', error: 'cycle: spec -> pick -> rfc -> ok -> build -> spec' },
       { file: 'notjson.json', error: 'not valid JSON (SyntaxError)' },

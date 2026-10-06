@@ -14,6 +14,10 @@ export const DEFAULT_ITERATIONS = 3;
 export const NODE_KINDS = ['skill', 'choice', 'loop', 'human_gate'] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
+// Evidence the server checks when a skill node reports `pass` (#63).
+export const NODE_CHECKS = ['rfc-doc', 'adr-doc', 'pr-url'] as const;
+export type NodeCheck = (typeof NODE_CHECKS)[number];
+
 export interface GraphNode {
   id: string;
   kind: NodeKind;
@@ -23,6 +27,8 @@ export interface GraphNode {
   // Object.create(null), so a key such as "constructor" is never inherited.
   options?: Record<string, string[]>;
   maxIterations?: number;
+  // 'skill' only: the evidence check applied on a pass.
+  check?: NodeCheck;
 }
 
 export interface Graph {

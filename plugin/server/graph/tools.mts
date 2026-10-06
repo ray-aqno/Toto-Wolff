@@ -9,6 +9,7 @@ import type { Message } from '../mcp/protocol.mts';
 import type { Tool, ToolDefinition } from '../mcp/server.mts';
 import { approveNode, createRun, currentStep, reportNode, resumeRun } from './engine.mts';
 import type { RunState, Step, Transition } from './engine.mts';
+import { builtinGraphs } from './builtin.mts';
 import { findGraph, loadUserGraphs } from './graphs.mts';
 import { assertNotBusy, withRunLock } from './lock.mts';
 import { GraphError, MAX_ITERATIONS } from './model.mts';
@@ -152,7 +153,8 @@ async function status(projectDir: string, args: Record<string, unknown>): Promis
 
 async function list(projectDir: string): Promise<unknown> {
   const { graphs, invalid } = await loadUserGraphs(projectDir);
-  return { graphs: graphs.map(({ graph, file }) => ({ id: graph.id, nodes: graph.nodes.length, source: `.toto/graphs/${file}` })), invalid };
+  const builtins = builtinGraphs().map((g) => ({ id: g.id, nodes: g.nodes.length, source: 'built-in' }));
+  return { graphs: [...builtins, ...graphs.map(({ graph, file }) => ({ id: graph.id, nodes: graph.nodes.length, source: `.toto/graphs/${file}` }))], invalid };
 }
 
 function template(args: Record<string, unknown>): unknown {

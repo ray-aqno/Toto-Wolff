@@ -14,7 +14,7 @@ import { checkDoc, checkPrUrl, docKindOf, ideaSlug, nextDocPath } from './checks
 import { findGraph, loadUserGraphs } from './graphs.mts';
 import { assertNotBusy, withRunLock } from './lock.mts';
 import { GraphError, MAX_ITERATIONS } from './model.mts';
-import { appendEvents, ensureRunsDir, newRunId, readState, runDir, writeState } from './store.mts';
+import { appendEvents, ensureRunsDir, newRunId, readState, runDir, runStartMs, writeState } from './store.mts';
 import { TEMPLATE_KINDS, isTemplateKind, templateFor } from './templates.mts';
 
 const MAX_IDEA = 4096;
@@ -142,7 +142,7 @@ async function checkEvidence(projectDir: string, state: RunState, nodeId: string
   const node = state.graph.nodes.find((n) => n.id === nodeId);
   assert.ok(node !== undefined, 'the current node is in the graph');
   const kind = docKindOf(node.check);
-  if (kind !== null) await checkDoc(projectDir, kind, state.input.idea, artifacts?.[0]);
+  if (kind !== null) await checkDoc(projectDir, kind, state.input.idea, artifacts?.[0], runStartMs(state.runId));
   else if (node.check === 'pr-url') checkPrUrl(evidence);
 }
 

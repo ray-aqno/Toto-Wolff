@@ -1,6 +1,6 @@
 // Evidence checks for idea-to-pr (#63): slugs, document numbering, DOC_EXISTS,
 // symlinks and size, whole-line headings, path normalisation, PR URLs.
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -96,7 +96,7 @@ describe('checkDoc', () => {
 
   it('accepts the template at the expected path, with CRLF line ends too', async () => {
     put('docs/adr/0001-faster-builds.md', ADR.replace(/\n/g, '\r\n'));
-    await expect(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md')).resolves.toBeUndefined();
+    await expect(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', 0)).resolves.toBeUndefined();
   });
 
   it.each([
@@ -105,46 +105,60 @@ describe('checkDoc', () => {
     ['a ./ prefix', './docs/adr/0001-faster-builds.md'],
   ])('normalises %s (Safety Car S4)', async (_name, artifact) => {
     put('docs/adr/0001-faster-builds.md', ADR);
-    await expect(checkDoc(project, 'adr', IDEA, artifact ?? join(project, 'docs/adr/0001-faster-builds.md'))).resolves.toBeUndefined();
+    await expect(checkDoc(project, 'adr', IDEA, artifact ?? join(project, 'docs/adr/0001-faster-builds.md'), 0)).resolves.toBeUndefined();
   });
 
   it('names the expected path for a wrong number, a wrong folder, or none', async () => {
     put('docs/adr/0003-other.md', ADR);
     put('docs/adr/0001-faster-builds.md', ADR);
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md'), 'BAD_EVIDENCE', 'artifacts[0] must be docs/adr/0004-faster-builds.md, not docs/adr/0001-faster-builds.md');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', 0), 'BAD_EVIDENCE', 'artifacts[0] must be docs/adr/0004-faster-builds.md, not docs/adr/0001-faster-builds.md');
     rmSync(join(project, 'docs', 'adr', '0001-faster-builds.md'));
-    await rejects(checkDoc(project, 'adr', IDEA, undefined), 'BAD_EVIDENCE', 'artifacts[0] must be docs/adr/0004-faster-builds.md');
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/rfc/0004-faster-builds.md'), 'BAD_EVIDENCE', 'must be docs/adr/0004-faster-builds.md');
+    await rejects(checkDoc(project, 'adr', IDEA, undefined, 0), 'BAD_EVIDENCE', 'artifacts[0] must be docs/adr/0004-faster-builds.md');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/rfc/0004-faster-builds.md', 0), 'BAD_EVIDENCE', 'must be docs/adr/0004-faster-builds.md');
   });
 
   it('reports DOC_EXISTS, naming the file, when the claimed path differs from an existing doc for the idea', async () => {
     put('docs/adr/0001-faster-builds.md', ADR);
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0002-faster-builds.md'), 'DOC_EXISTS', 'docs/adr/0001-faster-builds.md already covers this idea');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0002-faster-builds.md', 0), 'DOC_EXISTS', 'docs/adr/0001-faster-builds.md already covers this idea');
   });
 
   it('refuses a missing file', async () => {
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md'), 'BAD_EVIDENCE', 'cannot be read (ENOENT)');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', 0), 'BAD_EVIDENCE', 'cannot be read (ENOENT)');
   });
 
   it('matches headings as whole lines: "### Status" is not "## Status" (Arbiter condition 5)', async () => {
     put('docs/adr/0001-faster-builds.md', ADR.replace('## Status', '### Status'));
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md'), 'BAD_EVIDENCE', 'missing the template headings: ## Status');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', 0), 'BAD_EVIDENCE', 'missing the template headings: ## Status');
   });
 
   it('refuses a symlinked document and an oversized one', async () => {
     put('real.md', ADR);
     mkdirSync(join(project, 'docs', 'adr'), { recursive: true });
     symlinkSync(join(project, 'real.md'), join(project, 'docs', 'adr', '0001-faster-builds.md'));
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md'), 'BAD_EVIDENCE', 'must be a regular file');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', 0), 'BAD_EVIDENCE', 'must be a regular file');
     rmSync(join(project, 'docs', 'adr', '0001-faster-builds.md'));
     put('docs/adr/0001-faster-builds.md', `${ADR}${'x'.repeat(MAX_DOC_BYTES)}`);
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md'), 'BAD_EVIDENCE', /bytes; the limit is 262144/);
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', 0), 'BAD_EVIDENCE', /bytes; the limit is 262144/);
   });
 
   it('raises DOC_EXISTS when another file already covers the idea', async () => {
     put('docs/adr/0001-faster-builds.md', ADR);
     put('docs/adr/0002-faster-builds.md', ADR);
-    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0002-faster-builds.md'), 'DOC_EXISTS', '0001-faster-builds.md already covers this idea');
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0002-faster-builds.md', 0), 'DOC_EXISTS', '0001-faster-builds.md already covers this idea');
+  });
+});
+
+describe('checkDoc: this run\'s document only (PR #71 review)', () => {
+  it('refuses a document written before the run started, with DOC_EXISTS', async () => {
+    put('docs/adr/0001-faster-builds.md', templateFor('adr'));
+    const old = new Date('2020-01-01T00:00:00Z');
+    utimesSync(join(project, 'docs', 'adr', '0001-faster-builds.md'), old, old);
+    await rejects(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', Date.UTC(2026, 0, 1)), 'DOC_EXISTS', 'was written before this run started');
+  });
+
+  it('accepts one written since', async () => {
+    put('docs/adr/0001-faster-builds.md', templateFor('adr'));
+    await expect(checkDoc(project, 'adr', IDEA, 'docs/adr/0001-faster-builds.md', Date.now() - 60_000)).resolves.toBeUndefined();
   });
 });
 
@@ -153,7 +167,7 @@ describe('checkPrUrl', () => {
     expect(() => { checkPrUrl('https://github.com/ray-aqno/Toto-Wolff/pull/71\n'); }).not.toThrow();
   });
 
-  it.each([['opened https://github.com/a/b/pull/1'], ['https://github.com/a/b/issues/1'], ['http://github.com/a/b/pull/1'], ['https://gitlab.com/a/b/pull/1'], ['https://github.com/a/b/pull/1/files']])('refuses %j', (evidence) => {
+  it.each([['opened https://github.com/a/b/pull/1'], ['https://github.com/a/b/issues/1'], ['http://github.com/a/b/pull/1'], ['https://gitlab.com/a/b/pull/1'], ['https://github.com/a/b/pull/1/files'], ['https://github.com/owner/repo?x/pull/1'], ['https://github.com/owner#x/repo/pull/1'], ['https://github.com/a b/c/pull/1']])('refuses %j', (evidence) => {
     expect(() => { checkPrUrl(evidence); }).toThrow(expect.objectContaining({ code: 'BAD_EVIDENCE' }) as Error);
   });
 });

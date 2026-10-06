@@ -18,7 +18,8 @@ const MAX_DOC_ENTRIES = 1000;
 const MAX_DOC_NUMBER = 9998;
 const MAX_SLUG = 50;
 const DOC_NAME = /^(\d{4})-(.+)\.md$/i;
-const PR_URL = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/[0-9]+$/;
+// Owner and repo in GitHub's own characters, so `?` or `#` cannot fake a path (PR #71 review).
+const PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[0-9]+$/;
 
 function bad(message: string): GraphError {
   return new GraphError('BAD_EVIDENCE', message);
@@ -100,7 +101,9 @@ export async function nextDocPath(projectDir: string, kind: TemplateKind, slug: 
 }
 
 // Reads a regular, non-symlinked file through one handle, capped (condition 4).
-async function readDoc(abs: string, shown: string): Promise<string> {
+// It must have been modified since the run started (`sinceMs`): an older
+// document for the idea is not this run's work (PR #71 review).
+async function readDoc(abs: string, shown: string, sinceMs: number): Promise<string> {
   let st;
   try {
     st = await lstat(abs);
@@ -108,6 +111,7 @@ async function readDoc(abs: string, shown: string): Promise<string> {
     throw bad(`${shown} cannot be read (${codeOf(err)})`);
   }
   if (st.isSymbolicLink() || !st.isFile()) throw bad(`${shown} must be a regular file, not a link or folder`);
+  if (st.mtimeMs < sinceMs) throw new GraphError('DOC_EXISTS', `${shown} was written before this run started; move it and write this run's document`);
   const handle = await open(abs, 'r').catch((err: unknown) => {
     throw bad(`${shown} cannot be opened (${codeOf(err)})`);
   });
@@ -130,13 +134,13 @@ function normalise(projectDir: string, artifact: string): string {
 }
 
 /** Checks a reported RFC/ADR: right path and number, a regular file, every template heading. */
-export async function checkDoc(projectDir: string, kind: TemplateKind, idea: string, artifact: string | undefined): Promise<void> {
+export async function checkDoc(projectDir: string, kind: TemplateKind, idea: string, artifact: string | undefined, sinceMs: number): Promise<void> {
   const slug = ideaSlug(idea);
   const reported = artifact === undefined ? null : normalise(projectDir, artifact);
   const name = reported !== null && reported.startsWith(`docs/${kind}/`) ? reported.slice(`docs/${kind}/`.length) : null;
   const expected = await nextDocPath(projectDir, kind, slug, name);
   if (reported !== expected) throw bad(`artifacts[0] must be ${expected}${reported === null ? '' : `, not ${reported.slice(0, 200)}`}`);
-  const text = await readDoc(join(projectDir, ...expected.split('/')), expected);
+  const text = await readDoc(join(projectDir, ...expected.split('/')), expected, sinceMs);
   const lines = new Set(text.split('\n').map((l) => l.trimEnd()));
   const missing = templateHeadings(kind).filter((h) => !lines.has(h));
   if (missing.length > 0) throw bad(`${expected} is missing the template headings: ${missing.join(', ')}`);

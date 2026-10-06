@@ -44,6 +44,14 @@ export function runDir(projectDir: string, runId: string): string {
   return dir;
 }
 
+/** When a run started, from its id (UTC, to the second). */
+export function runStartMs(runId: string): number {
+  assert.ok(RUN_ID_PATTERN.test(runId), 'a run id');
+  const t = Date.UTC(Number(runId.slice(0, 4)), Number(runId.slice(4, 6)) - 1, Number(runId.slice(6, 8)), Number(runId.slice(9, 11)), Number(runId.slice(11, 13)), Number(runId.slice(13, 15)));
+  assert.ok(Number.isFinite(t), 'a valid start time');
+  return t;
+}
+
 /** YYYYMMDD-HHMMSS-<6 hex>, UTC. */
 export function newRunId(now: Date): string {
   const iso = now.toISOString();

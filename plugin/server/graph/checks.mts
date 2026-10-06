@@ -18,8 +18,24 @@ const MAX_DOC_ENTRIES = 1000;
 const MAX_DOC_NUMBER = 9998;
 const MAX_SLUG = 50;
 const DOC_NAME = /^(\d{4})-(.+)\.md$/i;
-// Owner and repo in GitHub's own characters, so `?` or `#` cannot fake a path (PR #71 review).
-const PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[0-9]+$/;
+// A pull request link is parsed as a URL and compared part by part: the
+// github.com host, no user, port, query or fragment, and a path of owner and
+// repo in GitHub's own characters, so `?` or `#` cannot fake a path (PR #71
+// review). The server only checks the text; it never opens the link.
+const PR_HOST = 'github.com';
+const PR_PATH = /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[0-9]+$/;
+
+function isPrLink(text: string): boolean {
+  let link: URL;
+  try {
+    link = new URL(text);
+  } catch {
+    return false;
+  }
+  // href is the canonical form, so any other spelling (a port, a user, an
+  // uppercase host, extra characters) differs from the reported text.
+  return link.protocol === 'https:' && link.host === PR_HOST && link.search === '' && link.hash === '' && !text.includes('@') && PR_PATH.test(link.pathname) && link.href === text;
+}
 
 function bad(message: string): GraphError {
   return new GraphError('BAD_EVIDENCE', message);
@@ -149,7 +165,7 @@ export async function checkDoc(projectDir: string, kind: TemplateKind, idea: str
 
 /** Checks the pr step's evidence: the pull request URL alone. */
 export function checkPrUrl(evidence: string): void {
-  const url = evidence.trim();
-  if (!PR_URL.test(url)) throw bad('evidence must be the pull request URL alone, like https://github.com/<owner>/<repo>/pull/<number>');
-  assert.ok(url.startsWith('https://github.com/'), 'a GitHub URL');
+  const link = evidence.trim();
+  if (!isPrLink(link)) throw bad('evidence must be the pull request link alone: a github.com <owner>/<repo>/pull/<number> link');
+  assert.ok(link.length > PR_HOST.length, 'a pull request link is longer than its host');
 }

@@ -99,7 +99,7 @@ Each run lives in `.toto/runs/<runId>/` in the project (the project folder Claud
 The server checks some evidence when a step reports `pass`:
 
 - **The RFC or ADR** must be at the path the step gives as `doc.path`: `docs/<rfc|adr>/NNNN-<slug>.md`, numbered one above the highest document there (0001 in a project without a `docs/` folder), where the slug is the idea's first line in lowercase `a-z`, `0-9` and `-` (up to 50 characters). The file must be a regular file (no symbolic links, also not for `docs/` itself), at most 256 KiB, with every `## ` heading of its template on a line of its own. The document must be written during this run: one older than the run is `DOC_EXISTS`. If a document for the same slug already exists, the step answers `DOC_EXISTS` with its name: move it to write a new one, including after a failed run of the same idea. Two runs writing documents in one project at once can collide on a number; the second gets `BAD_EVIDENCE` naming the path to use.
-- **The `pr` step's** evidence must be the pull request URL alone (`https://github.com/<owner>/<repo>/pull/<number>`).
+- **The `pr` step's** evidence must be the pull request link alone: a github.com `<owner>/<repo>/pull/<number>` link. The server only checks the text; it never opens the link.
 
 These checks prove the shape, not the quality: a person judges at the gates.
 

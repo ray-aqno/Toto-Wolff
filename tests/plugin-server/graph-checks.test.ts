@@ -167,7 +167,7 @@ describe('checkPrUrl', () => {
     expect(() => { checkPrUrl('https://github.com/ray-aqno/Toto-Wolff/pull/71\n'); }).not.toThrow();
   });
 
-  it.each([['opened https://github.com/a/b/pull/1'], ['https://github.com/a/b/issues/1'], ['http://github.com/a/b/pull/1'], ['https://gitlab.com/a/b/pull/1'], ['https://github.com/a/b/pull/1/files'], ['https://github.com/owner/repo?x/pull/1'], ['https://github.com/owner#x/repo/pull/1'], ['https://github.com/a b/c/pull/1']])('refuses %j', (evidence) => {
+  it.each([['opened https://github.com/a/b/pull/1'], ['https://github.com/a/b/issues/1'], ['http://github.com/a/b/pull/1'], ['https://gitlab.com/a/b/pull/1'], ['https://github.com/a/b/pull/1/files'], ['https://github.com/owner/repo?x/pull/1'], ['https://github.com/owner#x/repo/pull/1'], ['https://github.com/a b/c/pull/1'], ['https://u@github.com/a/b/pull/1'], ['https://github.com:443/a/b/pull/1'], ['https://GitHub.com/a/b/pull/1'], ['https://github.com/a/b/pull/1/']])('refuses %j', (evidence) => {
     expect(() => { checkPrUrl(evidence); }).toThrow(expect.objectContaining({ code: 'BAD_EVIDENCE' }) as Error);
   });
 });

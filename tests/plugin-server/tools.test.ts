@@ -107,11 +107,10 @@ describe('the six tools in both eras', () => {
     }
   });
 
-  it('dashboard_status returns the vault stats plus the page file it wrote', async () => {
+  it('dashboard_status returns the vault stats only (no page file, 2.0.0)', async () => {
     const out = (await result('dashboard_status', {})) as Record<string, unknown>;
-    expect(Object.keys(out)).toEqual(['councilSessions', 'p10Plans', 'cabinetSessions', 'safetyCarReports', 'karpathyChecks', 'drsEvents', 'subagentLists', 'blockedItems', 'generatedAt', 'page']);
-    expect(out['page']).toBe(join(vault, '.toto-wolff', 'dashboard.html'));
-    expect(existsSync(join(vault, '.toto-wolff', 'dashboard.html'))).toBe(true);
+    expect(Object.keys(out)).toEqual(['councilSessions', 'p10Plans', 'cabinetSessions', 'safetyCarReports', 'karpathyChecks', 'drsEvents', 'subagentLists', 'blockedItems', 'generatedAt']);
+    expect(existsSync(join(vault, '.toto-wolff'))).toBe(false);
   });
 
   it.each([

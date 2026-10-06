@@ -1,6 +1,7 @@
 // A static guard over the shipped plugin tree: nothing under plugin/ may open
-// a socket, serve HTTP or make a request. The dashboard is a page file
-// (dashboard_page.mts), so none of these patterns has a reason to come back.
+// a socket, serve HTTP or make a request. The plugin has no dashboard page or
+// server (dashboard_status returns the stats only), so none of these patterns
+// has a reason to come back.
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

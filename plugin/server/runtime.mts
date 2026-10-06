@@ -19,10 +19,6 @@ export interface Runtime {
   // The project the graph tools keep runs in, resolved on each call so the
   // other tools never depend on it (Arbiter condition 8).
   projectDir(): string;
-  // Set once dashboard_status has written the page file; from then on each
-  // vault_write refreshes it.
-  markPageWritten(): void;
-  pageWritten(): boolean;
 }
 
 // The server's two settings: the vault folder the user chose in the plugin's
@@ -81,7 +77,6 @@ export function createRuntime(env: ServerConfig): Runtime {
     },
   };
   let drs: DRSService | null = null;
-  let pageWritten = false;
   const runtime: Runtime = {
     vaultPath,
     vault,
@@ -89,10 +84,6 @@ export function createRuntime(env: ServerConfig): Runtime {
     drs: () => (drs ??= new DRSService(join(resolveProjectDir(env, process.cwd()), '.toto', 'drs-config.json'), auditVault)),
     subagents: new SubagentService(),
     projectDir: () => resolveProjectDir(env, process.cwd()),
-    markPageWritten: () => {
-      pageWritten = true;
-    },
-    pageWritten: () => pageWritten,
   };
   assert.ok(isAbsolute(runtime.vaultPath), 'the runtime holds an absolute vault path');
   return runtime;

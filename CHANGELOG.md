@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The plugin dashboard is now a page file, `<vault>/.toto-wolff/dashboard.html`. `dashboard_status` writes it and returns its path as `page`. The plugin no longer runs a local web server.
+- The plugin has no dashboard page or web server. `dashboard_status` returns the vault's record counts, recent items and blocked items, for Claude to summarise; the visual dashboard stays in the 1.x CLI (`toto dashboard`).
 - The p10, llm-council, the-cabinet, safety-car and drs skills use the plugin's Vault folder setting. They no longer read TOTO_VAULT_PATH or ~/.toto/vault or write settings.local.json. Upgrading from 1.x: set Vault folder to the folder you used before (default ~/.toto/vault).
 
 ### Removed
@@ -22,7 +22,7 @@ toto-wolff 2.0: the plugin becomes a dependency-free MCP server and a state engi
 
 ### Breaking
 
-- **The server reads only its own settings.** They come from the plugin's `userConfig` (passed in the MCP server's `env` as `TOTO_WOLFF_VAULT` and `TOTO_WOLFF_PORT`, with the project as `TOTO_WOLFF_PROJECT`), asked when the plugin is enabled and changed in `/plugin` > Configure: **Vault folder** (`vault_path`, required; 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`) and **Dashboard port** (`dashboard_port`, `0` for none). `TOTO_VAULT_PATH`, `TOTO_MCP_PORT` and `TOTO_DRS_CONFIG` no longer reach the server: DRS reads the project's `.toto/drs-config.json`. The Claude plugin directory holds a plugin that reads the user's environment ("uses a credential from the user's machine").
+- **The server reads only its own settings.** They come from the plugin's `userConfig` (passed in the MCP server's `env` as `TOTO_WOLFF_VAULT`, with the project as `TOTO_WOLFF_PROJECT`), asked when the plugin is enabled and changed in `/plugin` > Configure: **Vault folder** (`vault_path`, required; 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`) and **Dashboard port** (`dashboard_port`, `0` for none). `TOTO_VAULT_PATH`, `TOTO_MCP_PORT` and `TOTO_DRS_CONFIG` no longer reach the server: DRS reads the project's `.toto/drs-config.json`. The Claude plugin directory holds a plugin that reads the user's environment ("uses a credential from the user's machine").
 See the README's "Upgrading to 2.0.0" for what to do.
 - **The plugin's MCP server makes no model calls and takes no credentials.** The `userConfig` settings (API key, auth token, base URL) and every `ANTHROPIC_*` lookup are gone; Claude runs each workflow step itself.
 - **Five MCP tools are removed:** `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run` and `karpathy_check`. The matching skills run those workflows through Claude.
@@ -31,8 +31,6 @@ See the README's "Upgrading to 2.0.0" for what to do.
 - **The Claude plugin directory installs from branch `plugin`**, which `.github/workflows/publish-plugin.yml` fills from each release tag as a forward commit. Marketplace installs still update from `main`'s `plugin/`.
 
 These change v1.6 behavior of the six tools carried into the 2.0 plugin (issue #60). Details in `plugin/README.md`.
-- **The dashboard HTTP server is off by default.** It starts only when `TOTO_MCP_PORT` is set (v1.6 always listened on 127.0.0.1:3099). Every Claude session runs its own plugin server, so a fixed default port would be raced. It now also answers only requests whose `Host` is `127.0.0.1:<port>` or `localhost:<port>`. `toto dashboard` says to set `TOTO_MCP_PORT` when it cannot reach the server.
-- **The dashboard's POST tool routes are removed.** v1.6 let any HTTP POST to `127.0.0.1:3099/<tool>` call a tool, including `vault_write`, from any web page. Only the dashboard's GET routes remain.
 - **`vault_search` matches literal text, not a regular expression**, case-sensitive as before, because v1.6's ripgrep is no longer used. A query that finds nothing and contains regex characters gets a `note` saying so.
 - **`vault_search` returns `{ results, truncated }`** instead of a bare array; `truncated` is `true` when a cap cut the results (500 results, files over 1 MiB skipped, 512 KiB of results). Result entries and their absolute `file` paths are unchanged.
 

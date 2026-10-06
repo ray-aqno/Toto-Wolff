@@ -19,5 +19,4 @@
 - [ ] If a numeric boundary was added, it is a named constant with a comment
 - [ ] No raw error internals in any HTTP response path I touched
 - [ ] `grep -r "listen\b" packages/mcp-server/src/index.ts` still shows `127.0.0.1`
-- [ ] If I changed `dashboard_html.ts`, every vault-sourced string is wrapped in `escHtml()`
 - [ ] No new ESLint violations introduced (checked by CI's `lint-baseline` job; the pre-existing baselined errors are a separate, tracked cleanup)

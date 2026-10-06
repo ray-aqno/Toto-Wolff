@@ -2,9 +2,24 @@ import { join, isAbsolute } from 'node:path';
 import assert from 'node:assert';
 import type { VaultService as VaultServiceV2 } from '../core/vault/VaultService.mts';
 import { getCachedVault } from './vault_cache.mts';
-import type { DashboardItem, DashboardResult } from './dashboard_html.mts';
 
-export type { DashboardItem, DashboardResult };
+export interface DashboardItem {
+  date: string;
+  excerpt: string;
+  status: string;
+}
+
+export interface DashboardResult {
+  councilSessions: { count: number; recent: DashboardItem[] };
+  p10Plans: { count: number; recent: DashboardItem[] };
+  cabinetSessions: { count: number; recent: DashboardItem[] };
+  safetyCarReports: { count: number; recent: DashboardItem[] };
+  karpathyChecks: { count: number; recent: DashboardItem[] };
+  drsEvents: { count: number; recent: DashboardItem[] };
+  subagentLists: { count: number; recent: DashboardItem[] };
+  blockedItems: Array<{ type: 'council' | 'p10' | 'cabinet' | 'safety-car' | 'karpathy' | 'drs'; date: string; excerpt: string }>;
+  generatedAt: string;
+}
 
 function getVault(vaultPath: string): Promise<VaultServiceV2> {
   return getCachedVault(vaultPath);

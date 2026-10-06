@@ -28,7 +28,7 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 | `vault_search` | `query` (1 to 500 characters) | `{ "results": [{ "file", "line", "text" }], "truncated": false }` |
 | `drs_check` | `tool` (`Write`, `Edit`, `NotebookEdit`, `Bash`), `target_path` or `command`, optional `message_before` | the DRS verdict |
 | `subagent_list` | optional `scope` (`user`, `project`, `both`) | the project's subagents (`.pi/agents`); `user` finds none |
-| `dashboard_status` | none | vault record counts and recent items, and `page`: the dashboard file it wrote (see Dashboard) |
+| `dashboard_status` | none | vault record counts, recent items and blocked items, for Claude to summarise |
 | `score_confidence` | `ruling` | `{ "tier", "matchCount", "disqualifiers" }` |
 
 The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools, the built-in idea-to-PR graph and the `graph-run` skill that drives it are below (issues #61 to #63).
@@ -49,10 +49,6 @@ The server's only settings are the vault folder below and the project folder Cla
 ### DRS
 
 `drs_check` reads its config from the project's `.toto/drs-config.json`. Without a config, DRS falls back to deny-all: every `Write`, `Edit` and `NotebookEdit` target is out of scope (Rule 2), and one warning is printed the first time `drs_check` runs. An override (`message_before: "override drs: <reason>"`) is honored only once its audit record is written to the vault's `DRS/` folder; the commit after it is best effort like any other.
-
-### Dashboard
-
-Ask Claude for the dashboard, or call `dashboard_status`. It writes `.toto-wolff/dashboard.html` inside your vault folder and returns its path in `page`. Open that file in a browser. From then on the server rewrites it every 15 seconds while the session runs, so new records show up whichever tool wrote them, and the open page reloads itself every 10 seconds unless a detail panel is open. If the page cannot be written, `page` is `null` and the stats still come back.
 
 Tracking issue: https://github.com/ray-aqno/Toto-Wolff/issues/57
 

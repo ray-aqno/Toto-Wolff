@@ -3,6 +3,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -10,9 +11,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
+  ICON_REL,
   MAX_FILE_BYTES,
+  MAX_LINE_CHARS,
   assertNoSymlink,
   assertUnderRoot,
   checkPluginLayout,
@@ -21,6 +25,8 @@ import {
   listTree,
   readSkillList,
   removeTree,
+  checkLicenseAndIcon,
+  syncLicense,
   syncSkills,
 } from './plugin-sync-lib.js';
 
@@ -109,7 +115,10 @@ describe('the plugin folder layout is enforced', () => {
     expect(problems()).toContain(`not under ${String(MAX_FILE_BYTES)} bytes (the directory's per-file limit): server/index.mts`);
   });
   it('a file just under the limit passes', () => {
-    writeFileSync(join(root, 'plugin', 'server', 'index.mts'), 'x'.repeat(MAX_FILE_BYTES - 1));
+    // In lines (999 characters plus a newline), so only the size is tested, not the minified guard.
+    const lines = `${'x'.repeat(999)}\n`.repeat(Math.floor((MAX_FILE_BYTES - 1) / 1000));
+    writeFileSync(join(root, 'plugin', 'server', 'index.mts'), lines + 'x'.repeat(MAX_FILE_BYTES - 1 - lines.length));
+    expect(statSync(join(root, 'plugin', 'server', 'index.mts')).size).toBe(MAX_FILE_BYTES - 1);
     expect(problems()).toEqual([]);
   });
   it('missing server entry', () => {
@@ -171,5 +180,65 @@ describe('path guards', () => {
   it('diffTrees reports nothing for identical trees', () => {
     const tree = listTree(join(root, '.claude', 'skills', 'drs'));
     expect(diffTrees(tree, tree)).toEqual([]);
+  });
+});
+
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+
+describe('spec criterion 2 and the shipped icon and LICENSE (#64)', () => {
+  it('allows a PNG icon and a LICENSE at their paths', () => {
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG);
+    writeFileSync(join(root, 'plugin', 'LICENSE'), 'MIT\n');
+    expect(problems()).toEqual([]);
+  });
+  it('refuses an icon that is not a PNG, or is executable', () => {
+    writeFileSync(join(root, 'plugin', ICON_REL), 'not a png');
+    expect(problems()).toContain(`not a PNG file: ${ICON_REL}`);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG);
+    chmodSync(join(root, 'plugin', ICON_REL), 0o755);
+    expect(problems()).toContain(`the icon must not be executable: ${ICON_REL}`);
+  });
+  it('exempts only the icon from the line scan (not any file starting with PNG bytes)', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'x.mts'), Buffer.concat([PNG, Buffer.from('a'.repeat(MAX_LINE_CHARS + 1))]));
+    expect(problems().some((p) => p.includes('looks minified') && p.endsWith('x.mts'))).toBe(true);
+  });
+  it(`refuses a line longer than ${String(MAX_LINE_CHARS)} characters, accepts one at the limit`, () => {
+    writeFileSync(join(root, 'plugin', 'server', 'x.mts'), `${'a'.repeat(MAX_LINE_CHARS)}\n`);
+    expect(problems()).toEqual([]);
+    writeFileSync(join(root, 'plugin', 'server', 'x.mts'), `${'a'.repeat(MAX_LINE_CHARS + 1)}\n`);
+    expect(problems()).toContain(`a line of ${String(MAX_LINE_CHARS + 1)} characters looks minified (limit ${String(MAX_LINE_CHARS)}): server/x.mts`);
+  });
+  it.each([['package.json'], ['pnpm-lock.yaml'], ['yarn.lock'], ['package-lock.json'], ['bun.lockb']])('refuses %s anywhere, even inside a skill', (name) => {
+    writeFileSync(join(root, '.claude', 'skills', 'drs', name), '{}');
+    syncSkills(root, SKILLS);
+    expect(problems()).toContain(`no package manifest or lockfile may ship: skills/drs/${name}`);
+  });
+  it('refuses a .min. file, but lock.mts (a real server file) is fine (Arbiter condition 1)', () => {
+    writeFileSync(join(root, '.claude', 'skills', 'drs', 'app.min.js'), 'x');
+    syncSkills(root, SKILLS);
+    expect(problems()).toContain('no minified file may ship: skills/drs/app.min.js');
+    rmSync(join(root, '.claude', 'skills', 'drs', 'app.min.js'));
+    syncSkills(root, SKILLS);
+    writeFileSync(join(root, 'plugin', 'server', 'lock.mts'), 'export {};\n');
+    expect(problems()).toEqual([]);
+  });
+  it('syncs LICENSE from the root and flags a copy that differs', () => {
+    writeFileSync(join(root, 'LICENSE'), 'MIT License\n');
+    syncLicense(root);
+    expect(checkLicenseAndIcon(root)).toEqual([]);
+    writeFileSync(join(root, 'plugin', 'LICENSE'), 'changed\n');
+    expect(checkLicenseAndIcon(root)).toEqual(['plugin/LICENSE must be a byte copy of the root LICENSE']);
+  });
+});
+
+describe('spec criterion 10: the marketplace on main installs a valid plugin (Arbiter condition 6)', () => {
+  it("resolves marketplace.json's source to a folder that passes the layout check", () => {
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    const market = JSON.parse(readFileSync(join(repo, '.claude-plugin', 'marketplace.json'), 'utf-8')) as { plugins: { name: string; source: string }[] };
+    const entry = market.plugins.find((p) => p.name === 'toto-wolff');
+    expect(entry?.source).toBe('./plugin');
+    const folder = join(repo, entry?.source ?? '');
+    const skills = readSkillList(join(folder, '.claude-plugin', 'plugin.json'));
+    expect(checkPluginLayout(folder, skills)).toEqual([]);
   });
 });

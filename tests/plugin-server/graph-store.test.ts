@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRun } from '../../plugin/server/graph/engine.mts';
-import { acquireLock, assertNotBusy, isAlive, parsePid, releaseLock, withRunLock } from '../../plugin/server/graph/lock.mts';
+import { acquireLock, assertNotBusy, assertStillHeld, isAlive, parsePid, releaseLock, withRunLock } from '../../plugin/server/graph/lock.mts';
 import { MAX_STATE_BYTES, appendEvents, ensureRunsDir, newRunId, readState, resolveProjectDir, runDir, writeState } from '../../plugin/server/graph/store.mts';
 import { parseGraph } from '../../plugin/server/graph/validate.mts';
 
@@ -188,6 +188,16 @@ describe('the lock', () => {
     writeFileSync(join(dir, `lock.${String(process.pid)}.tmp`), 'old');
     await expect(withRunLock(dir, runId, () => Promise.reject(new Error('boom')))).rejects.toThrow('boom');
     expect(existsSync(join(dir, 'lock'))).toBe(false);
+  });
+
+  it('notices a lock taken over by another process before writing (PR #73 review)', async () => {
+    const { dir, runId } = await newRun();
+    await acquireLock(dir, runId);
+    await expect(assertStillHeld(dir, runId)).resolves.toBeUndefined();
+    writeFileSync(join(dir, 'lock'), `${String(live.pid)}\n`);
+    await expect(assertStillHeld(dir, runId)).rejects.toMatchObject({ code: 'RUN_BUSY', message: expect.stringContaining('took over its lock') as unknown });
+    rmSync(join(dir, 'lock'));
+    await expect(assertStillHeld(dir, runId)).rejects.toMatchObject({ code: 'RUN_BUSY' });
   });
 
   it('leaves a lock taken by another live process in place on release', async () => {

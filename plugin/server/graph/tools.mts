@@ -12,7 +12,7 @@ import type { RunState, Step, Transition } from './engine.mts';
 import { builtinGraphs } from './builtin.mts';
 import { checkDoc, checkPrUrl, docKindOf, ideaSlug, nextDocPath } from './checks.mts';
 import { findGraph, loadUserGraphs } from './graphs.mts';
-import { assertNotBusy, withRunLock } from './lock.mts';
+import { assertNotBusy, assertStillHeld, withRunLock } from './lock.mts';
 import { GraphError, MAX_ITERATIONS } from './model.mts';
 import { appendEvents, ensureRunsDir, newRunId, readState, runDir, runStartMs, writeState } from './store.mts';
 import { TEMPLATE_KINDS, isTemplateKind, templateFor } from './templates.mts';
@@ -98,6 +98,7 @@ async function save(projectDir: string, t: Transition, extra: Record<string, unk
   const now = new Date().toISOString();
   t.state.eventSeq += t.events.length;
   t.state.updatedAt = now;
+  await assertStillHeld(runDir(projectDir, t.state.runId), t.state.runId);
   await writeState(projectDir, t.state);
   const events = t.events.map((e, i): object => (i === 0 ? { ...e, ...extra } : e));
   await appendEvents(projectDir, t.state.runId, events, first, now);

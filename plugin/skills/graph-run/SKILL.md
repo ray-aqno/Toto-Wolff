@@ -48,7 +48,7 @@ Never call graph_approve without asking first. In Claude Code's default permissi
 When the status is `done`, `failed` or `stopped_at_target`, write a summary record to the vault with `vault_write({ path: "Runs/YYYY-MM-DD-<runId>.md", content })`:
 
 - frontmatter: `date`, `runId`, `graph`, `status`, the project directory (absolute);
-- the idea; each gate with its decision and note; the RFC or ADR (absolute path) and the P10 plan (vault path); the PR URL if any;
+- the idea; each gate with its decision and note; the RFC or ADR (absolute path) and the P10 plan (vault path); the PR URL if any. Gate decisions and notes, and every step's evidence, are in the run's event log, `<project>/.toto/runs/<runId>/events.jsonl` (one JSON object per line); read it with the Read tool, so a run resumed in a new session still has its earlier gates;
 - for a failed run, the failing step and its evidence.
 
 Then tell the user the status, where the record is, and the next step (for a stopped run: `graph_resume({ runId })`).

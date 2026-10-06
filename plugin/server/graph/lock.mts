@@ -127,6 +127,24 @@ export async function releaseLock(dir: string): Promise<void> {
   }
 }
 
+/**
+ * Right before a state write: the lock must still hold our pid. In the narrow
+ * double-takeover race (two processes clearing the same stale lock), the one
+ * whose lock was removed finds another pid here and stops with RUN_BUSY
+ * instead of overwriting the other's state (PR #73 review).
+ */
+export async function assertStillHeld(dir: string, runId: string): Promise<void> {
+  assert.ok(dir.length > 0, 'a run directory');
+  let text = '';
+  try {
+    text = await readFile(join(dir, 'lock'), 'utf8');
+  } catch {
+    // A missing lock is lost too.
+  }
+  if (parsePid(text) !== process.pid) throw new GraphError('RUN_BUSY', `run ${runId} is busy: another process took over its lock`);
+  assert.equal(parsePid(text), process.pid, 'we hold the lock');
+}
+
 /** Runs `fn` holding the run's lock. */
 export async function withRunLock<T>(dir: string, runId: string, fn: () => Promise<T>): Promise<T> {
   await acquireLock(dir, runId);

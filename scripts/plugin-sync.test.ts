@@ -204,6 +204,9 @@ describe('spec criterion 2 and the shipped icon and LICENSE (#64)', () => {
     expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
     writeFileSync(join(root, 'plugin', ICON_REL), PNG.subarray(0, 13));
     expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    // Full length, but the last chunk is not IEND (cut off and padded).
+    writeFileSync(join(root, 'plugin', ICON_REL), Buffer.concat([PNG.subarray(0, PNG.length - 12), Buffer.alloc(12)]));
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
     writeFileSync(join(root, 'plugin', ICON_REL), PNG);
     chmodSync(join(root, 'plugin', ICON_REL), 0o755);
     expect(problems()).toContain(`the icon must not be executable: ${ICON_REL}`);

@@ -11,7 +11,6 @@ import { VaultSearchError } from '../types.mts';
 import type { SearchResult, VaultWriteResult } from '../types.mts';
 import { execFile } from 'node:child_process';
 import type { ExecFileException } from 'node:child_process';
-import { childEnv } from '../childEnv.mts';
 import { promisify } from 'node:util';
 import { MAX_SEARCH_RESULTS, searchFiles } from './search.mts';
 import type { BoundedSearch } from './search.mts';
@@ -307,7 +306,7 @@ export class VaultService {
   private async searchWithCommand(command: string, query: string, rootPath: string): Promise<SearchResult[]> {
     const timeoutMs = this.config.searchTimeoutMs ?? SEARCH_COMMAND_TIMEOUT_MS;
     try {
-      const { stdout } = await execFileAsync(command, ['--json', '--', query, rootPath], { timeout: timeoutMs, env: childEnv() });
+      const { stdout } = await execFileAsync(command, ['--json', '--', query, rootPath], { timeout: timeoutMs });
       return parseRgOutput(stdout);
     } catch (err) {
       const code = (err as ExecFileException).code;

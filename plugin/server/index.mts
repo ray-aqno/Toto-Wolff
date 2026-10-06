@@ -15,7 +15,12 @@ import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 // stderr line. The dashboard runs only when a port is configured, and closes when
 // stdin ends, so the process exits with its client.
 async function start(): Promise<void> {
-  const env = configFromEnv(process.env);
+  // Only the plugin's three settings (plugin.json's env block), by name.
+  const env = configFromEnv({
+    TOTO_WOLFF_VAULT: process.env['TOTO_WOLFF_VAULT'],
+    TOTO_WOLFF_PROJECT: process.env['TOTO_WOLFF_PROJECT'],
+    TOTO_WOLFF_PORT: process.env['TOTO_WOLFF_PORT'],
+  });
   const runtime = createRuntime(env);
   const port = dashboardPort(env);
   const dashboard = port === null ? null : await startDashboard({ port, vaultPath: runtime.vaultPath });

@@ -40,8 +40,6 @@ The server reads only the settings below, which Claude Code passes it from the p
 - **Vault folder** (`vault_path`, required): the absolute path of the folder the server keeps its records in. 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`; enter that folder to keep your records. Without it, the server stops with one line on stderr.
 - **Dashboard port** (`dashboard_port`): `0` (the default) for no dashboard, or a port from 1 to 65535.
 
-The git and search programs the server runs get only `PATH`, never your other variables. Vault commits are made as `toto-wolff <toto-wolff@localhost>`.
-
 ### The vault
 
 - **Location:** the configured vault folder. One server process serves one vault.
@@ -55,7 +53,7 @@ The git and search programs the server runs get only `PATH`, never your other va
 
 ### Dashboard (off by default)
 
-The dashboard HTTP server starts only when the dashboard port is set to a port from 1 to 65535 (every Claude session runs its own server, so there is no default port to fight over). It listens on `127.0.0.1` only and serves only GET routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. A request whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` gets 403, which blocks DNS rebinding from web pages. Any program on this machine can still read vault records through `/dashboard/record`, so turn the dashboard on only where that is acceptable. If the port is in use or not allowed, the server prints one warning and the MCP tools keep working. v1's POST tool routes (calling tools over HTTP) are removed.
+The dashboard HTTP server starts only when the dashboard port is set to a port from 1 to 65535 (every Claude session runs its own server, so there is no default port to fight over). It listens on `127.0.0.1` only and serves only GET routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. A request addressed to any name but `127.0.0.1:<port>` or `localhost:<port>` gets 403, which blocks DNS rebinding from web pages. Any program on this machine can still read vault records through `/dashboard/record`, so turn the dashboard on only where that is acceptable. If the port is in use or not allowed, the server prints one warning and the MCP tools keep working. v1's POST tool routes (calling tools over HTTP) are removed.
 
 Tracking issue: https://github.com/ray-aqno/Toto-Wolff/issues/57
 

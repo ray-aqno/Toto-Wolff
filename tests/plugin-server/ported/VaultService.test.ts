@@ -17,7 +17,7 @@ describe('VaultService.search() searchCommand override (regression)', () => {
     // A fake "rg" that ignores its arguments and always reports one fixed
     // match. Real ripgrep would never produce this output, so seeing it in
     // the result proves searchCommand's configured executable actually ran
-    // — not that the code silently fell back to real rg or in-memory search.
+    //: not that the code silently fell back to real rg or in-memory search.
     fakeCommandPath = join(tmpDir, 'fake-search-command.js');
     writeFileSync(
       fakeCommandPath,
@@ -99,7 +99,7 @@ describe('VaultService.close() idempotency (regression)', () => {
     const serviceB = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
 
     // B has a PENDING (not yet committed) queued write before A's redundant
-    // second close() — this is what actually exposes a double-release:
+    // second close(): this is what actually exposes a double-release:
     // close() only clears the queue, so a functional write-then-drain on B
     // would look fine either way unless something was already queued and
     // waiting when the (wrongly) extra release evicted the shared backend.
@@ -150,7 +150,7 @@ describe('VaultService rejects operations after close() (regression)', () => {
     // Without this guard, a closed-but-still-called service can keep
     // reading/writing through a backend VaultFactory already evicted, while
     // an unrelated later create() for the same vault gets a fresh backend
-    // with its own queue — two independent queues racing the same git
+    // with its own queue: two independent queues racing the same git
     // working tree.
     await expect(service.read('x.md')).rejects.toThrow('closed');
     await expect(service.write('x.md', 'y')).rejects.toThrow('closed');
@@ -175,13 +175,13 @@ describe('VaultService.close() retry after backend.close() failure (regression)'
 
     await expect(service.close()).rejects.toThrow('simulated close failure');
 
-    // Not marked closed — a data operation must still work, not throw
+    // Not marked closed: a data operation must still work, not throw
     // "VaultService is closed".
     await expect(service.read('anything.md')).resolves.toBeNull();
 
     // The mocked rejection was "once"; this retry calls the real close().
     // Asserting the resolved value alone wouldn't distinguish a genuine
-    // retry from a silent no-op (both just resolve without throwing) — the
+    // retry from a silent no-op (both just resolve without throwing): the
     // call count is what actually proves backend.close() ran a second time.
     await expect(service.close()).resolves.toBeUndefined();
     expect(closeSpy).toHaveBeenCalledTimes(2);
@@ -216,7 +216,7 @@ describe('VaultFactory concurrent create() during a slow close() (regression)', 
 
     const closePromise = service.close(); // enqueues the close op; hasn't run yet
 
-    // service.close() only SCHEDULES its work via .then() — the actual
+    // service.close() only SCHEDULES its work via .then(): the actual
     // backend.close() call happens several microtask hops later, not
     // synchronously here. Yield until it's actually been reached, so the
     // "concurrent create()" below is a genuine race, not a no-op because
@@ -227,7 +227,7 @@ describe('VaultFactory concurrent create() during a slow close() (regression)', 
     }
 
     // Now that close() is genuinely in flight, a fresh create() for the
-    // SAME config must not receive the instance that's mid-teardown — it
+    // SAME config must not receive the instance that's mid-teardown: it
     // should build (and get) a genuinely new one.
     const freshService = await VaultService.create({ backend: 'file', options: { rootPath: tmpDir } });
     expect(freshService.getBackend()).not.toBe(closingBackend);
@@ -265,13 +265,13 @@ describe('VaultFactory.release() ties retries to a specific instance (regression
 
     // Without matching by instance (not just cache key), this would find X
     // parked under the same key and "retry" closing X instead of ever
-    // touching Y — Y's own reference count would never decrement.
+    // touching Y: Y's own reference count would never decrement.
     await serviceB.close();
     expect(closeYSpy).toHaveBeenCalledTimes(1);
     expect(closeXSpy).toHaveBeenCalledTimes(1); // still just the one failed attempt
 
     // A's own retry must still find X (untouched by B's close()) and
-    // actually retry it — proving B's close() didn't consume A's retry.
+    // actually retry it: proving B's close() didn't consume A's retry.
     await expect(serviceA.close()).resolves.toBeUndefined();
     expect(closeXSpy).toHaveBeenCalledTimes(2);
   });
@@ -298,12 +298,12 @@ describe('VaultService.create() failed-initialize reference leak (regression)', 
 
     rmSync(rootPath); // clear the obstruction
     const service = await VaultService.create({ backend: 'file', options: { rootPath } });
-    const firstBackend = service.getBackend(); // captured before close() — closed services reject getBackend()
+    const firstBackend = service.getBackend(); // captured before close(): closed services reject getBackend()
     await service.close();
 
     // If the failed attempt above had leaked a reference, this close() only
     // brings the count from 2 down to 1 (not 0), so the backend never
-    // actually evicts — a fresh create() with the same config would still
+    // actually evicts: a fresh create() with the same config would still
     // return that same, never-evicted instance instead of a new one.
     const service2 = await VaultService.create({ backend: 'file', options: { rootPath } });
     expect(service2.getBackend()).not.toBe(firstBackend);

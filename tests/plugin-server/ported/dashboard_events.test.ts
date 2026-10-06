@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import type { ServerResponse } from 'node:http';
 import { EventEmitter } from 'node:events';
 
-// dashboard_status is mocked at the file level — vi.resetModules() re-evaluates
+// dashboard_status is mocked at the file level: vi.resetModules() re-evaluates
 // the factory for each fresh module instance, keeping the mock in effect.
 vi.mock('../../../plugin/server/handlers/dashboard_status.mts', () => ({
   handleDashboardStatus: vi.fn().mockResolvedValue({
@@ -66,7 +66,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('registerClient — connects and logs', () => {
+describe('registerClient: connects and logs', () => {
   it('logs client connected message', async () => {
     const { registerClient, unregisterClient } = await freshRegistry();
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -80,8 +80,8 @@ describe('registerClient — connects and logs', () => {
 });
 
 // C2 fix: 503 test now exercises the real entry point (handleSseRequest) so the
-// capacity check fires before writeHead(200) — no ERR_HTTP_HEADERS_SENT.
-describe('handleSseRequest — 503 at capacity (real entry point)', () => {
+// capacity check fires before writeHead(200): no ERR_HTTP_HEADERS_SENT.
+describe('handleSseRequest: 503 at capacity (real entry point)', () => {
   it('returns 503 before sending SSE headers when at MAX_CLIENTS', async () => {
     vi.useRealTimers(); // real http.Server needs real timers for this test
     vi.resetModules();
@@ -112,7 +112,7 @@ describe('handleSseRequest — 503 at capacity (real entry point)', () => {
 
     expect(atCap()).toBe(true);
 
-    // The 51st request through the real handler — headers must NOT be committed before 503
+    // The 51st request through the real handler: headers must NOT be committed before 503
     const overflow = makeFakeRes();
     sseReq({} as IncomingMessage, overflow, '/tmp/vault');
     expect(overflow.statusCode).toBe(503);
@@ -125,7 +125,7 @@ describe('handleSseRequest — 503 at capacity (real entry point)', () => {
   }, 10_000);
 });
 
-describe('registerClient — interval lifecycle', () => {
+describe('registerClient: interval lifecycle', () => {
   it('starts two intervals on first client, clears both on last client leaving', async () => {
     const { registerClient, unregisterClient } = await freshRegistry();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -160,7 +160,7 @@ describe('registerClient — interval lifecycle', () => {
   });
 });
 
-describe('registerClient — close cleanup', () => {
+describe('registerClient: close cleanup', () => {
   it('unregisters client when res emits close', async () => {
     const { registerClient } = await freshRegistry();
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -174,13 +174,13 @@ describe('registerClient — close cleanup', () => {
   });
 });
 
-describe('writeSseToClient — destroyed guard', () => {
+describe('writeSseToClient: destroyed guard', () => {
   it('does not write to a destroyed client', async () => {
     const { registerClient } = await freshRegistry();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const res = makeFakeRes({ destroyed: true });
-    // registerClient early-returns on destroyed — no clients registered, no intervals started
+    // registerClient early-returns on destroyed: no clients registered, no intervals started
     registerClient(res, '/tmp/vault');
 
     const writeSpy = vi.spyOn(res as unknown as { write: () => boolean }, 'write');
@@ -189,7 +189,7 @@ describe('writeSseToClient — destroyed guard', () => {
   });
 });
 
-describe('broadcastStats — vault failure emits event:error', () => {
+describe('broadcastStats: vault failure emits event:error', () => {
   it('sends event:error frame when vault read throws', async () => {
     const mod = await freshRegistry();
     const { handleDashboardStatus } = await import('../../../plugin/server/handlers/dashboard_status.mts');
@@ -209,7 +209,7 @@ describe('broadcastStats — vault failure emits event:error', () => {
   });
 });
 
-describe('broadcastStats — successful broadcast', () => {
+describe('broadcastStats: successful broadcast', () => {
   it('sends event:stats frame with correct counts', async () => {
     const mod = await freshRegistry();
     const { handleDashboardStatus } = await import('../../../plugin/server/handlers/dashboard_status.mts');
@@ -259,10 +259,10 @@ describe('broadcastKeepAlive', () => {
   });
 });
 
-// C3 — real socket integration test (Karpathy condition).
+// C3: real socket integration test (Karpathy condition).
 // Starts a real http.Server, connects via raw TCP, receives the connected frame,
 // hard-destroys the socket, and asserts the registry tears down cleanly.
-describe('SSE — real socket integration', () => {
+describe('SSE: real socket integration', () => {
   it('receives connected frame and cleans up intervals on hard disconnect', async () => {
     vi.useRealTimers();
     vi.resetModules();
@@ -321,7 +321,7 @@ describe('SSE — real socket integration', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(received.join('')).toContain('event: connected');
-    // Registry tears down on last disconnect — no clients remain
+    // Registry tears down on last disconnect: no clients remain
     expect(registryMod.isAtCapacity()).toBe(false);
 
     await new Promise<void>((resolve, reject) =>

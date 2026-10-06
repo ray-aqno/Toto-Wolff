@@ -24,7 +24,7 @@ describe('FileStorage.write() queue capacity (regression)', () => {
     await storage.initialize();
 
     await storage.write('a.md', 'first');
-    // Queue is now at capacity — this write must be rejected before the
+    // Queue is now at capacity: this write must be rejected before the
     // file is touched, not after (a full-queue rejection must never leave
     // vault data changed with no record of that change ever queued).
     await expect(storage.write('b.md', 'second')).rejects.toThrow('queue full');
@@ -49,7 +49,7 @@ describe('FileStorage.write() queue deduplication (regression)', () => {
     expect(result.committed).toBe(true);
     expect(readFileSync(join(tmpDir, 'a.md'), 'utf8')).toBe('v2');
 
-    // A commit with nothing left queued must be a clean no-op — proves the
+    // A commit with nothing left queued must be a clean no-op: proves the
     // queue actually drained rather than getting stuck retrying a no-op
     // "second write to a.md" entry forever.
     const second = await storage.commit('vault:');

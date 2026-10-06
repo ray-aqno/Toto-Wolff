@@ -45,7 +45,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('handleRecordRequest — missing params', () => {
+describe('handleRecordRequest: missing params', () => {
   it('returns 400 when type is missing', async () => {
     const res = makeRes();
     await handleRecordRequest(makeReq('/dashboard/record?file=2026-06-22-foo.md'), res, VAULT);
@@ -65,7 +65,7 @@ describe('handleRecordRequest — missing params', () => {
   });
 });
 
-describe('handleRecordRequest — invalid type', () => {
+describe('handleRecordRequest: invalid type', () => {
   it('returns 404 for unknown type', async () => {
     const res = makeRes();
     await handleRecordRequest(makeReq('/dashboard/record?type=unknown&file=foo.md'), res, VAULT);
@@ -73,7 +73,7 @@ describe('handleRecordRequest — invalid type', () => {
   });
 });
 
-describe('handleRecordRequest — path traversal', () => {
+describe('handleRecordRequest: path traversal', () => {
   it('returns 404 for filename with ..',  async () => {
     const res = makeRes();
     await handleRecordRequest(
@@ -95,7 +95,7 @@ describe('handleRecordRequest — path traversal', () => {
   it('returns 404 for sibling-prefix traversal (vault-evil attack)', async () => {
     // /tmp/test-vault-evil should not be accessible even though startsWith('/tmp/test-vault') is true
     const res = makeRes();
-    // This would only be possible if resolved path escapes vault — filename normalization catches it first
+    // This would only be possible if resolved path escapes vault: filename normalization catches it first
     // but we also test that the isInsideVault check uses path.sep suffix
     await handleRecordRequest(
       makeReq('/dashboard/record?type=council&file=' + encodeURIComponent('../test-vault-evil/secret.md')),
@@ -105,7 +105,7 @@ describe('handleRecordRequest — path traversal', () => {
   });
 });
 
-describe('handleRecordRequest — ENOENT → 404', () => {
+describe('handleRecordRequest: ENOENT → 404', () => {
   it('returns 404 when file does not exist', async () => {
     const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
     vi.mocked(readFile).mockRejectedValueOnce(enoent);
@@ -120,7 +120,7 @@ describe('handleRecordRequest — ENOENT → 404', () => {
   });
 });
 
-describe('handleRecordRequest — non-ENOENT error → 500', () => {
+describe('handleRecordRequest: non-ENOENT error → 500', () => {
   it('returns 500 for EACCES', async () => {
     const eacces = Object.assign(new Error('EACCES'), { code: 'EACCES' });
     vi.mocked(readFile).mockRejectedValueOnce(eacces);
@@ -135,7 +135,7 @@ describe('handleRecordRequest — non-ENOENT error → 500', () => {
   });
 });
 
-describe('handleRecordRequest — 100KB cap → 413', () => {
+describe('handleRecordRequest: 100KB cap → 413', () => {
   it('returns 413 when file exceeds 100_000 bytes', async () => {
     vi.mocked(readFile).mockResolvedValueOnce('x'.repeat(100_001));
 
@@ -159,7 +159,7 @@ describe('handleRecordRequest — 100KB cap → 413', () => {
   });
 });
 
-describe('handleRecordRequest — valid requests', () => {
+describe('handleRecordRequest: valid requests', () => {
   it('serves a council record with 200 and text/plain content-type', async () => {
     const content = '# Council Record\n\nSome content here.';
     vi.mocked(readFile).mockResolvedValueOnce(content);

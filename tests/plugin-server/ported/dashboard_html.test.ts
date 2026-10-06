@@ -65,7 +65,7 @@ describe('renderDashboardHtml', () => {
 
   it('renders populated cards and escapes vault-sourced strings in the decision list (XSS guard)', () => {
     // The recentDecisions row goes through esc() and is properly escaped. The raw
-    // jsonData dump embedded in the client <script> block is now also safe — see
+    // jsonData dump embedded in the client <script> block is now also safe: see
     // the dedicated script-injection test below (fix/dashboard-json-script-escape).
     const html = renderDashboardHtml(populatedResult);
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');

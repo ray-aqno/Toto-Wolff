@@ -1,20 +1,15 @@
-// The server's settings come from its arguments (plugin.json fills them from
-// userConfig and ${CLAUDE_PROJECT_DIR}), never from the user's environment.
+// The server's settings come from its env block, which plugin.json fills from
+// userConfig and ${CLAUDE_PROJECT_DIR}; no other variable is read.
 import { describe, expect, it } from 'vitest';
-import { configFromArgs, resolveVaultPath } from '../../plugin/server/runtime.mts';
+import { configFromEnv, resolveVaultPath } from '../../plugin/server/runtime.mts';
 
-describe('configFromArgs', () => {
-  it('maps the three flags to their settings', () => {
-    expect(configFromArgs(['--vault', '/v', '--project', '/p', '--port', '3099'])).toEqual({ vault: '/v', project: '/p', port: '3099' });
+describe('configFromEnv', () => {
+  it('reads the three plugin settings and nothing else', () => {
+    expect(configFromEnv({ TOTO_WOLFF_VAULT: '/v', TOTO_WOLFF_PROJECT: '/p', TOTO_WOLFF_PORT: '3099', TOTO_VAULT_PATH: '/old', HOME: '/h' })).toEqual({ vault: '/v', project: '/p', port: '3099' });
   });
 
   it('leaves out empty values, unsubstituted references and port 0', () => {
-    expect(configFromArgs(['--vault', '', '--project', '${CLAUDE_PROJECT_DIR}', '--port', '0'])).toEqual({});
-  });
-
-  it('refuses an unknown flag or a flag without a value', () => {
-    expect(() => configFromArgs(['--home', '/h'])).toThrow('unknown argument: --home');
-    expect(() => configFromArgs(['--vault'])).toThrow('unknown argument: --vault');
+    expect(configFromEnv({ TOTO_WOLFF_VAULT: '', TOTO_WOLFF_PROJECT: '${CLAUDE_PROJECT_DIR}', TOTO_WOLFF_PORT: '0' })).toEqual({});
   });
 });
 

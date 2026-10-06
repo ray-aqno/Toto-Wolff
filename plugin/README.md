@@ -35,7 +35,7 @@ The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safet
 
 ### Settings
 
-The server reads no environment variables. Claude Code asks for its settings when you enable the plugin, and you can change them in `/plugin` (select toto-wolff on the **Installed** tab, then **Configure**):
+The server reads only the settings below, which Claude Code passes it from the plugin's configuration; it reads no other environment variable. Claude Code asks for them when you enable the plugin, and you can change them in `/plugin` (select toto-wolff on the **Installed** tab, then **Configure**):
 
 - **Vault folder** (`vault_path`, required): the absolute path of the folder the server keeps its records in. 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`; enter that folder to keep your records. Without it, the server stops with one line on stderr.
 - **Dashboard port** (`dashboard_port`): `0` (the default) for no dashboard, or a port from 1 to 65535.

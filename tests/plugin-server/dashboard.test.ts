@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dashboardPort, startDashboard } from '../../plugin/server/dashboard/http.mts';
 import { closeAllClients, isAtCapacity, registerClient } from '../../plugin/server/handlers/sse_registry.mts';
 import type { Dashboard } from '../../plugin/server/dashboard/http.mts';
-import { isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
+import { isolatedEnv, removeIsolatedEnvs, serverEnv } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 
@@ -127,7 +127,7 @@ describe('the real entry with a dashboard port', () => {
     const address = probe.address();
     const port = address !== null && typeof address === 'object' ? address.port : 0;
     await new Promise((done) => probe.close(done));
-    const child = spawn(process.execPath, [ENTRY, ...serverArgs({ port: String(port) })], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv() });
+    const child = spawn(process.execPath, [ENTRY], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv(serverEnv({ port: String(port) })) });
     let err = '';
     child.stderr.on('data', (d: Buffer) => (err += d.toString('utf8')));
     const exited = new Promise<number | null>((done) => child.on('exit', done));

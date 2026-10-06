@@ -7,7 +7,7 @@ import process from 'node:process';
 import { dashboardPort, startDashboard } from './dashboard/http.mts';
 import { createServer } from './mcp/server.mts';
 import { runStdio } from './mcp/stdio.mts';
-import { configFromArgs, createRuntime } from './runtime.mts';
+import { configFromEnv, createRuntime } from './runtime.mts';
 import { createTools } from './tools/index.mts';
 import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 
@@ -15,7 +15,7 @@ import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 // stderr line. The dashboard runs only when a port is configured, and closes when
 // stdin ends, so the process exits with its client.
 async function start(): Promise<void> {
-  const env = configFromArgs(process.argv.slice(2));
+  const env = configFromEnv(process.env);
   const runtime = createRuntime(env);
   const port = dashboardPort(env);
   const dashboard = port === null ? null : await startDashboard({ port, vaultPath: runtime.vaultPath });

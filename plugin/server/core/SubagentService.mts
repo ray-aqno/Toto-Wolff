@@ -54,8 +54,8 @@ export class SubagentService {
 
       const { frontmatter, systemPrompt } = extracted;
 
-      const parseField = (key: string): string => {
-        const match = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
+      const parseField = (field: string): string => {
+        const match = frontmatter.match(new RegExp('^' + field + ':\\s*(.+)$', 'm'));
         return match?.[1]?.trim() ?? '';
       };
 

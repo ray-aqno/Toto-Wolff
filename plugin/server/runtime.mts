@@ -21,24 +21,20 @@ export interface Runtime {
   projectDir(): string;
 }
 
-// The server's settings come from its arguments, which plugin.json fills from
-// the plugin's userConfig and ${CLAUDE_PROJECT_DIR}; it reads nothing from the
-// user's environment.
+// The server's settings are the values the user chose in the plugin's
+// userConfig, which plugin.json passes in the server's env block; it reads
+// no other variable the user has set.
 export type ServerConfig = Partial<Record<'vault' | 'project' | 'port', string>>;
-const FLAGS: Readonly<Record<string, keyof ServerConfig>> = { '--vault': 'vault', '--project': 'project', '--port': 'port' };
-const MAX_ARGS = 16;
+const SETTINGS: Readonly<Record<keyof ServerConfig, string>> = { vault: 'TOTO_WOLFF_VAULT', project: 'TOTO_WOLFF_PROJECT', port: 'TOTO_WOLFF_PORT' };
 
-/** The settings in `argv`; an empty, unsubstituted or "0" (no dashboard) value is left out. */
-export function configFromArgs(argv: readonly string[]): ServerConfig {
-  if (argv.length > MAX_ARGS) throw new Error(`at most ${String(MAX_ARGS)} arguments`);
+/** The settings in `env`; an empty, unsubstituted or "0" (no dashboard) value is left out. */
+export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
   const config: ServerConfig = {};
-  // LOOP BOUND: at most MAX_ARGS / 2 flag and value pairs.
-  for (let i = 0; i < argv.length; i += 2) {
-    const name = FLAGS[argv[i] ?? ''];
-    const value = argv[i + 1];
-    if (name === undefined || value === undefined) throw new Error(`unknown argument: ${(argv[i] ?? '').slice(0, 40)}`);
-    if (value === '' || value.includes('${') || (name === 'port' && value === '0')) continue;
-    config[name] = value;
+  // LOOP BOUND: the three settings.
+  for (const [setting, name] of Object.entries(SETTINGS) as [keyof ServerConfig, string][]) {
+    const value = env[name];
+    if (value === undefined || value === '' || value.includes('${') || (setting === 'port' && value === '0')) continue;
+    config[setting] = value;
   }
   assert.ok(Object.keys(config).length <= 3, 'at most the three settings');
   return config;

@@ -58,6 +58,16 @@ in order and get explicit sign-off before each step marked **confirm**.
    the `plugin-launch-smoke-test` job and the lint-baseline job's
    `check:plugin-sync` step. Read Greptile's
    review comments; they're data to act on, not a gate to wait out.
+   - **Manual checks (2.0 and later), before `/cabinet`:** run the
+     interactive `graph-run` smoke check and record the result in the
+     release PR. In a scratch git repo, start
+     `claude --plugin-dir <repo>/plugin` in the default permission mode,
+     run `/toto-wolff:graph-run` on idea-to-pr with `stopAt: "adr"`, and
+     confirm that it asks you at the approve-ruling gate, that the
+     `graph_approve` call shows a permission prompt, and that the ADR lands
+     at `docs/adr/0001-<slug>.md`. CI cannot do this, because it needs a
+     person to answer (spec criterion 12; Safety Car S8 for #63). A release
+     without it recorded does not go to `/cabinet`.
 
 7. **Run `/cabinet "<release description>" vX.Y.Z`** (**confirm**). All three
    seats (Garry Tan, Richard Feynman, Andrej Karpathy) must vote to ship.

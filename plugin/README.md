@@ -31,7 +31,7 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 | `dashboard_status` | none | vault record counts and recent items |
 | `score_confidence` | `ruling` | `{ "tier", "matchCount", "disqualifiers" }` |
 
-The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools are below (issues #61 and #62); the built-in idea-to-PR graph arrives in #63.
+The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools, the built-in idea-to-PR graph and the `graph-run` skill that drives it are below (issues #61 to #63).
 
 ### The vault
 
@@ -76,7 +76,7 @@ A graph is checked when it is loaded: a cycle, an unknown edge endpoint, more th
 
 The current step is the first ready node in `nodes` order. With `stopAt`, the run pauses (`stopped_at_target`) after that node completes, or before the next step if a choice skipped it; `graph_resume` continues it, to a new target or to the end. Reporting a step that is already complete returns the run as it is, so a retry after a crash is safe. For a loop, pass the step's `iteration` with each report: a report for an earlier attempt then changes nothing (even a different outcome: the `iteration` in the returned step is the attempt that counts), and a later one is `STALE_STEP`. Without `iteration`, a report always applies to the current attempt: a retried `fail` uses up another attempt, and a late `pass` meant for an earlier attempt completes the loop even though the current attempt never ran. Pass `iteration` to rule both out. Once the run has failed, any further report is `RUN_FINISHED`.
 
-Graph failures come back as a tool result `{ "error": { "code", "message" } }` with `isError: true`. The codes: `UNKNOWN_GRAPH`, `UNKNOWN_RUN`, `UNKNOWN_NODE`, `INVALID_GRAPH`, `INVALID_CHOICE`, `RUN_BUSY`, `STALE_STEP` (not the current step, or the run is stopped at its target), `NOT_A_GATE` (`graph_approve` on a non-gate, or `graph_report` on a gate), `RUN_FINISHED`.
+Graph failures come back as a tool result `{ "error": { "code", "message" } }` with `isError: true`. The codes: `UNKNOWN_GRAPH`, `UNKNOWN_RUN`, `UNKNOWN_NODE`, `INVALID_GRAPH`, `INVALID_CHOICE`, `RUN_BUSY`, `STALE_STEP` (not the current step, or the run is stopped at its target), `NOT_A_GATE` (`graph_approve` on a non-gate, or `graph_report` on a gate), `RUN_FINISHED`, `BAD_EVIDENCE` (a checked step's evidence is wrong: the message says what is expected) and `DOC_EXISTS` (a document for the idea already exists).
 
 ### Run files
 
@@ -86,6 +86,17 @@ Each run lives in `.toto/runs/<runId>/` in the project (`CLAUDE_PROJECT_DIR`, el
 - `events.jsonl` logs every change, with the evidence, artifacts and notes (which are kept out of `state.json`). Events are numbered; a crash at the wrong moment can leave a gap in the numbers, never a repeat.
 - `lock` holds the process id of a call that is changing the run. A second Claude session working on the same run gets `RUN_BUSY` until that call ends. A lock left by a process that no longer exists is taken over, so a crash never blocks a run. The lock needs a filesystem with hard links (any normal Linux or macOS filesystem, and WSL's `/mnt/c`). If a lock ever blocks a run with no session working on it (for example after the process id was reused, or when sessions run in separate containers sharing one project folder, which is not supported), delete `.toto/runs/<runId>/lock` by hand.
 
+### The built-in idea-to-pr graph and the graph-run skill
+
+`idea-to-pr` is built in (a project graph cannot reuse its id): spec, council, a gate on the ruling, an RFC-or-ADR choice (the user picks), the document, a P10 plan, a gate on the plan, the Safety Car, a Karpathy loop (up to 3 attempts: every remaining P10 stage, each verified), a gate on opening the PR, and the PR (`/ship`). Run it with the `graph-run` skill (`/toto-wolff:graph-run`; named so it does not clash with Claude Code's own `run`), which asks you at every gate and choice and writes a summary record to the vault (`Runs/YYYY-MM-DD-<runId>.md`) when the run ends. Steps use the skills `spec` and `ship` from gstack, which the plugin does not ship; without them Claude does the step directly and says so in the evidence.
+
+The server checks some evidence when a step reports `pass`:
+
+- **The RFC or ADR** must be at the path the step gives as `doc.path`: `docs/<rfc|adr>/NNNN-<slug>.md`, numbered one above the highest document there (0001 in a project without a `docs/` folder), where the slug is the idea's first line in lowercase `a-z`, `0-9` and `-` (up to 50 characters). The file must be a regular file (no symbolic links, also not for `docs/` itself), at most 256 KiB, with every `## ` heading of its template on a line of its own. The document must be written during this run: one older than the run is `DOC_EXISTS`. If a document for the same slug already exists, the step answers `DOC_EXISTS` with its name: move it to write a new one, including after a failed run of the same idea. Two runs writing documents in one project at once can collide on a number; the second gets `BAD_EVIDENCE` naming the path to use.
+- **The `pr` step's** evidence must be the pull request URL alone (`https://github.com/<owner>/<repo>/pull/<number>`).
+
+These checks prove the shape, not the quality: a person judges at the gates.
+
 ### Human gates are advisory
 
-Every call comes from Claude, so the server cannot prove that a person approved a gate. The plugin grants no automatic permission for `graph_approve`, so in Claude Code's default permission mode the call shows a permission prompt. If you allow `graph_approve` (or `mcp__plugin_toto-wolff_toto-wolff__*`) in your settings, or run in auto or bypass mode, a human gate becomes a step Claude can pass on its own.
+Every call comes from Claude, so the server cannot prove that a person approved a gate. The plugin grants no automatic permission for `graph_approve`, so in Claude Code's default permission mode the call shows a permission prompt. `graph-run` must ask you before every approval, and stop when it cannot ask (headless, `-p`, auto mode, subagents). If you allow `graph_approve` (or `mcp__plugin_toto-wolff_toto-wolff__*`) in your settings, or run in auto or bypass mode, a human gate becomes a step Claude can pass on its own.

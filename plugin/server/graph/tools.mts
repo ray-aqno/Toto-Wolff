@@ -9,10 +9,12 @@ import type { Message } from '../mcp/protocol.mts';
 import type { Tool, ToolDefinition } from '../mcp/server.mts';
 import { approveNode, createRun, currentStep, reportNode, resumeRun } from './engine.mts';
 import type { RunState, Step, Transition } from './engine.mts';
+import { builtinGraphs } from './builtin.mts';
+import { checkDoc, checkPrUrl, docKindOf, ideaSlug, nextDocPath } from './checks.mts';
 import { findGraph, loadUserGraphs } from './graphs.mts';
 import { assertNotBusy, withRunLock } from './lock.mts';
 import { GraphError, MAX_ITERATIONS } from './model.mts';
-import { appendEvents, ensureRunsDir, newRunId, readState, runDir, writeState } from './store.mts';
+import { appendEvents, ensureRunsDir, newRunId, readState, runDir, runStartMs, writeState } from './store.mts';
 import { TEMPLATE_KINDS, isTemplateKind, templateFor } from './templates.mts';
 
 const MAX_IDEA = 4096;
@@ -70,9 +72,22 @@ function artifactsOf(args: Record<string, unknown>): string[] | undefined {
   return raw as string[];
 }
 
-function view(state: RunState): { runId: string; status: string; step?: Step } {
-  const step = currentStep(state);
-  return step === null ? { runId: state.runId, status: state.status } : { runId: state.runId, status: state.status, step };
+type StepView = Step & { doc?: { path: string } | { error: string } };
+
+// The run's status and step; a document step also gets where to write it.
+async function view(projectDir: string, state: RunState): Promise<{ runId: string; status: string; step?: StepView }> {
+  const step: StepView | null = currentStep(state);
+  if (step === null) return { runId: state.runId, status: state.status };
+  const kind = docKindOf(state.graph.nodes.find((n) => n.id === step.nodeId)?.check);
+  if (kind !== null) {
+    // A filesystem problem is a reason on the step, never a thrown error.
+    step.doc = await nextDocPath(projectDir, kind, ideaSlug(state.input.idea)).then(
+      (path) => ({ path }),
+      (err: unknown) => ({ error: err instanceof GraphError ? `${err.code}: ${err.message}` : String(err) }),
+    );
+  }
+  assert.ok(step.nodeId === state.current, 'the view shows the current step');
+  return { runId: state.runId, status: state.status, step };
 }
 
 // Saves a transition: state first (atomic), then its events numbered from
@@ -102,18 +117,33 @@ async function start(projectDir: string, args: Record<string, unknown>): Promise
   const dir = runDir(projectDir, runId);
   await mkdir(dir);
   await withRunLock(dir, runId, () => save(projectDir, t, {}));
-  return view(t.state);
+  return view(projectDir, t.state);
 }
 
-// A state-changing call: under the run's lock, read, transition, save.
-async function change(projectDir: string, runId: string, step: (s: RunState) => Transition, extra: Record<string, unknown>): Promise<unknown> {
+// A state-changing call: under the run's lock, read, check (optional),
+// transition, save.
+async function change(projectDir: string, runId: string, step: (s: RunState) => Transition, extra: Record<string, unknown>, before?: (s: RunState) => Promise<void>): Promise<unknown> {
   const dir = runDir(projectDir, runId);
   await readState(projectDir, runId);
   return withRunLock(dir, runId, async () => {
-    const t = step(await readState(projectDir, runId));
+    const state = await readState(projectDir, runId);
+    if (before !== undefined) await before(state);
+    const t = step(state);
     await save(projectDir, t, extra);
-    return view(t.state);
+    return view(projectDir, t.state);
   });
+}
+
+// The evidence check of a checked node, only for a `pass` of the current,
+// pending step of a running run (Arbiter condition 1): a repeated report of
+// a done node is never re-checked and stays a no-op.
+async function checkEvidence(projectDir: string, state: RunState, nodeId: string, evidence: string, artifacts: string[] | undefined): Promise<void> {
+  if (state.status !== 'running' || state.current !== nodeId || state.nodes[nodeId]?.state !== 'pending') return;
+  const node = state.graph.nodes.find((n) => n.id === nodeId);
+  assert.ok(node !== undefined, 'the current node is in the graph');
+  const kind = docKindOf(node.check);
+  if (kind !== null) await checkDoc(projectDir, kind, state.input.idea, artifacts?.[0], runStartMs(state.runId));
+  else if (node.check === 'pr-url') checkPrUrl(evidence);
 }
 
 function report(projectDir: string, args: Record<string, unknown>): Promise<unknown> {
@@ -125,7 +155,8 @@ function report(projectDir: string, args: Record<string, unknown>): Promise<unkn
   const choice = optionalText('choice', args, 40);
   const iteration = iterationOf(args);
   const extra = artifacts === undefined ? { evidence } : { evidence, artifacts };
-  return change(projectDir, runId, (s) => reportNode(s, nodeId, outcome, choice, iteration), extra);
+  const before = outcome === 'pass' ? (s: RunState): Promise<void> => checkEvidence(projectDir, s, nodeId, evidence, artifacts) : undefined;
+  return change(projectDir, runId, (s) => reportNode(s, nodeId, outcome, choice, iteration), extra, before);
 }
 
 function approve(projectDir: string, args: Record<string, unknown>): Promise<unknown> {
@@ -141,7 +172,7 @@ async function next(projectDir: string, args: Record<string, unknown>): Promise<
   // Lock first, then the state: a holder writes state.json before releasing,
   // so a state read after a free lock includes every finished call.
   await assertNotBusy(runDir(projectDir, runId), runId);
-  return view(await readState(projectDir, runId));
+  return view(projectDir, await readState(projectDir, runId));
 }
 
 async function status(projectDir: string, args: Record<string, unknown>): Promise<unknown> {
@@ -152,7 +183,8 @@ async function status(projectDir: string, args: Record<string, unknown>): Promis
 
 async function list(projectDir: string): Promise<unknown> {
   const { graphs, invalid } = await loadUserGraphs(projectDir);
-  return { graphs: graphs.map(({ graph, file }) => ({ id: graph.id, nodes: graph.nodes.length, source: `.toto/graphs/${file}` })), invalid };
+  const builtins = builtinGraphs().map((g) => ({ id: g.id, nodes: g.nodes.length, source: 'built-in' }));
+  return { graphs: [...builtins, ...graphs.map(({ graph, file }) => ({ id: graph.id, nodes: graph.nodes.length, source: `.toto/graphs/${file}` }))], invalid };
 }
 
 function template(args: Record<string, unknown>): unknown {

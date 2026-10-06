@@ -12,10 +12,11 @@ import {
   MAX_NODES,
   MAX_SKILL_CHARS,
   MIN_ITERATIONS,
+  NODE_CHECKS,
   NODE_KINDS,
   hasKey,
 } from './model.mts';
-import type { Graph, GraphNode, NodeKind } from './model.mts';
+import type { Graph, GraphNode, NodeCheck, NodeKind } from './model.mts';
 
 const MAX_EDGES = MAX_NODES * (MAX_NODES - 1);
 
@@ -54,6 +55,16 @@ function parseOptions(raw: unknown, nodeId: string): Record<string, string[]> {
   return options;
 }
 
+// The optional evidence check: skill nodes only, one of NODE_CHECKS.
+function parseCheck(raw: unknown, id: string, kind: NodeKind): NodeCheck | undefined {
+  if (raw === undefined) return undefined;
+  if (kind !== 'skill') throw invalid(`node ${id}: only skill nodes take a check`);
+  const found = NODE_CHECKS.find((c) => c === raw);
+  if (found === undefined) throw invalid(`node ${id}: check must be one of ${NODE_CHECKS.join(', ')}`);
+  assert.ok(NODE_CHECKS.includes(found), 'a known check');
+  return found;
+}
+
 function parseNodeFields(raw: Record<string, unknown>, id: string, kind: NodeKind): GraphNode {
   if (typeof raw.instruction !== 'string' || raw.instruction.length === 0 || raw.instruction.length > MAX_INSTRUCTION_CHARS) {
     throw invalid(`node ${id}: instruction must be 1 to ${String(MAX_INSTRUCTION_CHARS)} characters`);
@@ -75,6 +86,8 @@ function parseNodeFields(raw: Record<string, unknown>, id: string, kind: NodeKin
     }
     node.maxIterations = n;
   } else if (raw.maxIterations !== undefined) throw invalid(`node ${id}: only loop nodes take maxIterations`);
+  const check = parseCheck(raw.check, id, kind);
+  if (check !== undefined) node.check = check;
   assert.equal(node.id, id, 'the node keeps its id');
   return node;
 }

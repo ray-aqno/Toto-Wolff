@@ -16,7 +16,8 @@
     "./skills/safety-car",
     "./skills/p10",
     "./skills/llm-council",
-    "./skills/the-cabinet"
+    "./skills/the-cabinet",
+    "./skills/graph-run"
   ],
   "mcpServers": {
     "toto-wolff": {

@@ -49,7 +49,7 @@ export const SERVER_ENTRY_REL = join(SERVER_DIR_REL, 'index.mts');
 /** Where the real skill files live, relative to the repo root. */
 export const SKILLS_SOURCE_DIR = join('.claude', 'skills');
 
-/** Upper bound on skills a manifest may list; the plugin ships 7 today. */
+/** Upper bound on skills a manifest may list; the plugin ships 8 today. */
 export const MAX_SKILLS = 16;
 /** Upper bound on files walked in any one tree; a skill has a handful. */
 export const MAX_FILES = 500;

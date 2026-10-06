@@ -198,9 +198,30 @@ describe('spec criterion 12: no shipped auto-allow for graph_approve', () => {
       }
     }
     expect(hits.length).toBeGreaterThan(0);
-    // The README documents why gates are advisory; it grants nothing.
-    expect(hits.filter((h) => !(h.startsWith('server/') && h.endsWith('.mts')) && h !== 'README.md')).toEqual([]);
+    // The README documents why gates are advisory and graph-run drives the
+    // gates; neither grants anything.
+    expect(hits.filter((h) => !(h.startsWith('server/') && h.endsWith('.mts')) && h !== 'README.md' && h !== 'skills/graph-run/SKILL.md')).toEqual([]);
     expect(JSON.stringify(JSON.parse(readFileSync(join(PLUGIN, '.claude-plugin', 'plugin.json'), 'utf8')))).not.toMatch(/"permissions"|"allow"/);
+  });
+
+  it('ships no skill whose allowed-tools pre-approves a toto-wolff tool or an mcp__ wildcard', () => {
+    const skills = readdirSync(join(PLUGIN, 'skills'));
+    expect(skills).toContain('graph-run');
+    for (const name of skills) {
+      const text = readFileSync(join(PLUGIN, 'skills', name, 'SKILL.md'), 'utf8');
+      const front = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
+      const allowed = /allowed-tools:([\s\S]*?)(?:\n[a-z-]+:|$)/.exec(front)?.[1] ?? '';
+      expect(allowed, name).not.toMatch(/toto-wolff|graph_|mcp__/);
+    }
+  });
+
+  it('graph-run asks the user before graph_approve, and stops when it cannot ask (Safety Car S7)', () => {
+    const text = readFileSync(join(PLUGIN, 'skills', 'graph-run', 'SKILL.md'), 'utf8');
+    const gates = text.slice(text.indexOf('## Human gates'), text.indexOf('## When the run ends'));
+    expect(gates.indexOf('AskUserQuestion')).toBeGreaterThan(-1);
+    expect(gates.indexOf('AskUserQuestion')).toBeLessThan(gates.indexOf('graph_approve'));
+    expect(gates).toContain('Never call graph_approve without asking first.');
+    expect(text).toContain('If you cannot ask the user (AskUserQuestion is unavailable, fails, or returns an empty or default answer), stop and report that the run is awaiting a person: never call graph_approve, and never report a choice, without the user\'s own answer.');
   });
 
   it('keeps run files inside the temp project (Arbiter condition 8)', () => {

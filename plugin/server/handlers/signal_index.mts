@@ -13,15 +13,15 @@ const MAX_RECORD_BYTES = 10_240; // P10 Rule 3: reject oversized records
  * On parse failure, logs a warning and returns [].
  * Observable via stderr: drop is never silent.
  */
-function parseArrayValue(value: string, key: string, sourceHint: string): string[] {
+function parseArrayValue(value: string, field: string, sourceHint: string): string[] {
   assert(typeof value === 'string', 'value must be a string');
-  assert(typeof key === 'string', 'key must be a string');
+  assert(typeof field === 'string', 'field must be a string');
   try {
     const parsed: unknown = JSON.parse(value);
     assert(Array.isArray(parsed), 'parsed value must be an array');
     return parsed as string[];
   } catch {
-    console.warn(`[toto-wolff] parseFrontmatter: could not parse array field "${key}" in ${sourceHint}: stored as empty array`);
+    console.warn(`[toto-wolff] parseFrontmatter: could not parse array field "${field}" in ${sourceHint}: stored as empty array`);
     return [];
   }
 }
@@ -43,13 +43,13 @@ function parseFrontmatter(raw: string, sourceHint: string): Record<string, unkno
     const line = lines[i] ?? "";
     const colonIdx = line.indexOf(":");
     if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).trim();
+    const field = line.slice(0, colonIdx).trim();
     const value = line.slice(colonIdx + 1).trim().replace(/^["']|["']$/g, "");
-    if (key.length === 0) continue;
+    if (field.length === 0) continue;
     if (value.trimStart().startsWith("[")) {
-      result[key] = parseArrayValue(value, key, sourceHint);
+      result[field] = parseArrayValue(value, field, sourceHint);
     } else {
-      result[key] = value;
+      result[field] = value;
     }
   }
   return result;

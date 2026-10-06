@@ -43,13 +43,13 @@ function parseOptions(raw: unknown, nodeId: string): Record<string, string[]> {
   const keys = Object.keys(raw);
   if (keys.length === 0) throw invalid(`node ${nodeId}: a choice needs at least one option`);
   // LOOP BOUND: option keys of one node; each list is checked against MAX_NODES.
-  for (const key of keys) {
-    requireId(key, `node ${nodeId}: option name "${key.slice(0, 40)}"`);
-    const ids = raw[key];
+  for (const name of keys) {
+    requireId(name, `node ${nodeId}: option name "${name.slice(0, 40)}"`);
+    const ids = raw[name];
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_NODES) {
-      throw invalid(`node ${nodeId}: option ${key} must list 1 to ${String(MAX_NODES)} node ids`);
+      throw invalid(`node ${nodeId}: option ${name} must list 1 to ${String(MAX_NODES)} node ids`);
     }
-    options[key] = ids.map((id) => requireId(id, `node ${nodeId}: option ${key} entry`));
+    options[name] = ids.map((id) => requireId(id, `node ${nodeId}: option ${name} entry`));
   }
   assert.equal(Object.keys(options).length, keys.length, 'every option is kept');
   return options;
@@ -123,9 +123,9 @@ function parseEdges(raw: unknown, ids: ReadonlySet<string>): [string, string][] 
       if (!ids.has(end)) throw invalid(`edge ${from.slice(0, 40)} -> ${to.slice(0, 40)}: unknown node ${end.slice(0, 40)}`);
     }
     if (from === to) throw invalid(`edge ${from} -> ${to}: a node cannot lead to itself`);
-    const key = `${from}\n${to}`;
-    if (seen.has(key)) throw invalid(`duplicate edge ${from} -> ${to}`);
-    seen.add(key);
+    const name = `${from}\n${to}`;
+    if (seen.has(name)) throw invalid(`duplicate edge ${from} -> ${to}`);
+    seen.add(name);
     return [from, to];
   });
   assert.equal(edges.length, raw.length, 'every edge is kept');
@@ -208,11 +208,11 @@ function checkChoices(graph: Graph, preds: ReadonlyMap<string, string[]>): void 
   // LOOP BOUND: at most MAX_NODES nodes, each with option lists bounded by MAX_NODES.
   for (const node of graph.nodes) {
     if (node.options === undefined) continue;
-    for (const key of Object.keys(node.options)) {
-      for (const id of node.options[key] ?? []) {
-        const label = `node ${node.id}: option ${key} lists ${id}`;
+    for (const name of Object.keys(node.options)) {
+      for (const id of node.options[name] ?? []) {
+        const label = `node ${node.id}: option ${name} lists ${id}`;
         if (owner.has(id)) throw invalid(`${label}, which is already in option ${owner.get(id) ?? ''}`);
-        owner.set(id, `${node.id}.${key}`);
+        owner.set(id, `${node.id}.${name}`);
         const from = preds.get(id);
         if (from === undefined) throw invalid(`${label}: unknown node ${id}`);
         if (!from.includes(node.id)) throw invalid(`${label}, which is not a direct successor of ${node.id}`);

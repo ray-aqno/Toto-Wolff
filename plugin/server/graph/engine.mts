@@ -86,7 +86,7 @@ function isReady(state: RunState, nodeId: string, preds: ReadonlyMap<string, str
 function propagateSkips(state: RunState, preds: ReadonlyMap<string, string[]>): string[] {
   const skipped: string[] = [];
   // LOOP BOUND: at most MAX_NODES passes (each pass that changes anything skips >= 1 node).
-  for (let pass = 0; pass < MAX_NODES; pass++) {
+  for (let round = 0; round < MAX_NODES; round++) {
     let changed = false;
     // LOOP BOUND: at most MAX_NODES nodes.
     for (const node of state.graph.nodes) {
@@ -209,9 +209,9 @@ function applyChoice(state: RunState, node: GraphNode, choice: string | undefine
   }
   const pruned: string[] = [];
   // LOOP BOUND: option lists of one node, at most MAX_NODES ids in all.
-  for (const key of Object.keys(options)) {
-    if (key === choice) continue;
-    for (const id of options[key] ?? []) {
+  for (const name of Object.keys(options)) {
+    if (name === choice) continue;
+    for (const id of options[name] ?? []) {
       if (recordOf(state, id).state !== 'pending') continue;
       recordOf(state, id).state = 'skipped';
       pruned.push(id);

@@ -151,10 +151,10 @@ export function toolError(text: string): Message {
 }
 
 // Reads a required string argument, or rejects the call with INVALID_PARAMS.
-export function requireString(args: Record<string, unknown>, key: string): string {
+export function requireString(args: Record<string, unknown>, field: string): string {
   assert.ok(isRecord(args), 'tool arguments are an object');
-  assert.ok(key.length > 0, 'an argument key is never empty');
-  const value = args[key];
-  if (typeof value !== 'string') throw new RpcError(INVALID_PARAMS, `${key} must be a string`);
+  assert.ok(field.length > 0, 'an argument field is never empty');
+  const value = args[field];
+  if (typeof value !== 'string') throw new RpcError(INVALID_PARAMS, `${field} must be a string`);
   return value;
 }

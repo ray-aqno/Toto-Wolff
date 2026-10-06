@@ -341,7 +341,7 @@ function buildSafetyCarCard(count: number, recent: DashboardItem[]): string {
     <div class="panel-empty">No safety car reviews yet</div>
   </div>`;
   }
-  const passCount = recent.filter((i) => i.status === 'pass').length;
+  const passed = recent.filter((i) => i.status === 'pass').length;
   const conditionalCount = recent.filter((i) => i.status === 'conditional').length;
   const failCount = recent.filter((i) => i.status === 'fail').length;
   return `<div class="card" id="card-safety-car" data-panel="safety-car" style="--delay:.24s">
@@ -353,7 +353,7 @@ function buildSafetyCarCard(count: number, recent: DashboardItem[]): string {
     <div class="stat-unit">Adversarial Reviews</div>
     <hr class="sep">
     <div style="display:flex;gap:.5rem;font-size:.65rem;color:var(--dim)">
-      <span style="color:#00D2BE">✓ ${passCount}</span>
+      <span style="color:#00D2BE">✓ ${passed}</span>
       <span style="color:#e09020">~ ${conditionalCount}</span>
       <span style="color:#e03030">✗ ${failCount}</span>
     </div>`;
@@ -370,7 +370,7 @@ function buildKarpathyCard(count: number, recent: DashboardItem[]): string {
     <div class="panel-empty">No karpathy checks yet</div>
   </div>`;
   }
-  const passCount = recent.filter((i) => i.status === 'pass').length;
+  const passed = recent.filter((i) => i.status === 'pass').length;
   const failCount = recent.filter((i) => i.status === 'fail').length;
   return `<div class="card" id="card-karpathy" data-panel="karpathy" style="--delay:.26s">
     <div class="card-header">
@@ -381,7 +381,7 @@ function buildKarpathyCard(count: number, recent: DashboardItem[]): string {
     <div class="stat-unit">Execution Verifications</div>
     <hr class="sep">
     <div style="display:flex;gap:.5rem;font-size:.65rem;color:var(--dim)">
-      <span style="color:#00D2BE">✓ ${passCount}</span>
+      <span style="color:#00D2BE">✓ ${passed}</span>
       <span style="color:#e03030">✗ ${failCount}</span>
     </div>`;
 }

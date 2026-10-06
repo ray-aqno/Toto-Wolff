@@ -122,7 +122,7 @@ export async function startDashboard(options: { port: number; vaultPath: string 
   server.on('error', (err: NodeJS.ErrnoException) => {
     process.stderr.write(`toto-wolff: dashboard server error (${err.code ?? err.name})\n`);
   });
-  process.stderr.write(`toto-wolff: dashboard at http://${HOST}:${String(port)}/dashboard\n`);
+  process.stderr.write(`toto-wolff: dashboard at ${HOST} port ${String(port)}, page /dashboard\n`);
   return {
     port,
     close: () =>

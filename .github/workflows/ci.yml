@@ -8,7 +8,7 @@ on:
 
 jobs:
   typecheck-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
@@ -32,7 +32,7 @@ jobs:
         run: pnpm test
 
   eval-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: typecheck-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -67,7 +67,7 @@ jobs:
           pnpm exec tsx --tsconfig scripts/tsconfig.json scripts/eval-gate.ts
 
   secret-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
@@ -103,7 +103,7 @@ jobs:
           fi
 
   lint-baseline:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -145,7 +145,7 @@ jobs:
         run: pnpm check:plugin-sync
 
   check-patterns:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -167,7 +167,7 @@ jobs:
           cat /tmp/check-patterns-output.txt >> "$GITHUB_STEP_SUMMARY"
 
   validate-plugin-manifest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -188,7 +188,7 @@ jobs:
           claude plugin validate plugin --strict
 
   plugin-launch-smoke-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: validate-plugin-manifest
     permissions:
       contents: read
@@ -311,7 +311,7 @@ jobs:
   # must refuse with one line and exit 1. A job of its own: setup-node changes
   # the Node every later step uses, so no pnpm or claude step may follow it.
   node-version-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -338,7 +338,7 @@ jobs:
           fi
 
   pre-commit-hook-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -351,7 +351,7 @@ jobs:
         run: bats tests/pre-commit.bats
 
   drs-conformance-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:

@@ -9,23 +9,15 @@ import type { StorageBackend, BackendStats } from './StorageBackend.mts';
 import { VaultFactory } from './VaultFactory.mts';
 import { VaultSearchError } from '../types.mts';
 import type { SearchResult, VaultWriteResult } from '../types.mts';
-import { execFile } from 'node:child_process';
-import type { ExecFileException } from 'node:child_process';
-import { promisify } from 'node:util';
-import { MAX_SEARCH_RESULTS, searchFiles } from './search.mts';
+import { searchFiles } from './search.mts';
 import type { BoundedSearch } from './search.mts';
 
 const MAX_LIST_RESULTS = 1000;
-const execFileAsync = promisify(execFile);
 
 export interface VaultConfig {
   backend: string;
   /** Backend-specific options (passed to backend constructor) */
   options: Record<string, unknown>;
-  /** Optional: an external search command (ripgrep-compatible --json output); default: the built-in search */
-  searchCommand?: string;
-  /** Optional: search timeout in ms (default: 5000) */
-  searchTimeoutMs?: number;
 }
 
 export class VaultService {
@@ -260,8 +252,7 @@ export class VaultService {
 
   /**
    * Search the vault: on the file backend, the built-in literal search
-   * (search.mts), or the configured `searchCommand` (ripgrep-compatible
-   * `--json` output) when one is set; other backends search in memory.
+   * (search.mts); other backends search in memory.
    */
   async searchBounded(query: string): Promise<BoundedSearch> {
     assert(typeof query === 'string' && query.length > 0, 'query must be non-empty string');
@@ -275,9 +266,7 @@ export class VaultService {
     if (this.backend.id === 'file') {
       const rootPath = this.backend.getRootPath?.();
       if (!rootPath) throw new VaultSearchError('Cannot determine vault root path for search');
-      if (this.config.searchCommand === undefined) return searchFiles(rootPath, query);
-      const results = await this.searchWithCommand(this.config.searchCommand, query, rootPath);
-      return { results: results.slice(0, MAX_SEARCH_RESULTS), truncated: results.length > MAX_SEARCH_RESULTS };
+      return searchFiles(rootPath, query);
     }
 
     // Fallback: list all files and search in-memory (for non-file backends)
@@ -301,18 +290,6 @@ export class VaultService {
       }
     }
     return { results, truncated: false };
-  }
-
-  private async searchWithCommand(command: string, query: string, rootPath: string): Promise<SearchResult[]> {
-    const timeoutMs = this.config.searchTimeoutMs ?? SEARCH_COMMAND_TIMEOUT_MS;
-    try {
-      const { stdout } = await execFileAsync(command, ['--json', '--', query, rootPath], { timeout: timeoutMs });
-      return parseRgOutput(stdout);
-    } catch (err) {
-      const code = (err as ExecFileException).code;
-      if (code === 1) return [];
-      throw new VaultSearchError(`${command} failed with code ${String(code)}`);
-    }
   }
 
   /** Drain the commit queue (for git-backed backends). */
@@ -353,29 +330,4 @@ export class VaultService {
       this.closed = true;
     });
   }
-}
-
-const SEARCH_COMMAND_TIMEOUT_MS = 5_000;
-
-function parseRgOutput(stdout: string): SearchResult[] {
-  const results: SearchResult[] = [];
-  for (const line of stdout.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line) as {
-        type: string;
-        data?: { path?: { text: string }; line_number?: number; lines?: { text: string } };
-      };
-      if (parsed.type === 'match' && parsed.data !== undefined) {
-        results.push({
-          file: parsed.data.path?.text ?? '',
-          line: parsed.data.line_number ?? 0,
-          text: parsed.data.lines?.text.trim() ?? '',
-        });
-      }
-    } catch {
-      // skip malformed rg output lines
-    }
-  }
-  return results;
 }

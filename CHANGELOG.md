@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The plugin dashboard is now a page file, `<vault>/.toto-wolff/dashboard.html`. `dashboard_status` writes it and returns its path as `page`. The plugin no longer runs a local web server.
+- The p10, llm-council, the-cabinet, safety-car and drs skills use the plugin's Vault folder setting. They no longer read TOTO_VAULT_PATH or ~/.toto/vault or write settings.local.json. Upgrading from 1.x: set Vault folder to the folder you used before (default ~/.toto/vault).
+
+### Removed
+
+- The plugin `dashboard_port` setting and the plugin's HTTP routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. For a live served dashboard, use `packages/mcp-server` (TOTO_MCP_PORT, default 3099) or `toto dashboard`.
+- The plugin no longer ships skills/drs/bin/drs-check.sh. The plugin never registered it; the repo hook is unchanged; see docs/drs-hook.md.
+
 ## [2.0.0] - 2026-10-05
 
 toto-wolff 2.0: the plugin becomes a dependency-free MCP server and a state engine for task graphs. Claude runs every step; the server keeps the state, checks the evidence and stops at human gates. Breaking for 1.6 users: no credentials, five model-backed tools removed, Node 24 required (see Breaking, and the README's "Upgrading to 2.0.0").

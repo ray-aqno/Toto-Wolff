@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createServer } from '../../plugin/server/mcp/server.mts';
+import { createLineHandler } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler } from '../../plugin/server/mcp/server.mts';
 import { createRuntime } from '../../plugin/server/runtime.mts';
 import { createTools } from '../../plugin/server/tools/index.mts';
@@ -65,7 +65,7 @@ beforeAll(() => {
   writeFileSync(join(project, '.toto', 'graphs', 'demo.json'), JSON.stringify(GRAPH));
   writeFileSync(join(project, '.toto', 'graphs', 'broken.json'), JSON.stringify({ ...GRAPH, id: 'broken', edges: [...GRAPH.edges, ['build', 'spec']] }));
   writeFileSync(join(project, '.toto', 'graphs', 'notjson.json'), '{');
-  handle = createServer(createTools(createRuntime({ vault: join(project, 'vault'), project })));
+  handle = createLineHandler(createTools(createRuntime({ vault: join(project, 'vault'), project })));
   live = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
 });
 

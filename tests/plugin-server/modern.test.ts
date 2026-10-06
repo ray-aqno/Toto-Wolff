@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { createServer } from '../../plugin/server/mcp/server.mts';
+import { createLineHandler } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler, Tool } from '../../plugin/server/mcp/server.mts';
 import { DEFINITIONS } from '../../plugin/server/tools/index.mts';
 import { isolatedEnv, removeIsolatedEnvs, serverEnv } from './spawn-env.ts';
@@ -22,7 +22,7 @@ const req = (method: string, params?: unknown, id: unknown = 1): string =>
   JSON.stringify({ jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) });
 const modern = (method: string, extra: Record<string, unknown> = {}, meta: unknown = META): string =>
   req(method, { ...extra, _meta: meta });
-const serve = (tools: Tool[] = [echo]): LineHandler => createServer(tools);
+const serve = (tools: Tool[] = [echo]): LineHandler => createLineHandler(tools);
 
 describe('server/discover', () => {
   it('advertises 2026-07-28, the tools capability, caching hints and the server identity', async () => {

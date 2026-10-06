@@ -36,7 +36,7 @@ export async function* readLines(input: AsyncIterable<Buffer | string>): AsyncGe
     const chunk = typeof raw === 'string' ? Buffer.from(raw, 'utf8') : raw;
     assert.ok(Buffer.isBuffer(chunk), 'stdin yields byte chunks');
     let start = 0;
-    // Bound: each pass consumes through a newline or ends, so at most chunk.length + 1 passes.
+    // Bound: each iteration consumes through a newline or ends, so at most chunk.length + 1 iterations.
     while (start <= chunk.length) {
       const newline = chunk.indexOf(NEWLINE_BYTE, start);
       const piece = chunk.subarray(start, newline === -1 ? chunk.length : newline);

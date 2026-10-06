@@ -218,7 +218,7 @@ jobs:
 
           # (i) The installed cache is the plugin/ folder and nothing else: the
           # readable .mts server (no .js or .mjs anywhere: nothing is built or
-          # bundled), the listed skills (drs-check.sh still executable), no
+          # bundled), the listed skills (without the repo-only drs/bin hook), no
           # symlinks (one pointing outside the folder ships dangling), and no
           # repository files such as packages/ (the whole repo used to ship).
           if [ ! -f "$CACHE_DIR/server/index.mts" ]; then
@@ -230,8 +230,8 @@ jobs:
             echo "::error::installed plugin cache contains built JavaScript: $BUILT"
             exit 1
           fi
-          if [ ! -x "$CACHE_DIR/skills/drs/bin/drs-check.sh" ]; then
-            echo "::error::skills/drs/bin/drs-check.sh is missing or not executable in the installed cache"
+          if [ -e "$CACHE_DIR/skills/drs/bin" ]; then
+            echo "::error::installed plugin cache contains skills/drs/bin: the repo-only DRS hook script must not ship"
             exit 1
           fi
           if [ -n "$(find "$CACHE_DIR" -type l)" ]; then

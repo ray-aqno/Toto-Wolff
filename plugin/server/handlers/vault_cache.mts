@@ -1,4 +1,4 @@
-// The one V2 vault the HTTP handlers and SignalIndex share. A server process
+// The one V2 vault the dashboard page and SignalIndex share. A server process
 // serves exactly one vault path, so the cache holds one promise; a different
 // path is a programming error and fails loudly instead of being ignored.
 import assert from 'node:assert/strict';

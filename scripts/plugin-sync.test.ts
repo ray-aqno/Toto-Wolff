@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -17,6 +18,7 @@ import {
   ICON_REL,
   MAX_FILE_BYTES,
   MAX_LINE_CHARS,
+  SKILL_EXCLUDES,
   assertNoSymlink,
   assertUnderRoot,
   checkPluginLayout,
@@ -34,15 +36,21 @@ import {
 const SKILLS = ['drs', 'p10'];
 let root: string;
 
-/** Builds a fixture repo: two source skills (drs has an executable script), a manifest and a server entry. */
+/**
+ * Builds a fixture repo: two source skills, a manifest and a server entry.
+ * drs has the repository-only bin/drs-check.sh (SKILL_EXCLUDES keeps it out
+ * of the plugin); p10 has an executable script that is copied.
+ */
 function makeFixture(): string {
   const dir = mkdtempSync(join(tmpdir(), 'plugin-sync-test-'));
   mkdirSync(join(dir, '.claude', 'skills', 'drs', 'bin'), { recursive: true });
   writeFileSync(join(dir, '.claude', 'skills', 'drs', 'SKILL.md'), '---\nname: drs\ndescription: d\n---\n');
   writeFileSync(join(dir, '.claude', 'skills', 'drs', 'bin', 'drs-check.sh'), '#!/bin/sh\nexit 0\n');
   chmodSync(join(dir, '.claude', 'skills', 'drs', 'bin', 'drs-check.sh'), 0o755);
-  mkdirSync(join(dir, '.claude', 'skills', 'p10'), { recursive: true });
+  mkdirSync(join(dir, '.claude', 'skills', 'p10', 'bin'), { recursive: true });
   writeFileSync(join(dir, '.claude', 'skills', 'p10', 'SKILL.md'), '---\nname: p10\ndescription: p\n---\n');
+  writeFileSync(join(dir, '.claude', 'skills', 'p10', 'bin', 'run.sh'), '#!/bin/sh\nexit 0\n');
+  chmodSync(join(dir, '.claude', 'skills', 'p10', 'bin', 'run.sh'), 0o755);
   mkdirSync(join(dir, 'plugin', '.claude-plugin'), { recursive: true });
   writeManifest(dir, SKILLS.map((s) => `./skills/${s}`));
   mkdirSync(join(dir, 'plugin', 'server'), { recursive: true });
@@ -67,26 +75,45 @@ afterEach(() => {
 });
 
 describe('a freshly synced plugin folder', () => {
-  it('passes every check and keeps the exec bit on drs-check.sh', () => {
+  it('passes every check and keeps the exec bit on a copied script', () => {
     expect(problems()).toEqual([]);
-    expect(statSync(join(root, 'plugin', 'skills', 'drs', 'bin', 'drs-check.sh')).mode & 0o111).not.toBe(0);
+    expect(statSync(join(root, 'plugin', 'skills', 'p10', 'bin', 'run.sh')).mode & 0o111).not.toBe(0);
+  });
+});
+
+describe('the repository-only drs hook script (SKILL_EXCLUDES)', () => {
+  it('is not copied into the plugin, and its absence is not drift', () => {
+    expect(SKILL_EXCLUDES['drs']).toEqual(['bin/']);
+    expect(existsSync(join(root, 'plugin', 'skills', 'drs', 'bin'))).toBe(false);
+    expect(existsSync(join(root, 'plugin', 'skills', 'drs', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(root, '.claude', 'skills', 'drs', 'bin', 'drs-check.sh'))).toBe(true);
+    expect(checkSkillCopies(root, SKILLS)).toEqual([]);
+  });
+
+  it('is removed from a plugin copy by the next sync, and reported as extra until then', () => {
+    mkdirSync(join(root, 'plugin', 'skills', 'drs', 'bin'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'skills', 'drs', 'bin', 'drs-check.sh'), '#!/bin/sh\nexit 0\n');
+    expect(checkSkillCopies(root, SKILLS)).toContain('skills/drs/bin/drs-check.sh: extra');
+    syncSkills(root, SKILLS);
+    expect(existsSync(join(root, 'plugin', 'skills', 'drs', 'bin'))).toBe(false);
+    expect(checkSkillCopies(root, SKILLS)).toEqual([]);
   });
 });
 
 describe('drift in a skill copy is caught', () => {
-  const copied = (): string => join(root, 'plugin', 'skills', 'drs', 'bin', 'drs-check.sh');
+  const copied = (): string => join(root, 'plugin', 'skills', 'p10', 'bin', 'run.sh');
 
   it('flipped byte', () => {
     writeFileSync(copied(), '#!/bin/sh\nexit 1\n');
-    expect(problems()).toContain('skills/drs/bin/drs-check.sh: bytes');
+    expect(problems()).toContain('skills/p10/bin/run.sh: bytes');
   });
   it('lost exec bit', () => {
     chmodSync(copied(), 0o644);
-    expect(problems()).toContain('skills/drs/bin/drs-check.sh: mode');
+    expect(problems()).toContain('skills/p10/bin/run.sh: mode');
   });
   it('deleted file', () => {
     unlinkSync(copied());
-    expect(problems()).toContain('skills/drs/bin/drs-check.sh: missing');
+    expect(problems()).toContain('skills/p10/bin/run.sh: missing');
   });
   it('extra file in a skill', () => {
     writeFileSync(join(root, 'plugin', 'skills', 'p10', 'stray.md'), 'x');
@@ -159,6 +186,7 @@ describe('sources and manifests are validated', () => {
   });
   it('an empty skill directory is refused', () => {
     rmSync(join(root, '.claude', 'skills', 'p10', 'SKILL.md'));
+    rmSync(join(root, '.claude', 'skills', 'p10', 'bin'), { recursive: true });
     expect(() => syncSkills(root, SKILLS)).toThrow(/no files/);
   });
 });

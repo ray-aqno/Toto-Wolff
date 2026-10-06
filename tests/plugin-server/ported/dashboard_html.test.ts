@@ -155,7 +155,7 @@ describe('renderDashboardHtml: blocked items and sparklines', () => {
   });
 });
 
-describe('renderDashboardHtml: contrast token and record panel', () => {
+describe('renderDashboardHtml: contrast token and page reload', () => {
   // L6-004: .card-label's contrast against --card (#181818) previously failed
   // WCAG AA via var(--dim) (#555, ~2.38:1). Repointed to a new --label token.
   it('repoints .card-label off var(--dim) to the new --label contrast token', () => {
@@ -165,11 +165,14 @@ describe('renderDashboardHtml: contrast token and record panel', () => {
     expect(html).toContain('.card-label   { font-family: var(--mono); font-size: .62rem; color: var(--label);');
   });
 
-  // L6-007: the record-panel fetch handler previously rendered "Record not
-  // found." for every failure, including network errors and non-404 statuses.
-  it('branches the record-panel fetch failure message on 404 vs. any other status', () => {
+  // The page is a local file: it reloads itself on a timer instead of
+  // fetching, and holds off while a detail panel is open.
+  it('reloads on a visibility- and panel-aware timer and makes no requests', () => {
     const html = renderDashboardHtml(emptyResult);
-    expect(html).toContain("status === 404 ? 'Record not found.' : 'Could not load record. Check your connection and try again.'");
+    expect(html).toContain("document.visibilityState === 'visible' && !document.body.classList.contains('panel-open')");
+    expect(html).toContain('location.reload()');
+    expect(html).not.toContain('http-equiv');
+    expect(html).toContain('id="page-status">snapshot ' + emptyResult.generatedAt);
   });
 });
 

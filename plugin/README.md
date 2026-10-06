@@ -7,7 +7,7 @@ This folder is the Claude Code plugin. The marketplace (`claude plugin marketpla
 - **Node 24 or newer.** Claude Code starts the MCP server with `node ${CLAUDE_PLUGIN_ROOT}/server/index.mts`, and Node runs the TypeScript files directly by stripping their types. There is no build step and nothing to install.
 - On Node 22.18 to 23.x the server stops at once with `toto-wolff needs Node 24+`.
 - Below Node 22.18, Node cannot load a TypeScript file at all, so the server fails before that message can print. This README is the only warning there.
-- Nothing to sign in to. The server makes no model calls and no network calls: Claude runs the governance workflows through the plugin's skills.
+- The server makes no network calls and opens no ports; Claude runs the workflows through the plugin's skills.
 
 ## The MCP server
 
@@ -27,18 +27,17 @@ Six tools carry over from v1 (issue #60). Each returns its result as JSON text, 
 | `vault_write` | `path` (relative to the vault, no `..`), `content` | `{ "path": ... }` |
 | `vault_search` | `query` (1 to 500 characters) | `{ "results": [{ "file", "line", "text" }], "truncated": false }` |
 | `drs_check` | `tool` (`Write`, `Edit`, `NotebookEdit`, `Bash`), `target_path` or `command`, optional `message_before` | the DRS verdict |
-| `subagent_list` | optional `scope` (`user`, `project`, `both`) | the project's subagents (`.pi/agents`); `user` finds none, because the server reads no agent folder outside the project |
-| `dashboard_status` | none | vault record counts and recent items |
+| `subagent_list` | optional `scope` (`user`, `project`, `both`) | the project's subagents (`.pi/agents`); `user` finds none |
+| `dashboard_status` | none | vault record counts and recent items, and `page`: the dashboard file it wrote (see Dashboard) |
 | `score_confidence` | `ruling` | `{ "tier", "matchCount", "disqualifiers" }` |
 
 The five v1 model-backed tools (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are gone for good; the matching skills already run those workflows through Claude itself. The graph tools, the built-in idea-to-PR graph and the `graph-run` skill that drives it are below (issues #61 to #63).
 
 ### Settings
 
-The server reads only the settings below, which Claude Code passes it from the plugin's configuration; it reads no other environment variable. Claude Code asks for them when you enable the plugin, and you can change them in `/plugin` (select toto-wolff on the **Installed** tab, then **Configure**):
+The server's only settings are the vault folder below and the project folder Claude Code is working in. Claude Code asks for the vault folder when you enable the plugin, and you can change it in `/plugin` (select toto-wolff on the **Installed** tab, then **Configure**):
 
-- **Vault folder** (`vault_path`, required): the absolute path of the folder the server keeps its records in. 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`; enter that folder to keep your records. Without it, the server stops with one line on stderr.
-- **Dashboard port** (`dashboard_port`): `0` (the default) for no dashboard, or a port from 1 to 65535.
+- **Vault folder** (`vault_path`, required): the absolute path of the folder the server keeps its records in. The p10, llm-council, the-cabinet, safety-car and drs skills use the same folder. Without it, the server stops with one line on stderr.
 
 ### The vault
 
@@ -51,9 +50,9 @@ The server reads only the settings below, which Claude Code passes it from the p
 
 `drs_check` reads its config from the project's `.toto/drs-config.json`. Without a config, DRS falls back to deny-all: every `Write`, `Edit` and `NotebookEdit` target is out of scope (Rule 2), and one warning is printed the first time `drs_check` runs. An override (`message_before: "override drs: <reason>"`) is honored only once its audit record is written to the vault's `DRS/` folder; the commit after it is best effort like any other.
 
-### Dashboard (off by default)
+### Dashboard
 
-The dashboard HTTP server starts only when the dashboard port is set to a port from 1 to 65535 (every Claude session runs its own server, so there is no default port to fight over). It listens on `127.0.0.1` only and serves only GET routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. A request addressed to any name but `127.0.0.1:<port>` or `localhost:<port>` gets 403, which blocks DNS rebinding from web pages. Any program on this machine can still read vault records through `/dashboard/record`, so turn the dashboard on only where that is acceptable. If the port is in use or not allowed, the server prints one warning and the MCP tools keep working. v1's POST tool routes (calling tools over HTTP) are removed.
+Ask Claude for the dashboard, or call `dashboard_status`. It writes `.toto-wolff/dashboard.html` inside your vault folder and returns its path in `page`. Open that file in a browser. From then on the server rewrites it every 15 seconds while the session runs, so new records show up whichever tool wrote them, and the open page reloads itself every 10 seconds unless a detail panel is open. If the page cannot be written, `page` is `null` and the stats still come back.
 
 Tracking issue: https://github.com/ray-aqno/Toto-Wolff/issues/57
 

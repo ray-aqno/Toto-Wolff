@@ -75,6 +75,6 @@ export interface BackendStats {
 export interface StorageConfig {
   id: string;
   name: string;
-  /** Backend-specific options (e.g., path for file, bucket for S3, etc.) */
+  /** Backend-specific options (e.g., rootPath for the file backend) */
   options: Record<string, unknown>;
 }

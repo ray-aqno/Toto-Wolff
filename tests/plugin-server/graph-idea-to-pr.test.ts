@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createServer } from '../../plugin/server/mcp/server.mts';
+import { createLineHandler } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler } from '../../plugin/server/mcp/server.mts';
 import { createRuntime } from '../../plugin/server/runtime.mts';
 import { createTools } from '../../plugin/server/tools/index.mts';
@@ -26,7 +26,7 @@ function project(fixture: string): { dir: string; handle: LineHandler } {
   const dir = mkdtempSync(join(tmpdir(), 'toto-idea-to-pr-'));
   projects.push(dir);
   cpSync(join(FIXTURES, fixture), dir, { recursive: true });
-  return { dir, handle: createServer(createTools(createRuntime({ vault: join(dir, '.vault'), project: dir }))) };
+  return { dir, handle: createLineHandler(createTools(createRuntime({ vault: join(dir, '.vault'), project: dir }))) };
 }
 
 async function call(handle: LineHandler, name: string, args: Record<string, unknown>): Promise<Reply> {

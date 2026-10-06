@@ -85,7 +85,7 @@ export async function searchFiles(rootPath: string, query: string): Promise<Boun
   assert.ok(query.length > 0, 'the query is never empty');
   const state: SearchState = { results: [], truncated: false, totalBytes: 0, done: false };
   const stack: { dir: string; depth: number }[] = [{ dir: rootPath, depth: 0 }];
-  // LOOP BOUND: one pass per directory in the vault, at most MAX_SEARCH_DEPTH levels deep.
+  // LOOP BOUND: one iteration per directory in the vault, at most MAX_SEARCH_DEPTH levels deep.
   while (stack.length > 0 && !state.done) {
     const current = stack.pop();
     assert.ok(current !== undefined, 'walk stack underflow');

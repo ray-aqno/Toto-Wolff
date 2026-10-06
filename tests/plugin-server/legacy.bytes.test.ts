@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createServer } from '../../plugin/server/mcp/server.mts';
+import { createLineHandler } from '../../plugin/server/mcp/server.mts';
 import type { Tool } from '../../plugin/server/mcp/server.mts';
 import { isolatedEnv, removeIsolatedEnvs, serverEnv } from './spawn-env.ts';
 
@@ -103,7 +103,7 @@ describe('legacy replies are byte-identical to fa40059', () => {
   afterAll(removeIsolatedEnvs);
 
   it.each(IN_PROCESS.map(([input, output], i) => [i, input, output] as const))('case %i', async (_i, input, output) => {
-    const reply = await createServer([echo])(input);
+    const reply = await createLineHandler([echo])(input);
     expect(reply === null ? null : JSON.stringify(reply)).toBe(output);
   });
 

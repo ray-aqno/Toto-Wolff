@@ -31,7 +31,7 @@ import {
   rmSync,
   statSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,6 +63,13 @@ export const ICON_REL = join('.claude-plugin', 'icon.png');
 export const LICENSE_REL = 'LICENSE';
 /** Spec criterion 2's minified-file guard: no text line may be longer. */
 export const MAX_LINE_CHARS = 2000;
+/**
+ * Skill paths (relative to the skill folder, '/'-separated prefixes) that stay
+ * in the repository and are never copied into the plugin. drs/bin/ holds the
+ * repository's own PreToolUse hook script, which the plugin never registers;
+ * in the plugin, DRS runs through the drs_check tool.
+ */
+export const SKILL_EXCLUDES: Readonly<Record<string, readonly string[]>> = { drs: ['bin/'] };
 /** Spec criterion 2: no package manifest or lockfile may ship (exact names, so lock.mts is fine). */
 const FORBIDDEN_NAMES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb'];
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -195,14 +202,22 @@ function sha256Of(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
 }
 
+/** A skill source's files, minus the paths SKILL_EXCLUDES keeps in the repository. */
+export function skillSourceFiles(src: string): TreeEntry[] {
+  const excludes = SKILL_EXCLUDES[basename(src)] ?? [];
+  const files = listTree(src).filter((e) => !excludes.some((prefix) => e.rel.split(sep).join('/').startsWith(prefix)));
+  assert(files.length > 0, `skill has no files to ship: ${src}`);
+  return files;
+}
+
 /**
- * Replaces `dst` with a copy of `src`. copyFileSync keeps each file's mode,
+ * Replaces `dst` with a copy of `src`, minus its SKILL_EXCLUDES paths. copyFileSync keeps each file's mode,
  * so an exec bit survives; the closing diffTrees assertion fails the copy if
  * any file's bytes or exec bit did not (for example on a filesystem that
  * drops modes).
  */
 export function copySkill(root: string, src: string, dst: string): void {
-  const sourceFiles = listTree(src);
+  const sourceFiles = skillSourceFiles(src);
   removeTree(root, dst);
   // Bounded: listTree returns at most MAX_FILES entries.
   for (const entry of sourceFiles) {
@@ -334,7 +349,7 @@ export function checkSkillCopies(root: string, skills: string[]): string[] {
       continue;
     }
     // Bounded: diffTrees returns at most 2 * MAX_FILES findings.
-    for (const f of diffTrees(listTree(src), listTree(dst))) problems.push(`skills/${name}/${f.rel}: ${f.kind}`);
+    for (const f of diffTrees(skillSourceFiles(src), listTree(dst))) problems.push(`skills/${name}/${f.rel}: ${f.kind}`);
   }
   return problems;
 }

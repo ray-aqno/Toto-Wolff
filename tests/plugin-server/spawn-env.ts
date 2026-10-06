@@ -1,5 +1,5 @@
 // Environment for tests that spawn the real server entry: HOME and the vault
-// in a fresh temp directory, and no dashboard port or DRS config from the
+// in a fresh temp directory, and no plugin settings or DRS config from the
 // developer's shell, so nothing touches the real HOME and stderr stays empty.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,13 +15,13 @@ export function isolatedEnv(extra: Record<string, string> = {}): NodeJS.ProcessE
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: dir, TOTO_VAULT_PATH: join(dir, 'vault'), ...extra };
   if (extra['TOTO_MCP_PORT'] === undefined) delete env['TOTO_MCP_PORT'];
   delete env['TOTO_DRS_CONFIG'];
-  for (const name of ['TOTO_WOLFF_VAULT', 'TOTO_WOLFF_PROJECT', 'TOTO_WOLFF_PORT']) if (extra[name] === undefined) delete env[name];
+  for (const name of ['TOTO_WOLFF_VAULT', 'TOTO_WOLFF_PROJECT']) if (extra[name] === undefined) delete env[name];
   return env;
 }
 
 // The server's settings, as plugin.json passes them in its env block: a fresh
-// temp vault, plus any of vault, project and port in `extra`.
-export function serverEnv(extra: Partial<Record<'vault' | 'project' | 'port', string>> = {}): Record<string, string> {
+// temp vault, plus either of vault and project in `extra`.
+export function serverEnv(extra: Partial<Record<'vault' | 'project', string>> = {}): Record<string, string> {
   const dir = mkdtempSync(join(tmpdir(), 'toto-plugin-settings-'));
   created.push(dir);
   const config = { vault: join(dir, 'vault'), ...extra };

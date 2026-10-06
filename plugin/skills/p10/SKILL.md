@@ -94,17 +94,9 @@ Execution agent reads Obsidian draft — status: approved required to proceed
 
 ## Step 0 — Config Resolution
 
-Resolve `vaultPath` and this skill's log/plan directory before doing anything else. Same 3-step order in every skill this plugin bundles (p10, llm-council, the-cabinet) — do not deviate, this consistency is what keeps the lookup unambiguous:
+The vault folder is `${user_config.vault_path}` (the plugin's Vault folder setting). If this line still shows the placeholder, ask the user once for the vault folder and use their answer for this session; do not write it anywhere.
 
-1. `TOTO_VAULT_PATH` env var, if set — always wins.
-2. `<plugin-root>/settings.local.json`, if the plugin was installed via `claude plugin add` and the file exists.
-3. Hardcoded default (`~/.toto/vault`), if nothing above resolved.
-
-Print which source won (e.g. `resolved vaultPath from: env TOTO_VAULT_PATH`) before proceeding — this line is load-bearing, not cosmetic: without it, an env var silently shadowing a `settings.local.json` override becomes an invisible footgun.
-
-**First-run / no cached resolution beyond the hardcoded default:** if there's an interactive session (TTY available), ask the user for `vaultPath` (and this skill's log/plan dir, if it differs from the default) via `AskUserQuestion`, then write the answer to `<plugin-root>/settings.local.json` (source #2 above) so future runs skip the prompt. If writing fails (e.g. read-only plugin dir), use the answered value for this run only and warn that the prompt will repeat next time.
-
-**No interactive session available (headless, CI, scripted `claude plugin add`):** do NOT wait on `AskUserQuestion` — it has no path to a human here. Fall through to source #3 (hardcoded default) and emit a fail-loud stderr warning naming the exact remediation: `set TOTO_VAULT_PATH=<path> or create <plugin-root>/settings.local.json before running in a non-interactive environment`. Never proceed silently as if a value were confirmed when it wasn't.
+Below, `vaultPath` is that folder, and this skill's plan directory `p10.planDir` is `P10-Plans` inside it.
 
 ---
 
@@ -270,7 +262,7 @@ the block reason becomes the council input.
 
 ## Step 5 — Obsidian Commit (Haiku)
 
-Uses `vaultPath` and `p10.planDir` (default `P10-Plans`) resolved in Step 0.
+Uses `vaultPath` (the vault folder from Step 0) and `p10.planDir` (`P10-Plans`).
 
 **File:** `{vaultPath}/{p10.planDir}/YYYY-MM-DD-{task-slug}.md`
 

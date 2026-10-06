@@ -3,11 +3,13 @@
 // resultType and serverInfo around it (mcp/modern.mts). A handler's input
 // error becomes -32602; anything else is an internal error (mcp/server.mts).
 import assert from 'node:assert/strict';
+import process from 'node:process';
 import { INVALID_PARAMS, RpcError } from '../mcp/protocol.mts';
 import type { Message } from '../mcp/protocol.mts';
 import type { Tool, ToolDefinition } from '../mcp/server.mts';
 import { drainQuietly } from '../runtime.mts';
 import type { Runtime } from '../runtime.mts';
+import { writeDashboardPage } from '../handlers/dashboard_page.mts';
 import { handleDashboardStatus } from '../handlers/dashboard_status.mts';
 import { handleDrsCheck } from '../handlers/drs_check.mts';
 import { handleScoreConfidence } from '../handlers/score_confidence_tool.mts';
@@ -57,19 +59,58 @@ function requireRuling(args: Record<string, unknown>): void {
   if (typeof ruling !== 'string' || ruling.length === 0) throw new MCPValidationError('ruling must be non-empty string');
 }
 
+// Once dashboard_status has written the page, it is rewritten every
+// PAGE_REFRESH_MS, so records any tool writes (the skills write with Claude's
+// own file tools) appear without another call. A failed rewrite is one stderr
+// line; an overlapping one is skipped.
+const PAGE_REFRESH_MS = 15_000;
+
+function pageRefresher(vaultPath: string): () => Promise<void> {
+  let busy = false;
+  return async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      await writeDashboardPage(vaultPath);
+    } catch (err) {
+      process.stderr.write('toto-wolff: dashboard page not refreshed: ' + (err instanceof Error ? err.message : String(err)) + '\n');
+    } finally {
+      busy = false;
+    }
+  };
+}
+
 export function createTools(runtime: Runtime): Tool[] {
   assert.ok(runtime.vaultPath.length > 0, 'the runtime has a vault path');
+  const refreshPage = pageRefresher(runtime.vaultPath);
+  let timer: ReturnType<typeof setInterval> | null = null;
   const tools = [
     adapt('vault_write', async (args) => {
       const vault = await runtime.vault();
       const written = await handleVaultWrite(args, vault);
       await drainQuietly(vault);
+      // Keeps an open dashboard page current; a failed refresh never fails the write.
+      if (runtime.pageWritten()) await refreshPage();
       return written;
     }),
     adapt('vault_search', async (args) => handleVaultSearch(args, await runtime.vault())),
     adapt('drs_check', (args) => handleDrsCheck(args, runtime.drs())),
     adapt('subagent_list', (args) => handleSubagentList(args, runtime.subagents)),
-    adapt('dashboard_status', () => handleDashboardStatus(runtime.vaultPath)),
+    adapt('dashboard_status', async () => {
+      const stats = await handleDashboardStatus(runtime.vaultPath);
+      // The stats are the answer; the page is a convenience, so a failed write
+      // is one stderr line and `page: null`.
+      const page = await writeDashboardPage(runtime.vaultPath).catch((err: unknown) => {
+        process.stderr.write('toto-wolff: dashboard page not written: ' + (err instanceof Error ? err.message : String(err)) + '\n');
+        return null;
+      });
+      if (page !== null) {
+        runtime.markPageWritten();
+        timer ??= setInterval(() => void refreshPage(), PAGE_REFRESH_MS);
+        timer.unref();
+      }
+      return { ...stats, page };
+    }),
     adapt('score_confidence', (args) => {
       requireRuling(args);
       return handleScoreConfidence(args, runtime.vaultPath);

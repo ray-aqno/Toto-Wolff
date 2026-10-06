@@ -25,99 +25,20 @@ export interface DashboardResult {
 }
 
 /**
- * Returns the inline <script> block that wires SSE live updates to the dashboard.
- * TypeScript layer: assert inputs. Browser JS layer: defensive guards only (no assert).
+ * Returns the inline <script> block that reloads the page file every 10 s so
+ * it shows records written since it was opened. It skips the reload while the
+ * tab is hidden or a detail panel is open, so an open panel is never closed.
+ * Plain ES5, like the client script; it makes no requests of its own.
  */
-function injectSseScript(endpoint: string): string {
-  assert(typeof endpoint === 'string' && endpoint.startsWith('/'), 'injectSseScript: endpoint must be root-relative');
+function injectReloadScript(): string {
   const html = `<script>
 (function () {
-  var es = new EventSource('${endpoint}');
-  es.addEventListener('stats', function (e) {
-    var data;
-    try { data = JSON.parse(e.data); } catch { return; }
-    if (!data || typeof data !== 'object') return;
-    var bc = document.getElementById('blocked-count');
-    var cs = document.getElementById('connection-status');
-    if (bc) {
-      var n = typeof data.blockedCount === 'number' ? data.blockedCount : 0;
-      bc.textContent = n > 0 ? n + ' FLAG' + (n > 1 ? 'S' : '') : 'CLEAR';
-      bc.style.color = n > 0 ? 'var(--red)' : 'var(--dim)';
-    }
-    if (cs) { cs.textContent = '· LIVE'; cs.className = 'live'; }
-  });
-  es.addEventListener('error', function (e) {
-    var data;
-    try { data = JSON.parse(e.data); } catch { data = null; }
-    var cs = document.getElementById('connection-status');
-    if (!cs) return;
-    cs.textContent = data && data.message ? '· ' + data.message : '· vault error';
-    cs.className = 'error';
-  });
-  es.onerror = function () {
-    var cs = document.getElementById('connection-status');
-    if (!cs) return;
-    cs.textContent = '· reconnecting';
-    cs.className = '';
-  };
-  es.addEventListener('connected', function () {
-    var cs = document.getElementById('connection-status');
-    if (!cs) return;
-    cs.textContent = '· LIVE';
-    cs.className = 'live';
-  });
+  setInterval(function () {
+    if (document.visibilityState === 'visible' && !document.body.classList.contains('panel-open')) location.reload();
+  }, 10000);
 })();
 </script>`;
-  assert(html.length > 0, 'injectSseScript: html must not be empty');
-  return html;
-}
-
-/**
- * Returns the inline <script> block that adds record drill-down to the panel.
- * TypeScript layer: assert inputs. Browser JS layer: defensive guards only (no assert).
- */
-function injectPanelScript(): string {
-  const html = `<script>
-(function () {
-  document.querySelectorAll('[data-record-type]').forEach(function (row) {
-    row.addEventListener('click', function () {
-      var type = row.getAttribute('data-record-type');
-      var file = row.getAttribute('data-record-file');
-      if (!type || !file) return;
-      var spinner = document.getElementById('panel-spinner');
-      var body = document.getElementById('panel-body');
-      var panel = document.getElementById('panel');
-      var closeBtn = document.getElementById('panel-close');
-      if (!panel || !body) return;
-      if (spinner) { spinner.className = 'visible'; }
-      body.style.display = 'none';
-      panel.classList.add('open');
-      document.body.classList.add('panel-open');
-      if (closeBtn) { closeBtn.focus(); }
-      fetch('/dashboard/record?type=' + encodeURIComponent(type) + '&file=' + encodeURIComponent(file))
-        .then(function (r) {
-          if (!r.ok) { return Promise.reject(r.status); }
-          return r.text();
-        })
-        .then(function (text) {
-          if (spinner) { spinner.className = ''; }
-          body.style.display = '';
-          var pre = document.createElement('pre');
-          pre.style.cssText = 'white-space:pre-wrap;font-family:\\'JetBrains Mono\\',monospace;font-size:12px;color:#f0f0f0;line-height:1.5';
-          pre.textContent = text;
-          body.innerHTML = '';
-          body.appendChild(pre);
-        })
-        .catch(function (status) {
-          if (spinner) { spinner.className = ''; }
-          body.style.display = '';
-          body.textContent = status === 404 ? 'Record not found.' : 'Could not load record. Check your connection and try again.';
-        });
-    });
-  });
-})();
-</script>`;
-  assert(html.length > 0, 'injectPanelScript: html must not be empty');
+  assert(html.length > 0, 'injectReloadScript: html must not be empty');
   return html;
 }
 
@@ -149,7 +70,7 @@ function arcGauge(pct: number, color: string, label: string, id: string): string
   }
   const trackEnd = startAngle + sweepAngle;
   const arcLen = (sweepAngle / 360) * 2 * Math.PI * r;
-  return `<svg id="${id}" viewBox="0 0 140 120" xmlns="http://www.w3.org/2000/svg" style="width:140px;height:120px" data-pct="${clamp(pct, 0, 100)}" data-color="${color}" data-arclen="${arcLen.toFixed(2)}">
+  return `<svg id="${id}" viewBox="0 0 140 120" style="width:140px;height:120px" data-pct="${clamp(pct, 0, 100)}" data-color="${color}" data-arclen="${arcLen.toFixed(2)}">
     <path d="${arc(startAngle, trackEnd, r)}" fill="none" stroke="#2a2a2a" stroke-width="10" stroke-linecap="round"/>
     <path class="gauge-fill" d="${arc(startAngle, trackEnd, r)}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="0 ${arcLen.toFixed(2)}" style="transition:stroke-dasharray 1.2s cubic-bezier(.4,0,.2,1)"/>
     <text class="gauge-val" x="${cx}" y="${cy - 4}" text-anchor="middle" fill="white" font-family="'JetBrains Mono',monospace" font-size="20" font-weight="700">0%</text>
@@ -163,7 +84,7 @@ function arcGauge(pct: number, color: string, label: string, id: string): string
  * trend, so it is drawn as a flat line rather than reported as "no data".
  */
 function sparkline(counts: number[], color: string, id: string): string {
-  if (counts.length === 0) return `<svg viewBox="0 0 160 40" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:160px;height:40px"><text x="80" y="24" text-anchor="middle" fill="#444" font-size="10">no data</text></svg>`;
+  if (counts.length === 0) return `<svg viewBox="0 0 160 40" style="width:100%;max-width:160px;height:40px"><text x="80" y="24" text-anchor="middle" fill="#444" font-size="10">no data</text></svg>`;
   const values = counts.length === 1 ? [counts[0]!, counts[0]!] : counts;
   const max = Math.max(...values); const min = Math.min(...values); const range = max - min || 1;
   const w = 160; const h = 40; const pad = 4;
@@ -175,7 +96,7 @@ function sparkline(counts: number[], color: string, id: string): string {
   });
   const lastPt = pts[pts.length - 1]!.split(',');
   const pathLen = (w - pad * 2) * 1.2;
-  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${w}px;height:${h}px">
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px;height:${h}px">
     <polyline id="${id}" points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-dasharray="${pathLen}" stroke-dashoffset="${pathLen}" style="transition:stroke-dashoffset 1.4s ease-out"/>
     <circle class="spark-dot" cx="${lastPt[0]}" cy="${lastPt[1]}" r="3" fill="${color}" opacity="0"/>
   </svg>`;
@@ -196,7 +117,7 @@ function sessionBarChart(items: DashboardItem[]): string {
     <rect class="bar-rect" x="${labelW}" y="${y}" width="0" height="${barH}" rx="2" fill="#00D2BE" opacity="0.85" data-w="${targetW.toFixed(1)}" style="transition:width .8s cubic-bezier(.4,0,.2,1)"/>
     <text class="bar-val" x="${labelW + 4}" y="${y + barH - 4}" fill="#00D2BE" font-family="'JetBrains Mono',monospace" font-size="9" opacity="0">${val}</text>`;
   }).join('\n    ');
-  return `<svg id="bar-chart" viewBox="0 0 ${labelW + chartW + 32} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${labelW + chartW + 32}px;height:${svgH}px">${bars}</svg>`;
+  return `<svg id="bar-chart" viewBox="0 0 ${labelW + chartW + 32} ${svgH}" style="width:100%;max-width:${labelW + chartW + 32}px;height:${svgH}px">${bars}</svg>`;
 }
 
 /**
@@ -1114,7 +1035,7 @@ function buildPanelBodyStyles(): string {
 `;
 }
 
-/** Footer, empty state, SSE connection status, panel spinner, and mobile overlay breakpoints. */
+/** Footer, empty state, page status, panel spinner, and mobile overlay breakpoints. */
 function buildMiscStyles(): string {
   return `  /* ── Footer ──────────────────────────────────────────────────────────── */
   .footer { background: var(--surf); border-top: 1px solid var(--border); padding: .5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; transition: margin-right .35s cubic-bezier(.4,0,.2,1) }
@@ -1128,10 +1049,8 @@ function buildMiscStyles(): string {
   .empty-heading { font-family: var(--mono); font-size: .9rem; color: var(--teal); letter-spacing: .14em; margin-bottom: .6rem }
   .empty-sub     { font-family: var(--mono); font-size: .7rem; color: var(--dim); letter-spacing: .06em }
 
-  /* ── SSE connection status ───────────────────────────────────────────── */
-  #connection-status { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .06em; margin-left: .75rem }
-  #connection-status.live { color: var(--teal) }
-  #connection-status.error { color: var(--red) }
+  /* Page status */
+  #page-status { font-family: var(--mono); font-size: .6rem; color: var(--dim); letter-spacing: .06em; margin-left: .75rem }
 
   /* ── Panel spinner ───────────────────────────────────────────────────── */
   #panel-spinner { display: none; padding: 1rem; text-align: center }
@@ -1190,8 +1109,8 @@ function buildDashboardHeader(data: DashboardResult): string {
       <div class="header-logo">TOTO WOLFF</div>
       <div class="header-sub">PADDOCK INTERFACE &nbsp;·&nbsp; BRACKLEY HQ</div>
     </div>
-    <span class="header-badge">LIVE</span>
-    <span id="connection-status" aria-live="polite"></span>
+    <span class="header-badge">AUTO-REFRESH</span>
+    <span id="page-status">snapshot ${esc(data.generatedAt)}</span>
   </div>
   <div>
     <div class="header-ts">GENERATED &nbsp;<span class="val">${esc(data.generatedAt)}</span></div>
@@ -1350,8 +1269,7 @@ ${buildDetailPanelAside()}
 ${buildDashboardFooter(data)}
 
 ${buildDashboardClientScript(jsonData)}
-${injectSseScript('/dashboard/events')}
-${injectPanelScript()}
+${injectReloadScript()}
 </body>
 </html>`;
 }

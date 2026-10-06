@@ -1,7 +1,7 @@
 // The MCP request layer: built-in methods plus a fixed tool registry, served
 // in two eras. A request whose params._meta carries the 2026-07-28 keys is
 // served statelessly (mcp/modern.mts); every other request gets the 2025-11-25
-// handshake behavior. createServer validates the tools once and returns a line
+// handshake behavior. createLineHandler validates the tools once and returns a line
 // handler; it keeps no state between requests.
 import assert from 'node:assert/strict';
 import process from 'node:process';
@@ -87,7 +87,7 @@ function toolArguments(params: Record<string, unknown>): Record<string, unknown>
   return args;
 }
 
-// Runs one tool. Its own RpcErrors pass through; anything else is logged by
+// Runs one tool. Its own RpcErrors are rethrown unchanged; anything else is logged by
 // tool name only (never its arguments) and becomes INTERNAL_ERROR.
 async function callTool(registry: ReadonlyMap<string, Tool>, params: unknown): Promise<Message> {
   if (!isRecord(params) || typeof params.name !== 'string') {
@@ -189,7 +189,7 @@ async function handleOne(eras: Eras, value: unknown): Promise<Message | null> {
 }
 
 // Returns the handler for input lines. A null result means no reply is owed.
-export function createServer(tools: readonly Tool[]): LineHandler {
+export function createLineHandler(tools: readonly Tool[]): LineHandler {
   const registry = buildRegistry(tools);
   const eras: Eras = { legacy: buildMethods(registry), modern: buildModernMethods(registry) };
   assert.ok(eras.legacy.has('tools/call') && eras.modern.has('tools/call'), 'tools/call is served in both eras');

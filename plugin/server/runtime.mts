@@ -19,24 +19,27 @@ export interface Runtime {
   // The project the graph tools keep runs in, resolved on each call so the
   // other tools never depend on it (Arbiter condition 8).
   projectDir(): string;
+  // Set once dashboard_status has written the page file; from then on each
+  // vault_write refreshes it.
+  markPageWritten(): void;
+  pageWritten(): boolean;
 }
 
-// The server's settings are the values the user chose in the plugin's
-// userConfig, which plugin.json passes in the server's env block; it reads
-// no other variable the user has set.
-export type ServerConfig = Partial<Record<'vault' | 'project' | 'port', string>>;
-const SETTINGS: Readonly<Record<keyof ServerConfig, string>> = { vault: 'TOTO_WOLFF_VAULT', project: 'TOTO_WOLFF_PROJECT', port: 'TOTO_WOLFF_PORT' };
+// The server's two settings: the vault folder the user chose in the plugin's
+// userConfig and the project folder, both passed in plugin.json's env block.
+export type ServerConfig = Partial<Record<'vault' | 'project', string>>;
+const SETTINGS: Readonly<Record<keyof ServerConfig, string>> = { vault: 'TOTO_WOLFF_VAULT', project: 'TOTO_WOLFF_PROJECT' };
 
-/** The settings in `env`; an empty, unsubstituted or "0" (no dashboard) value is left out. */
+/** The settings in `env`; an empty or unsubstituted value is left out. */
 export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
   const config: ServerConfig = {};
-  // LOOP BOUND: the three settings.
+  // LOOP BOUND: the two settings.
   for (const [setting, name] of Object.entries(SETTINGS) as [keyof ServerConfig, string][]) {
     const value = env[name];
-    if (value === undefined || value === '' || value.includes('${') || (setting === 'port' && value === '0')) continue;
+    if (value === undefined || value === '' || value.includes('${')) continue;
     config[setting] = value;
   }
-  assert.ok(Object.keys(config).length <= 3, 'at most the three settings');
+  assert.ok(Object.keys(config).length <= 2, 'at most the two settings');
   return config;
 }
 
@@ -78,6 +81,7 @@ export function createRuntime(env: ServerConfig): Runtime {
     },
   };
   let drs: DRSService | null = null;
+  let pageWritten = false;
   const runtime: Runtime = {
     vaultPath,
     vault,
@@ -85,6 +89,10 @@ export function createRuntime(env: ServerConfig): Runtime {
     drs: () => (drs ??= new DRSService(join(resolveProjectDir(env, process.cwd()), '.toto', 'drs-config.json'), auditVault)),
     subagents: new SubagentService(),
     projectDir: () => resolveProjectDir(env, process.cwd()),
+    markPageWritten: () => {
+      pageWritten = true;
+    },
+    pageWritten: () => pageWritten,
   };
   assert.ok(isAbsolute(runtime.vaultPath), 'the runtime holds an absolute vault path');
   return runtime;

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createServer } from '../../plugin/server/mcp/server.mts';
+import { createLineHandler } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler } from '../../plugin/server/mcp/server.mts';
 import { getCachedVault } from '../../plugin/server/handlers/vault_cache.mts';
 import { createRuntime } from '../../plugin/server/runtime.mts';
@@ -52,7 +52,7 @@ beforeAll(() => {
   for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']) delete process.env[key];
   mkdirSync(join(root, 'project', '.toto'), { recursive: true });
   writeFileSync(join(root, 'project', '.toto', 'drs-config.json'), JSON.stringify({ allowed_paths: ['src/'], tenant_namespaces: [], current_tenant: '', halt_patterns: [] }));
-  handle = createServer(createTools(createRuntime({ vault, project: join(root, 'project') })));
+  handle = createLineHandler(createTools(createRuntime({ vault, project: join(root, 'project') })));
 });
 
 afterAll(() => {
@@ -105,6 +105,13 @@ describe('the six tools in both eras', () => {
       expect(reply.result?.['content'], `${name} modern=${String(modern)}`).toBeDefined();
       expect(reply.result?.['resultType']).toBe(modern ? 'complete' : undefined);
     }
+  });
+
+  it('dashboard_status returns the vault stats plus the page file it wrote', async () => {
+    const out = (await result('dashboard_status', {})) as Record<string, unknown>;
+    expect(Object.keys(out)).toEqual(['councilSessions', 'p10Plans', 'cabinetSessions', 'safetyCarReports', 'karpathyChecks', 'drsEvents', 'subagentLists', 'blockedItems', 'generatedAt', 'page']);
+    expect(out['page']).toBe(join(vault, '.toto-wolff', 'dashboard.html'));
+    expect(existsSync(join(vault, '.toto-wolff', 'dashboard.html'))).toBe(true);
   });
 
   it.each([

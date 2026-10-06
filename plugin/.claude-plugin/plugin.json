@@ -34,7 +34,6 @@
       ],
       "env": {
         "TOTO_WOLFF_VAULT": "${user_config.vault_path}",
-        "TOTO_WOLFF_PORT": "${user_config.dashboard_port}",
         "TOTO_WOLFF_PROJECT": "${CLAUDE_PROJECT_DIR}"
       }
     }
@@ -43,16 +42,8 @@
     "vault_path": {
       "type": "directory",
       "title": "Vault folder",
-      "description": "Absolute path of the folder toto-wolff keeps its records in (1.x used ~/.toto/vault).",
+      "description": "Absolute path of the folder toto-wolff keeps its records in.",
       "required": true
-    },
-    "dashboard_port": {
-      "type": "number",
-      "title": "Dashboard port",
-      "description": "Port for the local dashboard on 127.0.0.1, or 0 for no dashboard.",
-      "default": 0,
-      "min": 0,
-      "max": 65535
     }
   }
 }

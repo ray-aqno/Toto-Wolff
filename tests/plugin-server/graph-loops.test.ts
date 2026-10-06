@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createServer } from '../../plugin/server/mcp/server.mts';
+import { createLineHandler } from '../../plugin/server/mcp/server.mts';
 import type { LineHandler } from '../../plugin/server/mcp/server.mts';
 import { createRuntime } from '../../plugin/server/runtime.mts';
 import { createTools } from '../../plugin/server/tools/index.mts';
@@ -46,7 +46,7 @@ beforeAll(() => {
   mkdirSync(join(project, '.toto', 'graphs'), { recursive: true });
   writeFileSync(join(project, '.toto', 'graphs', 'loop3.json'), JSON.stringify(loopGraph('loop3')));
   writeFileSync(join(project, '.toto', 'graphs', 'loop1.json'), JSON.stringify(loopGraph('loop1', 1)));
-  handle = createServer(createTools(createRuntime({ vault: join(project, 'vault'), project })));
+  handle = createLineHandler(createTools(createRuntime({ vault: join(project, 'vault'), project })));
 });
 
 afterAll(() => {

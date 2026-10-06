@@ -85,7 +85,7 @@ function isReady(state: RunState, nodeId: string, preds: ReadonlyMap<string, str
 // fixed point. Returns the newly skipped ids in node order.
 function propagateSkips(state: RunState, preds: ReadonlyMap<string, string[]>): string[] {
   const skipped: string[] = [];
-  // LOOP BOUND: at most MAX_NODES passes (each pass that changes anything skips >= 1 node).
+  // LOOP BOUND: at most MAX_NODES rounds (each round that changes anything skips >= 1 node).
   for (let round = 0; round < MAX_NODES; round++) {
     let changed = false;
     // LOOP BOUND: at most MAX_NODES nodes.

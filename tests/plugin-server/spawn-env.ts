@@ -19,13 +19,13 @@ export function isolatedEnv(extra: Record<string, string> = {}): NodeJS.ProcessE
   return env;
 }
 
-// The server's settings, as plugin.json passes them in its env block: a fresh
-// temp vault, plus either of vault and project in `extra`.
-export function serverEnv(extra: Partial<Record<'vault' | 'project', string>> = {}): Record<string, string> {
+// The server's arguments, as plugin.json passes them: --vault with a fresh
+// temp vault (or extra.vault), and --project when extra.project is given.
+export function serverArgs(extra: Partial<Record<'vault' | 'project', string>> = {}): string[] {
   const dir = mkdtempSync(join(tmpdir(), 'toto-plugin-settings-'));
   created.push(dir);
   const config = { vault: join(dir, 'vault'), ...extra };
-  return Object.fromEntries(Object.entries(config).map(([name, value]) => [`TOTO_WOLFF_${name.toUpperCase()}`, value]));
+  return Object.entries(config).flatMap(([name, value]) => ['--' + name, value]);
 }
 
 export function removeIsolatedEnvs(): void {

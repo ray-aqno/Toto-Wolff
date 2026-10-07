@@ -30,12 +30,10 @@
     "toto-wolff": {
       "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/server/index.mts"
-      ],
-      "env": {
-        "TOTO_WOLFF_VAULT": "${user_config.vault_path}",
-        "TOTO_WOLFF_PROJECT": "${CLAUDE_PROJECT_DIR}"
-      }
+        "${CLAUDE_PLUGIN_ROOT}/server/index.mts",
+        "--vault",
+        "${user_config.vault_path}"
+      ]
     }
   },
   "userConfig": {

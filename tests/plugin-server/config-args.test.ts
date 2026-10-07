@@ -1,12 +1,12 @@
-// The server's settings come from its env block, which plugin.json fills from
-// userConfig and ${CLAUDE_PROJECT_DIR}; no other variable is read.
+// The server's settings come from its arguments (plugin.json passes
+// --vault ${user_config.vault_path}); it reads no environment variables.
 import { spawn } from 'node:child_process';
 import { connect, createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { configFromEnv, resolveVaultPath } from '../../plugin/server/runtime.mts';
-import { isolatedEnv, removeIsolatedEnvs, serverEnv } from './spawn-env.ts';
+import { configFromArgs, resolveVaultPath } from '../../plugin/server/runtime.mts';
+import { isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 
@@ -34,13 +34,19 @@ function accepts(port: number): Promise<boolean> {
   });
 }
 
-describe('configFromEnv', () => {
-  it('reads the two plugin settings and nothing else', () => {
-    expect(configFromEnv({ TOTO_WOLFF_VAULT: '/v', TOTO_WOLFF_PROJECT: '/p', TOTO_WOLFF_PORT: '3099', TOTO_VAULT_PATH: '/old', HOME: '/h' })).toEqual({ vault: '/v', project: '/p' });
+describe('configFromArgs', () => {
+  it('reads --vault and --project', () => {
+    expect(configFromArgs(['--vault', '/v', '--project', '/p'])).toEqual({ vault: '/v', project: '/p' });
   });
 
   it('leaves out empty values and unsubstituted references', () => {
-    expect(configFromEnv({ TOTO_WOLFF_VAULT: '', TOTO_WOLFF_PROJECT: '${CLAUDE_PROJECT_DIR}' })).toEqual({});
+    expect(configFromArgs(['--vault', '', '--project', '${CLAUDE_PROJECT_DIR}'])).toEqual({});
+    expect(configFromArgs(['--vault', '${user_config.vault_path}'])).toEqual({});
+  });
+
+  it('refuses an unknown flag or a flag without a value', () => {
+    expect(() => configFromArgs(['--port', '3099'])).toThrow('unknown argument: --port');
+    expect(() => configFromArgs(['--vault'])).toThrow('unknown argument: --vault');
   });
 });
 
@@ -51,12 +57,12 @@ describe('resolveVaultPath', () => {
   });
 });
 
-describe('a stray TOTO_WOLFF_PORT (the removed dashboard_port setting)', () => {
+describe('the environment is never read', () => {
   afterAll(removeIsolatedEnvs);
 
-  it('is ignored: the server answers over stdio and no listener starts', async () => {
+  it('ignores a stray TOTO_WOLFF_PORT: the server answers over stdio and no listener starts', async () => {
     const port = await freePort();
-    const child = spawn(process.execPath, [ENTRY], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv({ ...serverEnv(), TOTO_WOLFF_PORT: String(port) }) });
+    const child = spawn(process.execPath, [ENTRY, ...serverArgs()], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv({ TOTO_WOLFF_PORT: String(port) }) });
     let out = '';
     let err = '';
     child.stdout.on('data', (d: Buffer) => (out += d.toString('utf8')));
@@ -70,5 +76,15 @@ describe('a stray TOTO_WOLFF_PORT (the removed dashboard_port setting)', () => {
     child.stdin.end();
     expect(await exited).toBe(0);
     expect(err).toBe('');
+  }, 20_000);
+
+  it('ignores TOTO_WOLFF_VAULT: without --vault the server stops with one line', async () => {
+    const child = spawn(process.execPath, [ENTRY], { stdio: ['pipe', 'pipe', 'pipe'], env: isolatedEnv({ TOTO_WOLFF_VAULT: '/tmp/toto-wolff-env-vault' }) });
+    let err = '';
+    child.stderr.on('data', (d: Buffer) => (err += d.toString('utf8')));
+    const exited = new Promise<number | null>((done) => child.on('exit', done));
+    child.stdin.end();
+    expect(await exited).not.toBe(0);
+    expect(err).toContain('no vault folder');
   }, 20_000);
 });

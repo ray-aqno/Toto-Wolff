@@ -21,18 +21,25 @@ export interface Runtime {
   projectDir(): string;
 }
 
-// The server's two settings: the vault folder the user chose in the plugin's
-// userConfig and the project folder, both passed in plugin.json's env block.
-export type ServerConfig = Partial<Record<'vault' | 'project', string>>;
-const SETTINGS: Readonly<Record<keyof ServerConfig, string>> = { vault: 'TOTO_WOLFF_VAULT', project: 'TOTO_WOLFF_PROJECT' };
 
-/** The settings in `env`; an empty or unsubstituted value is left out. */
-export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
+// The server's settings come from its own arguments: plugin.json passes the
+// vault folder the user chose in the plugin's userConfig as --vault. The
+// project is the working directory Claude Code starts the server in (--project
+// overrides it, for tests). The server reads no environment variables.
+export type ServerConfig = Partial<Record<'vault' | 'project', string>>;
+const FLAGS: Readonly<Record<string, keyof ServerConfig>> = { '--vault': 'vault', '--project': 'project' };
+const MAX_ARGS = 8;
+
+/** The settings in `argv`; an empty or unsubstituted value is left out. */
+export function configFromArgs(argv: readonly string[]): ServerConfig {
+  if (argv.length > MAX_ARGS) throw new Error('at most ' + String(MAX_ARGS) + ' arguments');
   const config: ServerConfig = {};
-  // LOOP BOUND: the two settings.
-  for (const [setting, name] of Object.entries(SETTINGS) as [keyof ServerConfig, string][]) {
-    const value = env[name];
-    if (value === undefined || value === '' || value.includes('${')) continue;
+  // LOOP BOUND: at most MAX_ARGS / 2 flag and value pairs.
+  for (let i = 0; i < argv.length; i += 2) {
+    const setting = FLAGS[argv[i] ?? ''];
+    const value = argv[i + 1];
+    if (setting === undefined || value === undefined) throw new Error('unknown argument: ' + (argv[i] ?? '').slice(0, 40));
+    if (value === '' || value.includes('${')) continue;
     config[setting] = value;
   }
   assert.ok(Object.keys(config).length <= 2, 'at most the two settings');

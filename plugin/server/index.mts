@@ -6,18 +6,14 @@
 import process from 'node:process';
 import { createLineHandler } from './mcp/server.mts';
 import { runStdio } from './mcp/stdio.mts';
-import { configFromEnv, createRuntime } from './runtime.mts';
+import { configFromArgs, createRuntime } from './runtime.mts';
 import { createTools } from './tools/index.mts';
 import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 
 // Builds the tools inside the promise, so a missing or bad vault folder is one
 // stderr line. The process exits when stdin ends, with its client.
 async function start(): Promise<void> {
-  // Only the plugin's two settings (plugin.json's env block), by name.
-  const env = configFromEnv({
-    TOTO_WOLFF_VAULT: process.env['TOTO_WOLFF_VAULT'],
-    TOTO_WOLFF_PROJECT: process.env['TOTO_WOLFF_PROJECT'],
-  });
+  const env = configFromArgs(process.argv.slice(2));
   await runStdio(createLineHandler(createTools(createRuntime(env))));
 }
 

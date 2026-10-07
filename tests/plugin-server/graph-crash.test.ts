@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { isolatedEnv, removeIsolatedEnvs, serverEnv } from './spawn-env.ts';
+import { isolatedEnv, removeIsolatedEnvs, serverArgs } from './spawn-env.ts';
 
 const ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), '../../plugin/server/index.mts');
 const GRAPH = {
@@ -28,7 +28,7 @@ class Server {
   private id = 0;
 
   constructor() {
-    this.child = spawn(process.execPath, [ENTRY], { env: isolatedEnv(serverEnv({ project })) });
+    this.child = spawn(process.execPath, [ENTRY, ...serverArgs({ project })], { env: isolatedEnv() });
     this.child.stdout.on('data', (d: Buffer) => (this.out += d.toString('utf8')));
   }
 

@@ -264,11 +264,14 @@ jobs:
             echo "::error::installed manifest's mcpServers.toto-wolff.command is '$COMMAND', expected 'node': the launch mechanism regressed to a shell wrapper"
             exit 1
           fi
+          # Claude Code fills ${user_config.vault_path} from the plugin's
+          # Vault folder setting; a temp folder stands in for it here.
+          VAULT_DIR=$(mktemp -d)
           ARGS=()
           while IFS= read -r arg; do
             ARGS+=("$arg")
-          done < <(jq -r --arg root "$CACHE_DIR" \
-            '.mcpServers["toto-wolff"].args[] | gsub("\\$\\{CLAUDE_PLUGIN_ROOT\\}"; $root)' \
+          done < <(jq -r --arg root "$CACHE_DIR" --arg vault "$VAULT_DIR" \
+            '.mcpServers["toto-wolff"].args[] | gsub("\\$\\{CLAUDE_PLUGIN_ROOT\\}"; $root) | gsub("\\$\\{user_config\\.vault_path\\}"; $vault)' \
             "$CACHE_DIR/.claude-plugin/plugin.json")
           RESOLVED_ARGS_PATH="${ARGS[0]:-}"
           if [ -z "$RESOLVED_ARGS_PATH" ] || [ "$RESOLVED_ARGS_PATH" = "null" ] || [ ! -f "$RESOLVED_ARGS_PATH" ]; then

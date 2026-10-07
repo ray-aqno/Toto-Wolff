@@ -21,8 +21,8 @@ const NODE_STATES: readonly NodeState[] = ['pending', 'done', 'skipped', 'failed
 const RUN_STATUSES: readonly RunStatus[] = ['running', 'awaiting_approval', 'stopped_at_target', 'done', 'failed'];
 
 /** The configured project folder when it is absolute, else the working directory (Safety Car S7). */
-export function resolveProjectDir(env: ServerConfig, cwd: string): string {
-  const fromEnv = env['project'];
+export function resolveProjectDir(settings: ServerConfig, cwd: string): string {
+  const fromEnv = settings['project'];
   const dir = fromEnv !== undefined && isAbsolute(fromEnv) ? fromEnv : cwd;
   assert.ok(isAbsolute(dir), 'the working directory is absolute');
   assert.ok(dir.length > 0, 'the project directory is not empty');

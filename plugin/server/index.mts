@@ -13,8 +13,8 @@ import { NODE_VERSION_MESSAGE, checkNodeVersion } from './version.mts';
 // Builds the tools inside the promise, so a missing or bad vault folder is one
 // stderr line. The process exits when stdin ends, with its client.
 async function start(): Promise<void> {
-  const env = configFromArgs(process.argv.slice(2));
-  await runStdio(createLineHandler(createTools(createRuntime(env))));
+  const settings = configFromArgs(process.argv.slice(2));
+  await runStdio(createLineHandler(createTools(createRuntime(settings))));
 }
 
 if (checkNodeVersion(process.versions.node)) {

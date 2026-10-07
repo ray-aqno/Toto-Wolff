@@ -47,8 +47,8 @@ export function configFromArgs(argv: readonly string[]): ServerConfig {
 }
 
 /** The configured vault folder (userConfig vault_path); it must be absolute. */
-export function resolveVaultPath(env: ServerConfig): string {
-  const vaultPath = env['vault'];
+export function resolveVaultPath(settings: ServerConfig): string {
+  const vaultPath = settings['vault'];
   if (vaultPath === undefined) throw new Error('no vault folder: set it in /plugin > toto-wolff > Configure (Vault folder)');
   assert.ok(isAbsolute(vaultPath), 'the vault folder must be an absolute path');
   assert.ok(vaultPath.length > 1, 'the vault path is not the filesystem root');
@@ -70,8 +70,8 @@ export async function drainQuietly(vault: VaultService): Promise<void> {
   }
 }
 
-export function createRuntime(env: ServerConfig): Runtime {
-  const vaultPath = resolveVaultPath(env);
+export function createRuntime(settings: ServerConfig): Runtime {
+  const vaultPath = resolveVaultPath(settings);
   const vault = (): Promise<VaultService> => getCachedVault(vaultPath);
   // DRS override audit records: a rejected write reaches DRSService (the
   // override is then refused); only the commit after it is best effort.
@@ -88,9 +88,9 @@ export function createRuntime(env: ServerConfig): Runtime {
     vaultPath,
     vault,
     // DRS reads the project's .toto/drs-config.json.
-    drs: () => (drs ??= new DRSService(join(resolveProjectDir(env, process.cwd()), '.toto', 'drs-config.json'), auditVault)),
+    drs: () => (drs ??= new DRSService(join(resolveProjectDir(settings, process.cwd()), '.toto', 'drs-config.json'), auditVault)),
     subagents: new SubagentService(),
-    projectDir: () => resolveProjectDir(env, process.cwd()),
+    projectDir: () => resolveProjectDir(settings, process.cwd()),
   };
   assert.ok(isAbsolute(runtime.vaultPath), 'the runtime holds an absolute vault path');
   return runtime;

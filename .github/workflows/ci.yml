@@ -204,6 +204,16 @@ jobs:
 
       - name: Install the plugin fresh (simulates a real marketplace install from the committed plugin/ folder, no build step)
         run: |
+          set -euo pipefail
+          # The plugin requires its Vault folder setting; a user sets it in
+          # /plugin > Configure, which stores it here. A temp folder stands in.
+          VAULT_DIR=$(mktemp -d)
+          echo "VAULT_DIR=$VAULT_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.claude"
+          SETTINGS="$HOME/.claude/settings.json"
+          [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+          jq --arg v "$VAULT_DIR" '.pluginConfigs["toto-wolff@toto-wolff"].options.vault_path = $v' "$SETTINGS" > "$SETTINGS.tmp"
+          mv "$SETTINGS.tmp" "$SETTINGS"
           claude plugin marketplace add "$(pwd)"
           claude plugin install toto-wolff@toto-wolff
 
@@ -265,8 +275,7 @@ jobs:
             exit 1
           fi
           # Claude Code fills ${user_config.vault_path} from the plugin's
-          # Vault folder setting; a temp folder stands in for it here.
-          VAULT_DIR=$(mktemp -d)
+          # Vault folder setting (VAULT_DIR, set at install above).
           ARGS=()
           while IFS= read -r arg; do
             ARGS+=("$arg")

@@ -58,6 +58,14 @@ TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
 
 **Upgrading to 1.5.0:** DRS Rule 2 (out-of-scope write) now fails closed. An empty `allowed_paths` used to mean "no restriction" and now means "nothing allowed", so an existing install relying on that must either list its allowed paths or set `permissive: true` in `.toto/config.yml`'s `drs:` block to keep the old behavior. Run `pnpm generate:drs-config` from the repository root after changing the config: DRS reads the generated `.toto/drs-config.json`, not the YAML directly, so an edit to `config.yml` alone leaves writes blocked. See the CHANGELOG for details.
 
+**Upgrading to 2.0.0:** the plugin is now a dependency-free MCP server and a state engine for task graphs; Claude runs every step, so the server makes no model calls. What changes for a 1.6 install:
+- **Where it installs from.** A marketplace install (`claude plugin marketplace add ray-aqno/Toto-Wolff`) keeps working and updates from `main`'s `plugin/` folder: run `claude plugin marketplace update toto-wolff`, then update or reinstall the plugin. The Claude plugin directory installs from branch `plugin`, which the publish workflow fills from each release tag.
+- **No credentials.** The API key, auth token and base URL settings are gone (no `userConfig`, no `ANTHROPIC_*` needed). You can remove them from your plugin settings.
+- **Five tools are gone:** `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run` and `karpathy_check`. Their skills (`/llm-council`, `/p10`, `/the-cabinet`, `/safety-car`, `/karpathy`) still run those workflows, through Claude.
+- **Node 24** is required; on Node 22.18 to 23.x the server stops with one line, and older Node cannot load it.
+- **The six other tools** stay, with changes: the dashboard is off unless `TOTO_MCP_PORT` is set, `vault_search` matches literal text and returns `{ results, truncated }`, and `vault_write` takes `{ path, content }`.
+- **New:** task graphs (`graph_*` tools), the built-in `idea-to-pr` graph, and the `graph-run` skill. See `plugin/README.md` and the CHANGELOG.
+
 **Upgrading to 1.6.0:** the MCP server now refuses an `ANTHROPIC_AUTH_TOKEN` that has no base URL from the same place (the shell, `/plugin configure`, or `~/.claude.json`), instead of sending that gateway token to Anthropic's public endpoint. If the server stops starting after the upgrade, set the matching `ANTHROPIC_BASE_URL` (or `anthropic_base_url` in the plugin settings) next to the token, or switch to an API key. Setting both a key and a token in the same place now also stops the server; keep only one. See the CHANGELOG for details.
 
 **New to the terminology?** See [Concepts](#concepts) below for plain-English definitions of everything you'll encounter.

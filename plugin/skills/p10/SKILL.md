@@ -94,18 +94,9 @@ Execution agent reads Obsidian draft — status: approved required to proceed
 
 ## Step 0 — Config Resolution
 
-Resolve `vaultPath` and this skill's log/plan directory before doing anything else. Same 4-step order in every skill this plugin bundles (p10, llm-council, the-cabinet) — do not deviate, this consistency is what keeps the lookup unambiguous:
+The vault folder is `${user_config.vault_path}` (the plugin's Vault folder setting). If this line still shows the placeholder, ask the user once for the vault folder and use their answer for this session; do not write it anywhere.
 
-1. `TOTO_VAULT_PATH` env var, if set — always wins.
-2. `<plugin-root>/settings.local.json`, if the plugin was installed via `claude plugin add` and the file exists.
-3. Global `~/.claude/CLAUDE.md` prose (the legacy convention — still honored, not removed).
-4. Hardcoded default (`~/.toto/vault`), if nothing above resolved.
-
-Print which source won (e.g. `resolved vaultPath from: env TOTO_VAULT_PATH`) before proceeding — this line is load-bearing, not cosmetic: without it, an env var silently shadowing a `settings.local.json` override becomes an invisible footgun.
-
-**First-run / no cached resolution beyond the hardcoded default:** if there's an interactive session (TTY available), ask the user for `vaultPath` (and this skill's log/plan dir, if it differs from the default) via `AskUserQuestion`, then write the answer to `<plugin-root>/settings.local.json` (source #2 above) so future runs skip the prompt. If writing fails (e.g. read-only plugin dir), use the answered value for this run only and warn that the prompt will repeat next time.
-
-**No interactive session available (headless, CI, scripted `claude plugin add`):** do NOT wait on `AskUserQuestion` — it has no path to a human here. Fall through to source #4 (hardcoded default) and emit a fail-loud stderr warning naming the exact remediation: `set TOTO_VAULT_PATH=<path> or create <plugin-root>/settings.local.json before running in a non-interactive environment`. Never proceed silently as if a value were confirmed when it wasn't.
+Below, `vaultPath` is that folder, and this skill's plan directory `p10.planDir` is `P10-Plans` inside it.
 
 ---
 
@@ -271,7 +262,7 @@ the block reason becomes the council input.
 
 ## Step 5 — Obsidian Commit (Haiku)
 
-Uses `vaultPath` and `p10.planDir` (default `P10-Plans`) resolved in Step 0.
+Uses `vaultPath` (the vault folder from Step 0) and `p10.planDir` (`P10-Plans`).
 
 **File:** `{vaultPath}/{p10.planDir}/YYYY-MM-DD-{task-slug}.md`
 
@@ -350,14 +341,14 @@ Scouts load the relevant section below at codebase scan time.
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion. No `eval`. Flatten promise chains with `async/await`. |
+| 1 — Control flow | No recursion. No runtime code evaluation. Flatten promise chains with `async/await`. |
 | 2 — Loop bounds | Every `for`/`while` must have a provable bound. Comment the max count. No unbounded `while(true)`. |
 | 3 — Memory | No unbounded data structure growth at runtime. Arrays and maps must have max-size guards. |
 | 4 — Function size | ≤ 60 lines. ESLint `max-lines-per-function` enforced. |
 | 5 — Assertions | `assert` from `node:assert` or typed invariant helper. Min 2 per function. Type guards that throw count. |
 | 6 — Scope | `const` over `let`. `let` over `var`. No `var`. Module-level state must be justified. |
 | 7 — Return values | No ignored Promise rejections. Every `await` in try/catch or `.catch()`. ESLint `@typescript-eslint/no-floating-promises`. |
-| 8 — Macros | No `eval`, no `Function()` constructor, no dynamic `require`. |
+| 8 — Macros | No evaluating strings as code, no functions built from strings, no module loading at runtime. |
 | 9 — Pointers | No `any` type. No unchecked type assertions (`as Type` without guard). |
 | 10 — Warnings | `tsc --strict --noEmit` clean. ESLint zero warnings. `"strict": true` in tsconfig. |
 
@@ -365,14 +356,14 @@ Scouts load the relevant section below at codebase scan time.
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion (or explicit `sys.setrecursionlimit` with documented bound). No `exec`. No dynamic `import` at runtime. |
+| 1 — Control flow | No recursion (or explicit `sys.setrecursionlimit` with documented bound). No running strings as code. No module loading at runtime. |
 | 2 — Loop bounds | All `while` loops must document max iteration count. `for` over iterables preferred — document expected max length. |
 | 3 — Memory | No unbounded list/dict growth. Use `collections.deque(maxlen=N)` for bounded queues. Document max size for all growing structures. |
 | 4 — Function size | ≤ 60 lines. `flake8 --max-function-length` enforced. |
 | 5 — Assertions | `assert` with descriptive messages. Min 2 per function. `isinstance` checks count. |
 | 6 — Scope | No module-level mutable state unless justified. No `global` without documentation. |
 | 7 — Return values | No ignored returns for functions that can fail. Never bare `except:`. All exceptions caught at appropriate boundary. |
-| 8 — Macros | No `exec`, no `eval`, no `__import__`. |
+| 8 — Macros | No evaluating or running strings as code, no module loading at runtime. |
 | 9 — Pointers | All parameters and returns must have type annotations. `mypy --strict` must pass. |
 | 10 — Warnings | `mypy --strict` clean. `flake8` zero warnings. `pylint` score ≥ 9.0. |
 

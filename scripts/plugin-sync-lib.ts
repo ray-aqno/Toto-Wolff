@@ -1,12 +1,13 @@
 /**
  * Shared logic for the plugin/ folder: the Claude Code plugin ships only
- * plugin/ (its manifest, copies of the skills it lists, and one minified MCP
- * server bundle), never the whole repository.
+ * plugin/ (its manifest, copies of the skills it lists, and the readable .mts
+ * MCP server under plugin/server/), never the whole repository.
  *
- * Sources of truth stay where contributors edit them: skills in
- * .claude/skills/<name>/, server code in packages/. plugin/ is a generated
- * artifact. sync-plugin.ts regenerates it; check-plugin-sync.ts proves the
- * committed copy matches a fresh regeneration, failing closed on any
+ * Skills keep their source of truth in .claude/skills/<name>/ and are copied
+ * into plugin/; the server's source of truth is plugin/server/ itself (Node
+ * runs it directly, so there is nothing to build). sync-plugin.ts regenerates
+ * the skill copies; check-plugin-sync.ts proves the committed folder has the
+ * allowed shape and matches its sources, failing closed on any
  * difference in bytes or exec bit, on missing or extra files, and on symlinks
  * (a symlink pointing outside the plugin folder ships dangling in an
  * installed copy, so none are allowed anywhere in plugin/).
@@ -30,7 +31,7 @@ import {
   rmSync,
   statSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,24 +40,55 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const PLUGIN_DIR = 'plugin';
 /** The plugin manifest, relative to the plugin folder. */
 export const MANIFEST_REL = join('.claude-plugin', 'plugin.json');
-/** The minified MCP server bundle, relative to the plugin folder. */
-export const BUNDLE_REL = join('server', 'index.mjs');
+/** The plugin's own README, the one other file allowed at the plugin root. */
+export const README_REL = 'README.md';
+/** The MCP server folder, relative to the plugin folder. Only .mts files may ship in it. */
+export const SERVER_DIR_REL = 'server';
+/** The MCP server entry Claude Code starts, relative to the plugin folder. */
+export const SERVER_ENTRY_REL = join(SERVER_DIR_REL, 'index.mts');
 /** Where the real skill files live, relative to the repo root. */
 export const SKILLS_SOURCE_DIR = join('.claude', 'skills');
 
-/** Upper bound on skills a manifest may list; the plugin ships 7 today. */
+/** Upper bound on skills a manifest may list; the plugin ships 8 today. */
 export const MAX_SKILLS = 16;
 /** Upper bound on files walked in any one tree; a skill has a handful. */
 export const MAX_FILES = 500;
 /** Upper bound on directory depth walked in any one tree. */
 export const MAX_DEPTH = 8;
-/** The plugin directory's text-inspection limit: a larger file cannot be reviewed. */
-export const MAX_FILE_BYTES = 1024 * 1024;
-/** The esbuild banner, which must appear exactly once (twice means the bundle was bundled again). */
-export const BUNDLE_BANNER = 'import { createRequire as __totoCreateRequire }';
+/** The directory's pre-submission limit: every plugin file must be under 256 KiB. */
+export const MAX_FILE_BYTES = 256 * 1024;
+/** The plugin icon, the one binary file allowed (its own source of truth). */
+export const ICON_REL = join('.claude-plugin', 'icon.png');
+/** The plugin's copy of the repository LICENSE, written by sync:plugin. */
+export const LICENSE_REL = 'LICENSE';
+/** Spec criterion 2's minified-file guard: no text line may be longer. */
+export const MAX_LINE_CHARS = 2000;
+/**
+ * Skill paths (relative to the skill folder, '/'-separated prefixes) that stay
+ * in the repository and are never copied into the plugin. drs/bin/ holds the
+ * repository's own PreToolUse hook script, which the plugin never registers;
+ * in the plugin, DRS runs through the drs_check tool.
+ */
+export const SKILL_EXCLUDES: Readonly<Record<string, readonly string[]>> = { drs: ['bin/'] };
+/** Spec criterion 2: no package manifest or lockfile may ship (exact names, so lock.mts is fine). */
+const FORBIDDEN_NAMES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb'];
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// A PNG's last chunk: zero length, "IEND", and its fixed CRC.
+const PNG_IEND = Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
 
-/** Build order: mcp-server's tsc consumes core's emitted .d.ts files, so core builds first. */
-export const PACKAGES = ['core', 'mcp-server'] as const;
+/**
+ * A whole PNG, not only its first bytes (PR #72 review): the signature, an
+ * IHDR chunk first with a non-zero width and height, and IEND last.
+ */
+export function isCompletePng(bytes: Buffer): boolean {
+  assert(Buffer.isBuffer(bytes), 'a byte buffer');
+  if (bytes.length < PNG_SIGNATURE.length + 25 + PNG_IEND.length) return false;
+  if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return false;
+  const ihdrOk = bytes.readUInt32BE(8) === 13 && bytes.toString('latin1', 12, 16) === 'IHDR' && bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0;
+  const complete = ihdrOk && bytes.subarray(bytes.length - PNG_IEND.length).equals(PNG_IEND);
+  assert(typeof complete === 'boolean', 'a yes or no');
+  return complete;
+}
 
 export type Result = { ok: true } | { ok: false; message: string };
 
@@ -170,14 +202,22 @@ function sha256Of(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
 }
 
+/** A skill source's files, minus the paths SKILL_EXCLUDES keeps in the repository. */
+export function skillSourceFiles(src: string): TreeEntry[] {
+  const excludes = SKILL_EXCLUDES[basename(src)] ?? [];
+  const files = listTree(src).filter((e) => !excludes.some((prefix) => e.rel.split(sep).join('/').startsWith(prefix)));
+  assert(files.length > 0, `skill has no files to ship: ${src}`);
+  return files;
+}
+
 /**
- * Replaces `dst` with a copy of `src`. copyFileSync keeps each file's mode,
+ * Replaces `dst` with a copy of `src`, minus its SKILL_EXCLUDES paths. copyFileSync keeps each file's mode,
  * so an exec bit survives; the closing diffTrees assertion fails the copy if
  * any file's bytes or exec bit did not (for example on a filesystem that
  * drops modes).
  */
 export function copySkill(root: string, src: string, dst: string): void {
-  const sourceFiles = listTree(src);
+  const sourceFiles = skillSourceFiles(src);
   removeTree(root, dst);
   // Bounded: listTree returns at most MAX_FILES entries.
   for (const entry of sourceFiles) {
@@ -209,32 +249,89 @@ export function diffTrees(expected: TreeEntry[], actual: TreeEntry[]): Finding[]
 }
 
 /**
- * Checks the plugin folder's shape: only the manifest, the bundle and the
- * listed skills may exist; no file may exceed MAX_FILE_BYTES; the bundle must
- * exist and carry the esbuild banner exactly once. Returns the problems found.
+ * Checks the plugin folder's shape: only the manifest, README.md, the listed
+ * skills and .mts files under server/ may exist; every file must be under MAX_FILE_BYTES;
+ * the server entry must exist. Symlinks already fail listTree. Returns the
+ * problems found.
  */
 export function checkPluginLayout(pluginRoot: string, skills: string[]): string[] {
   assert(isAbsolute(pluginRoot), `plugin root must be absolute: ${pluginRoot}`);
   assert(skills.length >= 1 && skills.length <= MAX_SKILLS, 'skill list out of range');
-  const allowedSkillDirs = new Set(skills.map((name) => join('skills', name)));
+  const allowedSkillDirs = skills.map((name) => join('skills', name) + sep);
   const problems: string[] = [];
   // Bounded: listTree returns at most MAX_FILES entries.
   for (const entry of listTree(pluginRoot)) {
-    const inSkill = [...allowedSkillDirs].some((d) => entry.rel.startsWith(d + sep));
-    if (entry.rel !== MANIFEST_REL && entry.rel !== BUNDLE_REL && !inSkill) {
-      problems.push(`not allowed in the plugin folder: ${entry.rel}`);
-    }
-    if (statSync(join(pluginRoot, entry.rel)).size > MAX_FILE_BYTES) {
-      problems.push(`over ${String(MAX_FILE_BYTES)} bytes (the directory cannot inspect it): ${entry.rel}`);
+    const problem = layoutProblem(entry.rel, allowedSkillDirs);
+    if (problem !== null) problems.push(problem);
+    problems.push(...contentProblems(pluginRoot, entry));
+    if (statSync(join(pluginRoot, entry.rel)).size >= MAX_FILE_BYTES) {
+      problems.push(`not under ${String(MAX_FILE_BYTES)} bytes (the directory's per-file limit): ${entry.rel}`);
     }
   }
-  const bundle = join(pluginRoot, BUNDLE_REL);
-  if (!existsSync(bundle)) {
-    problems.push(`missing bundle: ${BUNDLE_REL}`);
-  } else {
-    const banners = readFileSync(bundle, 'utf-8').split(BUNDLE_BANNER).length - 1;
-    if (banners !== 1) problems.push(`bundle has ${String(banners)} esbuild banners, expected exactly 1 (bundled twice?)`);
+  if (!existsSync(join(pluginRoot, SERVER_ENTRY_REL))) problems.push(`missing server entry: ${SERVER_ENTRY_REL}`);
+  return problems;
+}
+
+/** Why one plugin file is not allowed where it is, or null if it is fine. */
+function layoutProblem(rel: string, allowedSkillDirs: string[]): string | null {
+  assert(rel.length > 0, 'a plugin file has a path');
+  if (rel === MANIFEST_REL || rel === README_REL || rel === ICON_REL || rel === LICENSE_REL) return null;
+  if (allowedSkillDirs.some((dir) => rel.startsWith(dir))) return null;
+  if (rel.startsWith(SERVER_DIR_REL + sep)) {
+    return rel.endsWith('.mts') ? null : `only readable .mts files may ship under ${SERVER_DIR_REL}/: ${rel}`;
   }
+  return `not allowed in the plugin folder: ${rel}`;
+}
+
+/**
+ * Spec criterion 2 per file: no package manifest or lockfile (exact names)
+ * and no minified file anywhere; the icon must be a non-executable PNG and
+ * is the only file exempt from the line scan (by exact path).
+ */
+function contentProblems(pluginRoot: string, entry: TreeEntry): string[] {
+  assert(entry.rel.length > 0, 'a plugin file has a path');
+  const name = entry.rel.split(sep).pop() ?? '';
+  const problems: string[] = [];
+  if (FORBIDDEN_NAMES.includes(name)) problems.push(`no package manifest or lockfile may ship: ${entry.rel}`);
+  if (/\.min\./i.test(name)) problems.push(`no minified file may ship: ${entry.rel}`);
+  const bytes = readFileSync(join(pluginRoot, entry.rel));
+  if (entry.rel === ICON_REL) {
+    if (!isCompletePng(bytes)) problems.push(`not a complete PNG file: ${entry.rel}`);
+    if (entry.exec) problems.push(`the icon must not be executable: ${entry.rel}`);
+    return problems;
+  }
+  // Bounded: one pass over a file under MAX_FILE_BYTES.
+  const longest = bytes.toString('utf-8').split('\n').reduce((m, line) => Math.max(m, line.length), 0);
+  if (longest > MAX_LINE_CHARS) problems.push(`a line of ${String(longest)} characters looks minified (limit ${String(MAX_LINE_CHARS)}): ${entry.rel}`);
+  assert(problems.length <= 4, 'at most four problems per file');
+  return problems;
+}
+
+/** Writes the plugin's LICENSE as a byte copy of the repository root's. */
+export function syncLicense(root: string): void {
+  assert(isAbsolute(root), `root must be absolute: ${root}`);
+  const src = join(root, LICENSE_REL);
+  assert(existsSync(src), `missing ${src}`);
+  copyFileSync(src, assertUnderRoot(root, join(PLUGIN_DIR, LICENSE_REL)));
+  assert(readFileSync(src).equals(readFileSync(join(root, PLUGIN_DIR, LICENSE_REL))), 'the LICENSE copy matches');
+}
+
+/** The plugin's LICENSE must equal the root LICENSE; the icon must be 100644 in git's index. */
+export function checkLicenseAndIcon(root: string): string[] {
+  assert(isAbsolute(root), `root must be absolute: ${root}`);
+  const problems: string[] = [];
+  const copy = join(root, PLUGIN_DIR, LICENSE_REL);
+  if (!existsSync(copy) || !readFileSync(copy).equals(readFileSync(join(root, LICENSE_REL)))) {
+    problems.push(`${PLUGIN_DIR}/${LICENSE_REL} must be a byte copy of the root LICENSE`);
+  }
+  // The icon must exist (PR #72 review): a committed deletion has no index
+  // mode to check, and publishing would remove it from branch plugin.
+  if (!existsSync(join(root, PLUGIN_DIR, ICON_REL))) problems.push(`${PLUGIN_DIR}/${ICON_REL} is missing`);
+  // The index mode, not the filesystem's (exec bits on some mounts are synthetic).
+  const ls = spawnSync('git', ['ls-files', '-s', '--', join(PLUGIN_DIR, ICON_REL)], { cwd: root, encoding: 'utf-8' });
+  const mode = ls.status === 0 ? ls.stdout.trim().split(/\s+/)[0] : undefined;
+  if (mode !== undefined && mode !== '' && mode !== '100644') problems.push(`${PLUGIN_DIR}/${ICON_REL} must be mode 100644 in git, not ${mode}`);
+  assert(problems.length <= 3, 'at most three problems');
   return problems;
 }
 
@@ -252,7 +349,7 @@ export function checkSkillCopies(root: string, skills: string[]): string[] {
       continue;
     }
     // Bounded: diffTrees returns at most 2 * MAX_FILES findings.
-    for (const f of diffTrees(listTree(src), listTree(dst))) problems.push(`skills/${name}/${f.rel}: ${f.kind}`);
+    for (const f of diffTrees(skillSourceFiles(src), listTree(dst))) problems.push(`skills/${name}/${f.rel}: ${f.kind}`);
   }
   return problems;
 }
@@ -265,34 +362,6 @@ export function syncSkills(root: string, skills: string[]): void {
   for (const name of skills) {
     copySkill(root, join(root, SKILLS_SOURCE_DIR, name), join(root, PLUGIN_DIR, 'skills', name));
   }
-}
-
-/**
- * Deletes both packages' dist/ and tsconfig.tsbuildinfo and the plugin's
- * server/ folder, then builds core and mcp-server in that order. Deleting
- * tsbuildinfo matters: a stale one lets tsc skip emitting, which is how the
- * old in-place bundle ended up bundled twice.
- */
-export function rebuildBundle(root: string): Result {
-  assert(isAbsolute(root), `root must be absolute: ${root}`);
-  assert(PACKAGES[0] === 'core', 'core must build first');
-  // Bounded: PACKAGES has 2 entries.
-  for (const pkg of PACKAGES) {
-    removeTree(root, join('packages', pkg, 'dist'));
-    removeTree(root, join('packages', pkg, 'tsconfig.tsbuildinfo'));
-  }
-  removeTree(root, join(PLUGIN_DIR, 'server'));
-  // Bounded: PACKAGES has 2 entries.
-  for (const pkg of PACKAGES) {
-    const build = spawnSync('pnpm', ['-C', join('packages', pkg), 'build'], { cwd: root, encoding: 'utf-8' });
-    if (build.error) return { ok: false, message: `could not spawn the ${pkg} build: ${build.error.message}` };
-    if (build.status !== 0) return { ok: false, message: `${pkg} build failed (exit ${String(build.status)}):\n${build.stderr}` };
-  }
-  const bundle = join(root, PLUGIN_DIR, BUNDLE_REL);
-  if (!existsSync(bundle) || statSync(bundle).size === 0) {
-    return { ok: false, message: `the build did not produce ${join(PLUGIN_DIR, BUNDLE_REL)}` };
-  }
-  return { ok: true };
 }
 
 /**

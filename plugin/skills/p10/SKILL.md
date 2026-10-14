@@ -341,61 +341,61 @@ Scouts load the relevant section below at codebase scan time.
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion. No runtime code evaluation. Flatten promise chains with `async/await`. |
-| 2 — Loop bounds | Every `for`/`while` must have a provable bound. Comment the max count. No unbounded `while(true)`. |
-| 3 — Memory | No unbounded data structure growth at runtime. Arrays and maps must have max-size guards. |
-| 4 — Function size | ≤ 60 lines. ESLint `max-lines-per-function` enforced. |
-| 5 — Assertions | `assert` from `node:assert` or typed invariant helper. Min 2 per function. Type guards that throw count. |
-| 6 — Scope | `const` over `let`. `let` over `var`. No `var`. Module-level state must be justified. |
-| 7 — Return values | No ignored Promise rejections. Every `await` in try/catch or `.catch()`. ESLint `@typescript-eslint/no-floating-promises`. |
-| 8 — Macros | No evaluating strings as code, no functions built from strings, no module loading at runtime. |
-| 9 — Pointers | No `any` type. No unchecked type assertions (`as Type` without guard). |
-| 10 — Warnings | `tsc --strict --noEmit` clean. ESLint zero warnings. `"strict": true` in tsconfig. |
+| 1: Control flow | No recursion. No runtime code evaluation. Flatten promise chains with `async/await`. |
+| 2: Loop bounds | Every `for`/`while` must have a provable bound. Comment the max count. No unbounded `while(true)`. |
+| 3: Memory | No unbounded data structure growth at runtime. Arrays and maps must have max-size guards. |
+| 4: Function size | ≤ 60 lines. ESLint `max-lines-per-function` enforced. |
+| 5: Assertions | `assert` from `node:assert` or typed invariant helper. Min 2 per function. Type guards that throw count. |
+| 6: Scope | `const` over `let`. `let` over `var`. No `var`. Module-level state must be justified. |
+| 7: Return values | No ignored Promise rejections. Every `await` in try/catch or `.catch()`. ESLint `@typescript-eslint/no-floating-promises`. |
+| 8: Macros | No evaluating strings as code, no functions built from strings, no module loading at runtime. |
+| 9: Pointers | No `any` type. No unchecked type assertions (`as Type` without guard). |
+| 10: Warnings | `tsc --strict --noEmit` clean. ESLint zero warnings. `"strict": true` in tsconfig. |
 
 ### Python
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion (or explicit `sys.setrecursionlimit` with documented bound). No running strings as code. No module loading at runtime. |
-| 2 — Loop bounds | All `while` loops must document max iteration count. `for` over iterables preferred — document expected max length. |
-| 3 — Memory | No unbounded list/dict growth. Use `collections.deque(maxlen=N)` for bounded queues. Document max size for all growing structures. |
-| 4 — Function size | ≤ 60 lines. `flake8 --max-function-length` enforced. |
-| 5 — Assertions | `assert` with descriptive messages. Min 2 per function. `isinstance` checks count. |
-| 6 — Scope | No module-level mutable state unless justified. No `global` without documentation. |
-| 7 — Return values | No ignored returns for functions that can fail. Never bare `except:`. All exceptions caught at appropriate boundary. |
-| 8 — Macros | No evaluating or running strings as code, no module loading at runtime. |
-| 9 — Pointers | All parameters and returns must have type annotations. `mypy --strict` must pass. |
-| 10 — Warnings | `mypy --strict` clean. `flake8` zero warnings. `pylint` score ≥ 9.0. |
+| 1: Control flow | No recursion (or explicit `sys.setrecursionlimit` with documented bound). No running strings as code. No module loading at runtime. |
+| 2: Loop bounds | All `while` loops must document max iteration count. `for` over iterables preferred; document expected max length. |
+| 3: Memory | No unbounded list/dict growth. Use `collections.deque(maxlen=N)` for bounded queues. Document max size for all growing structures. |
+| 4: Function size | ≤ 60 lines. `flake8 --max-function-length` enforced. |
+| 5: Assertions | `assert` with descriptive messages. Min 2 per function. `isinstance` checks count. |
+| 6: Scope | No module-level mutable state unless justified. No `global` without documentation. |
+| 7: Return values | No ignored returns for functions that can fail. Never bare `except:`. All exceptions caught at appropriate boundary. |
+| 8: Macros | No evaluating or running strings as code, no module loading at runtime. |
+| 9: Pointers | All parameters and returns must have type annotations. `mypy --strict` must pass. |
+| 10: Warnings | `mypy --strict` clean. `flake8` zero warnings. `pylint` score ≥ 9.0. |
 
 ### Go
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion unless provably bounded and documented. No `goto`. |
-| 2 — Loop bounds | All `for` loops with a condition (not range) must document max iterations. |
-| 3 — Memory | No unbounded goroutine spawning. Channel buffers must be sized. Use `sync.Pool` for reuse. |
-| 4 — Function size | ≤ 60 lines. `gocyclo` complexity ≤ 10. |
-| 5 — Assertions | Explicit error checks as assertions. `panic` with message for true invariant violations. |
-| 6 — Scope | `:=` at narrowest scope. Package-level vars must be justified. |
-| 7 — Return values | Every `error` return checked. `errcheck` linter enforced. No `_` for error values. |
-| 8 — Macros | No `unsafe` package without documented justification. |
-| 9 — Pointers | Prefer value receivers. Document every pointer receiver choice. |
-| 10 — Warnings | `go vet` clean. `staticcheck` clean. `golangci-lint` zero warnings. |
+| 1: Control flow | No recursion unless provably bounded and documented. No `goto`. |
+| 2: Loop bounds | All `for` loops with a condition (not range) must document max iterations. |
+| 3: Memory | No unbounded goroutine spawning. Channel buffers must be sized. Use `sync.Pool` for reuse. |
+| 4: Function size | ≤ 60 lines. `gocyclo` complexity ≤ 10. |
+| 5: Assertions | Explicit error checks as assertions. `panic` with message for true invariant violations. |
+| 6: Scope | `:=` at narrowest scope. Package-level vars must be justified. |
+| 7: Return values | Every `error` return checked. `errcheck` linter enforced. No `_` for error values. |
+| 8: Macros | No `unsafe` package without documented justification. |
+| 9: Pointers | Prefer value receivers. Document every pointer receiver choice. |
+| 10: Warnings | `go vet` clean. `staticcheck` clean. `golangci-lint` zero warnings. |
 
 ### Rust
 
 | Rule | Adaptation |
 |---|---|
-| 1 — Control flow | No recursion unless bounded. No `unsafe` control flow. |
-| 2 — Loop bounds | All `loop` blocks must document exit condition and maximum iteration bound. |
-| 3 — Memory | Ownership system enforces structurally. No `unsafe` allocator use. `Box::new` only in init paths. |
-| 4 — Function size | ≤ 60 lines. `clippy::too_many_lines` enforced. |
-| 5 — Assertions | `assert!` and `debug_assert!` min 2 per function. No `unwrap()` — use `expect("invariant reason")`. |
-| 6 — Scope | Narrowest scope always. No unnecessary `mut`. |
-| 7 — Return values | All `Result` and `Option` handled. No `unwrap()` in production paths. `#[must_use]` on all Result-returning functions. |
-| 8 — Macros | `macro_rules!` only for well-understood patterns. No proc macros without team review. |
-| 9 — Pointers | No raw pointers (`*const`, `*mut`) outside `unsafe`. No `unsafe` without /council-reviewed justification. |
-| 10 — Warnings | `cargo clippy -- -D warnings` clean. `cargo check` clean. |
+| 1: Control flow | No recursion unless bounded. No `unsafe` control flow. |
+| 2: Loop bounds | All `loop` blocks must document exit condition and maximum iteration bound. |
+| 3: Memory | Ownership system enforces structurally. No `unsafe` allocator use. `Box::new` only in init paths. |
+| 4: Function size | ≤ 60 lines. `clippy::too_many_lines` enforced. |
+| 5: Assertions | `assert!` and `debug_assert!` min 2 per function. No `unwrap()`: use `expect("invariant reason")`. |
+| 6: Scope | Narrowest scope always. No unnecessary `mut`. |
+| 7: Return values | All `Result` and `Option` handled. No `unwrap()` in production paths. `#[must_use]` on all Result-returning functions. |
+| 8: Macros | `macro_rules!` only for well-understood patterns. No proc macros without team review. |
+| 9: Pointers | No raw pointers (`*const`, `*mut`) outside `unsafe`. No `unsafe` without /council-reviewed justification. |
+| 10: Warnings | `cargo clippy -- -D warnings` clean. `cargo check` clean. |
 
 ---
 

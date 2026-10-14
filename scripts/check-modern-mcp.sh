@@ -35,10 +35,13 @@ esac
 
 WORK=$(mktemp -d)
 LOG=$(mktemp)
+# The server needs a vault folder to start; a throwaway one keeps the check
+# off the developer's own vault.
+VAULT_DIR=$(mktemp -d)
 cp -R "$PLUGIN_SRC" "$WORK/plugin"
 MANIFEST="$WORK/plugin/.claude-plugin/plugin.json"
-jq --arg log "$LOG" \
-  '.mcpServers["toto-wolff"] = {command: "sh", args: ["-c", ("tee -a \"" + $log + "\" | node \"${CLAUDE_PLUGIN_ROOT}/server/index.mts\"")]}' \
+jq --arg log "$LOG" --arg vault "$VAULT_DIR" \
+  '.mcpServers["toto-wolff"] = {command: "sh", args: ["-c", ("tee -a \"" + $log + "\" | node \"${CLAUDE_PLUGIN_ROOT}/server/index.mts\" --vault \"" + $vault + "\"")]}' \
   "$PLUGIN_SRC/.claude-plugin/plugin.json" > "$MANIFEST"
 PLUGIN_NAME=$(jq -r '.name' "$MANIFEST")
 

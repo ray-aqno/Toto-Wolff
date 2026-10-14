@@ -33,8 +33,9 @@ function isPrLink(text: string): boolean {
     return false;
   }
   // href is the canonical form, so any other spelling (a port, a user, an
-  // uppercase host, extra characters) differs from the reported text.
-  return link.protocol === 'https:' && link.host === PR_HOST && link.search === '' && link.hash === '' && !text.includes('@') && PR_PATH.test(link.pathname) && link.href === text;
+  // uppercase host, extra characters) differs from the reported text. href
+  // keeps an empty `?` or `#`, so those characters are refused in the text.
+  return link.protocol === 'https:' && link.host === PR_HOST && !/[?#@]/.test(text) && PR_PATH.test(link.pathname) && link.href === text;
 }
 
 function bad(message: string): GraphError {

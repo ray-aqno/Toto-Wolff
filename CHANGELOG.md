@@ -6,29 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
-
-- The plugin has no dashboard page or web server. `dashboard_status` returns the vault's record counts, recent items and blocked items, for Claude to summarise; the visual dashboard stays in the 1.x CLI (`toto dashboard`).
-- The p10, llm-council, the-cabinet, safety-car and drs skills use the plugin's Vault folder setting. They no longer read TOTO_VAULT_PATH or ~/.toto/vault or write settings.local.json. Upgrading from 1.x: set Vault folder to the folder you used before (default ~/.toto/vault).
-
-### Removed
-
-- The plugin `dashboard_port` setting and the plugin's HTTP routes: `/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed` and `/vault/signal`. For a live served dashboard, use `packages/mcp-server` (TOTO_MCP_PORT, default 3099) or `toto dashboard`.
-- The plugin no longer ships skills/drs/bin/drs-check.sh. The plugin never registered it; the repo hook is unchanged; see docs/drs-hook.md.
-
 ## [2.0.0] - 2026-10-05
 
 toto-wolff 2.0: the plugin becomes a dependency-free MCP server and a state engine for task graphs. Claude runs every step; the server keeps the state, checks the evidence and stops at human gates. Breaking for 1.6 users: no credentials, five model-backed tools removed, Node 24 required (see Breaking, and the README's "Upgrading to 2.0.0").
 
 ### Breaking
 
-- **The server reads only its own settings.** They come from the plugin's `userConfig` (passed to the server as `--vault ${user_config.vault_path}`; the project is the folder Claude Code starts the server in; the server reads no environment variables), asked when the plugin is enabled and changed in `/plugin` > Configure: **Vault folder** (`vault_path`, required; 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`) and **Dashboard port** (`dashboard_port`, `0` for none). `TOTO_VAULT_PATH`, `TOTO_MCP_PORT` and `TOTO_DRS_CONFIG` no longer reach the server: DRS reads the project's `.toto/drs-config.json`. The Claude plugin directory holds a plugin that reads the user's environment ("uses a credential from the user's machine").
+- **The server reads only its own settings.** They come from the plugin's `userConfig` (passed to the server as `--vault ${user_config.vault_path}`; the project is the folder Claude Code starts the server in; the server reads no environment variables), asked when the plugin is enabled and changed in `/plugin` > Configure: **Vault folder** (`vault_path`, required; 1.x used `TOTO_VAULT_PATH`, else `~/.toto/vault`). `TOTO_VAULT_PATH`, `TOTO_MCP_PORT` and `TOTO_DRS_CONFIG` no longer reach the server: DRS reads the project's `.toto/drs-config.json`. The Claude plugin directory holds a plugin that reads the user's environment ("uses a credential from the user's machine").
 See the README's "Upgrading to 2.0.0" for what to do.
 - **The plugin's MCP server makes no model calls and takes no credentials.** The `userConfig` settings (API key, auth token, base URL) and every `ANTHROPIC_*` lookup are gone; Claude runs each workflow step itself.
 - **Five MCP tools are removed:** `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run` and `karpathy_check`. The matching skills run those workflows through Claude.
 - **Node 24 is required.** The server is readable `.mts` files that Node runs directly (no bundle, no build).
 - **`subagent_list` lists project agents only** (`.pi/agents`). It no longer reads `~/.pi/agent` or `PI_CODING_AGENT_DIR`, the pi agent folder that also holds pi's credentials (the plugin directory refuses a plugin that reads it); `scope: "user"` finds nothing.
 - **The Claude plugin directory installs from branch `plugin`**, which `.github/workflows/publish-plugin.yml` fills from each release tag as a forward commit. Marketplace installs still update from `main`'s `plugin/`.
+- **The plugin has no dashboard page or web server.** Its HTTP routes (`/dashboard`, `/dashboard/events`, `/dashboard/record`, `/vault/reversed`, `/vault/signal`) are gone. `dashboard_status` returns the vault's record counts, recent items and blocked items, for Claude to summarise. For a live served dashboard, use `packages/mcp-server` (TOTO_MCP_PORT, default 3099) or `toto dashboard`.
+- **The p10, llm-council, the-cabinet, safety-car and drs skills use the plugin's Vault folder setting.** They no longer read TOTO_VAULT_PATH or ~/.toto/vault or write settings.local.json. Upgrading from 1.x: set Vault folder to the folder you used before (default ~/.toto/vault).
+- **The plugin no longer ships `skills/drs/bin/drs-check.sh`.** The plugin never registered it; the repo hook is unchanged; see docs/drs-hook.md.
 
 These change v1.6 behavior of the six tools carried into the 2.0 plugin (issue #60). Details in `plugin/README.md`.
 - **`vault_search` matches literal text, not a regular expression**, case-sensitive as before, because v1.6's ripgrep is no longer used. A query that finds nothing and contains regex characters gets a `note` saying so.
@@ -44,7 +37,7 @@ These change v1.6 behavior of the six tools carried into the 2.0 plugin (issue #
 
 ### Changed
 - **CI pins `ubuntu-24.04`** on every job (GitHub moves `ubuntu-latest` to Ubuntu 26 on October 19, 2026).
-- **The plugin's MCP server is rewritten as a dependency-free state engine.** `plugin/server/` holds readable `.mts` files that Node 24 runs directly, with no build and no bundle, so `plugin/server/index.mjs` and the esbuild step are gone. The server makes no model calls, so the plugin no longer asks for an API key, token or base URL (its `userConfig` is removed). It needs Node 24; Node 22.18 to 23.x get a one-line refusal, and older Node cannot load it at all. Of the 11 v1 MCP tools, the five model-backed ones (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are dropped for good, since the skills run those workflows through Claude; the other six carry over (issue #60). Issues #57 and #59.
+- **The plugin's MCP server is rewritten as a dependency-free state engine.** `plugin/server/` holds readable `.mts` files that Node 24 runs directly, with no build and no bundle, so `plugin/server/index.mjs` and the esbuild step are gone. The server makes no model calls, so the plugin no longer asks for an API key, token or base URL (those `userConfig` settings are removed; Vault folder is its only setting). It needs Node 24; Node 22.18 to 23.x get a one-line refusal, and older Node cannot load it at all. Of the 11 v1 MCP tools, the five model-backed ones (`council_run`, `p10_plan`, `cabinet_run`, `safety_car_run`, `karpathy_check`) are dropped for good, since the skills run those workflows through Claude; the other six carry over (issue #60). Issues #57 and #59.
 - **The plugin ships from `plugin/`, not the whole repository**: the marketplace source is now `./plugin`, and `plugin/` holds only the manifest (moved to `plugin/.claude-plugin/plugin.json`), copies of the 7 listed skills, and `plugin/server/index.mjs`, a minified esbuild bundle of the MCP server (0.79 MiB, under the plugin directory's 1 MiB inspection limit). Before, CI workflows, docs and tests shipped as part of the plugin, and the directory's review flagged them. `.claude/skills/` stays the source of truth; `pnpm sync:plugin` regenerates `plugin/` and CI's `check:plugin-sync` fails if the committed copy differs in bytes, exec bit, missing or extra files, or symlinks. **Upgrading from 1.6.0:** the install root moved, so run `claude plugin marketplace update toto-wolff`, then reinstall the plugin. With the new skill paths, Claude Code lists the P10 skill as `p10` (it listed `p10-bridge` before); the skill itself is unchanged.
 - **`packages/core/dist` and `packages/mcp-server/dist` are no longer committed**: the plugin's bundle inlines everything the server needs, so only `plugin/server/index.mjs` is tracked. `pnpm check:dist-sync` and `pnpm sync:dist` are replaced by `check:plugin-sync` and `sync:plugin`. Manual launches use `node plugin/server/index.mjs`.
 - **`linear-sync` has frontmatter**: a `name` and `description`, which the plugin directory required. The description keeps the skill user-invoked only.

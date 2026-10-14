@@ -7,6 +7,10 @@ import type { StorageBackend } from './StorageBackend.mts';
 import type { StorageConfig } from './StorageBackend.mts';
 import { FileStorage } from './FileStorage.mts';
 
+/**
+ * Creates and caches vault storage backends by id and config, so callers sharing a
+ * vault folder share one backend.
+ */
 export class VaultFactoryImpl {
   private backends = new Map<string, StorageBackend>();
   private backendClasses = new Map<string, new (config: StorageConfig) => StorageBackend>();

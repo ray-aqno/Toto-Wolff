@@ -20,6 +20,9 @@ export interface VaultConfig {
   options: Record<string, unknown>;
 }
 
+/**
+ * The vault API the tools use: serialized writes, searches and stats over one storage backend.
+ */
 export class VaultService {
   private backend: StorageBackend;
   private readonly config: VaultConfig;

@@ -57,6 +57,10 @@ function requireRuling(args: Record<string, unknown>): void {
   if (typeof ruling !== 'string' || ruling.length === 0) throw new MCPValidationError('ruling must be non-empty string');
 }
 
+/**
+ * Returns the six carried-over MCP tools and the graph tools, each wrapped so its result
+ * or error becomes an MCP tool result.
+ */
 export function createTools(runtime: Runtime): Tool[] {
   assert.ok(runtime.vaultPath.length > 0, 'the runtime has a vault path');
   const tools = [

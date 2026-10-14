@@ -1,28 +1,10 @@
-export class VaultCommitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'VaultCommitError';
-  }
-}
-
+/**
+ * Thrown when a vault search cannot run, such as when the vault root is unknown.
+ */
 export class VaultSearchError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'VaultSearchError';
-  }
-}
-
-export class LLMTimeoutError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'LLMTimeoutError';
-  }
-}
-
-export class P10BlockedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'P10BlockedError';
   }
 }
 

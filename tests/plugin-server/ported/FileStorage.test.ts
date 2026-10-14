@@ -57,6 +57,22 @@ describe('FileStorage.write() queue deduplication (regression)', () => {
   });
 });
 
+describe('FileStorage.commit() git options', () => {
+  it('skips the vault repository hooks and authors the commit as toto-wolff', async () => {
+    await execFileAsync('git', ['init'], { cwd: tmpDir });
+    // A hook that refuses every commit: the vault commit must not run it.
+    writeFileSync(join(tmpDir, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const storage = new FileStorage({ id: 'file', name: 'file', options: { rootPath: tmpDir } });
+    await storage.initialize();
+
+    await storage.write('a.md', 'record');
+    const result = await storage.commit('vault:');
+    expect(result).toEqual({ committed: true });
+    const { stdout } = await execFileAsync('git', ['log', '-1', '--format=%an <%ae>'], { cwd: tmpDir });
+    expect(stdout.trim()).toBe('toto-wolff <toto-wolff@localhost>');
+  });
+});
+
 describe('FileStorage.listDirAll() vs listDir() cap (regression)', () => {
   it('returns every file in a directory larger than the listDir() cap', async () => {
     const storage = new FileStorage({ id: 'file', name: 'file', options: { rootPath: tmpDir } });

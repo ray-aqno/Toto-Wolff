@@ -188,7 +188,9 @@ async function handleOne(eras: Eras, value: unknown): Promise<Message | null> {
   return isModern(request.params) ? serveModern(eras.modern, request) : dispatch(eras.legacy, request);
 }
 
-// Returns the handler for input lines. A null result means no reply is owed.
+/**
+ * Returns the handler for input lines. A null result means no reply is owed.
+ */
 export function createLineHandler(tools: readonly Tool[]): LineHandler {
   const registry = buildRegistry(tools);
   const eras: Eras = { legacy: buildMethods(registry), modern: buildModernMethods(registry) };

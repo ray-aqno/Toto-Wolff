@@ -1,6 +1,9 @@
 import assert from 'node:assert';
 import type { VaultService } from '../core/vault/VaultService.mts';
 
+/**
+ * Thrown when a tool's arguments are missing or malformed; reported to the caller as a tool error.
+ */
 export class MCPValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -30,6 +33,10 @@ function validateInput(raw: unknown): VaultWriteInput {
   return { path: input['path'], content: input['content'] };
 }
 
+/**
+ * Validates `vault_write` arguments and writes the record. Returns the caller's relative
+ * path, never the absolute path on disk.
+ */
 export async function handleVaultWrite(input: unknown, vault: VaultService): Promise<{ path: string }> {
   const { path, content } = validateInput(input);
   await vault.write(path, content);

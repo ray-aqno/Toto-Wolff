@@ -15,6 +15,9 @@ function getFrontmatter(content: string): { frontmatter: string; systemPrompt: s
   return { frontmatter, systemPrompt };
 }
 
+/**
+ * Lists the agent definitions under the project's `.pi/agents` folder for `subagent_list`.
+ */
 export class SubagentService {
   constructor() {}
 

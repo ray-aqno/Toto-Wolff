@@ -8,16 +8,28 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join, isAbsolute, dirname, relative } from 'node:path';
 import assert from 'node:assert';
+import { devNull } from 'node:os';
 import type { StorageBackend, WriteResult, CommitResult, BackendStats, StorageConfig } from './StorageBackend.mts';
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 10_000;
+/**
+ * Git options for vault commits. The vault repository's hooks are skipped
+ * (hooksPath points at the null device, which holds no hooks): a record the
+ * tool writes needs none. Every commit is authored as toto-wolff, so a commit
+ * never fails for want of a configured identity and shows the tool wrote it.
+ */
+const VAULT_COMMIT_OPTIONS = ['-c', 'core.hooksPath=' + devNull, '-c', 'user.name=toto-wolff', '-c', 'user.email=toto-wolff@localhost'] as const;
 const MAX_LIST_RESULTS = 1000;
 /** Deepest directory level the walks descend to (P10 Rule 2). */
 const MAX_WALK_DEPTH = 16;
 /** stats() counts at most this many files (P10 Rule 2); larger vaults undercount. */
 const MAX_STATS_FILES = 10_000;
 
+/**
+ * Vault storage on the local filesystem: writes files under the vault root, queues them,
+ * and commits the queue to git when the root is a git repository.
+ */
 export class FileStorage implements StorageBackend {
   readonly id = 'file';
   readonly name = 'Local Filesystem';
@@ -240,7 +252,7 @@ export class FileStorage implements StorageBackend {
       const commitMsg = `${message} ${filename}`;
       try {
         await execFileAsync('git', ['-C', this.rootPath, 'add', absPath], { timeout: GIT_TIMEOUT_MS });
-        await execFileAsync('git', ['-C', this.rootPath, 'commit', '-m', commitMsg], { timeout: GIT_TIMEOUT_MS });
+        await execFileAsync('git', [...VAULT_COMMIT_OPTIONS, '-C', this.rootPath, 'commit', '-m', commitMsg], { timeout: GIT_TIMEOUT_MS });
       } catch (err) {
         committed = false;
         reason = `git commit failed: ${this.redactRootPath((err as Error).message)}`;

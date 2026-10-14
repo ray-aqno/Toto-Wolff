@@ -25,6 +25,9 @@ function validateInput(raw: unknown): SubagentListInput {
   };
 }
 
+/**
+ * Validates `subagent_list` arguments and returns the agents found for the requested scope.
+ */
 export async function handleSubagentList(input: unknown, subagent: SubagentService): Promise<AgentConfig[]> {
   const { scope } = validateInput(input);
   return subagent.list(scope);

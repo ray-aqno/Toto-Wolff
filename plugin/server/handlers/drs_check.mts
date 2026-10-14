@@ -44,6 +44,9 @@ function validateInput(raw: unknown): DRSCheckInput {
   }
 }
 
+/**
+ * Validates `drs_check` arguments and returns the DRS verdict for the proposed tool call.
+ */
 export async function handleDrsCheck(input: unknown, drs: DRSService): Promise<DRSResult> {
   const validated = validateInput(input);
   return drs.check(validated);

@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 export const MIN_NODE_MAJOR = 24;
 export const NODE_VERSION_MESSAGE = `toto-wolff needs Node ${String(MIN_NODE_MAJOR)}+`;
 
-// Takes process.versions.node (for example "24.18.0", no leading "v").
+/**
+ * Takes process.versions.node (for example "24.18.0", no leading "v").
+ */
 export function checkNodeVersion(version: string): boolean {
   assert.equal(typeof version, 'string', 'a version is a string');
   const major = Number.parseInt(version.split('.')[0] ?? '', 10);

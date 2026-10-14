@@ -35,6 +35,9 @@ export interface Request {
 
 export type ParseResult = { ok: true; request: Request } | { ok: false; id: Id; error: RpcError };
 
+/**
+ * A JSON-RPC error with its numeric code and optional data, turned into an error response.
+ */
 export class RpcError extends Error {
   readonly code: number;
   readonly data: unknown;
@@ -46,22 +49,33 @@ export class RpcError extends Error {
   }
 }
 
+/**
+ * True for a plain object (not null, not an array).
+ */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * True for a valid JSON-RPC id: a string, a finite number or null.
+ */
 export function isId(value: unknown): value is Id {
   if (value === null || typeof value === 'string') return true;
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+/**
+ * Builds a JSON-RPC 2.0 success response for the given id and result.
+ */
 export function successResponse(id: Id, result: Message): Message {
   assert.ok(isId(id), 'response id must be a string, number or null');
   assert.ok(isRecord(result), 'result must be an object');
   return { jsonrpc: '2.0', id, result };
 }
 
-// `data` is added only when defined, so errors without it keep their old shape.
+/**
+ * `data` is added only when defined, so errors without it keep their old shape.
+ */
 export function errorResponse(id: Id, code: number, message: string, data?: unknown): Message {
   assert.ok(isId(id), 'response id must be a string, number or null');
   assert.ok(Number.isInteger(code) && code < 0, 'error codes are negative integers');
@@ -70,7 +84,9 @@ export function errorResponse(id: Id, code: number, message: string, data?: unkn
   return { jsonrpc: '2.0', id, error };
 }
 
-// Cuts text to at most maxBytes of UTF-8 without splitting a character.
+/**
+ * Cuts text to at most maxBytes of UTF-8 without splitting a character.
+ */
 export function truncateUtf8(text: string, maxBytes: number): string {
   assert.ok(Number.isInteger(maxBytes) && maxBytes > 0, 'maxBytes must be a positive integer');
   const bytes = Buffer.from(text, 'utf8');
@@ -87,7 +103,9 @@ export function truncateUtf8(text: string, maxBytes: number): string {
   return cut;
 }
 
-// Parses one line of JSON, or throws PARSE_ERROR.
+/**
+ * Parses one line of JSON, or throws PARSE_ERROR.
+ */
 export function decodeJson(line: string): unknown {
   assert.equal(typeof line, 'string', 'a line is a string');
   try {
@@ -115,7 +133,9 @@ function requestShapeError(value: Record<string, unknown>): string | null {
   return null;
 }
 
-// Validates one decoded JSON-RPC request object (not a batch).
+/**
+ * Validates one decoded JSON-RPC request object (not a batch).
+ */
 export function validateRequest(value: unknown): ParseResult {
   const id = readableId(value);
   if (!isRecord(value)) return { ok: false, id, error: new RpcError(INVALID_REQUEST, 'Invalid request') };
@@ -127,7 +147,9 @@ export function validateRequest(value: unknown): ParseResult {
   return { ok: true, request: { hasId, id, method: String(method), params: value.params } };
 }
 
-// Decodes and validates a single (non-batch) request line.
+/**
+ * Decodes and validates a single (non-batch) request line.
+ */
 export function parseRequest(line: string): ParseResult {
   let value: unknown;
   try {
@@ -142,7 +164,9 @@ export function parseRequest(line: string): ParseResult {
   return validateRequest(value);
 }
 
-// A tool-level failure: the call itself worked, but the tool reports an error.
+/**
+ * A tool-level failure: the call itself worked, but the tool reports an error.
+ */
 export function toolError(text: string): Message {
   assert.equal(typeof text, 'string', 'a tool error carries text');
   const message = truncateUtf8(text.length > 0 ? text : 'Tool failed', 4096);
@@ -150,7 +174,9 @@ export function toolError(text: string): Message {
   return { content: [{ type: 'text', text: message }], isError: true };
 }
 
-// Reads a required string argument, or rejects the call with INVALID_PARAMS.
+/**
+ * Reads a required string argument, or rejects the call with INVALID_PARAMS.
+ */
 export function requireString(args: Record<string, unknown>, field: string): string {
   assert.ok(isRecord(args), 'tool arguments are an object');
   assert.ok(field.length > 0, 'an argument field is never empty');

@@ -25,8 +25,10 @@ const MAX_ECHOED_VERSION_BYTES = 128;
 
 export type ServerInfo = Readonly<{ name: string; version: string }>;
 
-// True when params._meta holds either required 2026-07-28 key (own keys only,
-// whatever their values). Every other request takes the legacy path.
+/**
+ * True when params._meta holds either required 2026-07-28 key (own keys only,
+ * whatever their values). Every other request takes the legacy path.
+ */
 export function isModern(params: unknown): boolean {
   if (!isRecord(params) || !isRecord(params._meta)) return false;
   const meta = params._meta;
@@ -34,8 +36,10 @@ export function isModern(params: unknown): boolean {
   return Object.hasOwn(meta, META_PROTOCOL_VERSION) || Object.hasOwn(meta, META_CLIENT_CAPABILITIES);
 }
 
-// Validates a modern request's _meta: field presence and type first (-32602),
-// then the version (-32022). Only called for requests isModern accepted.
+/**
+ * Validates a modern request's _meta: field presence and type first (-32602),
+ * then the version (-32022). Only called for requests isModern accepted.
+ */
 export function checkMeta(params: unknown): void {
   assert.ok(isModern(params), 'checkMeta runs only on modern requests');
   const meta = isRecord(params) && isRecord(params._meta) ? params._meta : {};
@@ -55,8 +59,10 @@ export function checkMeta(params: unknown): void {
   }
 }
 
-// Returns a new result with resultType ("complete" unless the handler set one)
-// and the server's identity merged into _meta. Never writes to `result`.
+/**
+ * Returns a new result with resultType ("complete" unless the handler set one)
+ * and the server's identity merged into _meta. Never writes to `result`.
+ */
 export function withComplete(result: Message, serverInfo: ServerInfo): Message {
   assert.ok(serverInfo.name.length > 0, 'the server has a name');
   const meta = result._meta;
@@ -67,7 +73,9 @@ export function withComplete(result: Message, serverInfo: ServerInfo): Message {
   return wrapped;
 }
 
-// server/discover: built fresh for every reply, so no reply can alter another.
+/**
+ * server/discover: built fresh for every reply, so no reply can alter another.
+ */
 export function discoverResult(serverInfo: ServerInfo): Message {
   assert.ok(MODERN_VERSIONS.length > 0, 'at least one modern version is served');
   const result = withComplete(
@@ -78,8 +86,10 @@ export function discoverResult(serverInfo: ServerInfo): Message {
   return result;
 }
 
-// tools/list: the whole list in one page. The server never issues a cursor, so
-// any cursor a client sends is invalid (-32602), including "" and null.
+/**
+ * tools/list: the whole list in one page. The server never issues a cursor, so
+ * any cursor a client sends is invalid (-32602), including "" and null.
+ */
 export function toolsListResult(definitions: readonly unknown[], params: unknown, serverInfo: ServerInfo): Message {
   assert.ok(Number.isInteger(definitions.length), 'definitions are a list');
   if (isRecord(params) && Object.hasOwn(params, 'cursor')) throw new RpcError(INVALID_PARAMS, 'Invalid cursor');

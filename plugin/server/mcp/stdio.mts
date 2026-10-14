@@ -24,9 +24,11 @@ function decodeLine(bytes: Buffer): LineEvent {
   }
 }
 
-// Splits a byte stream into lines. Bytes are joined before decoding, so a
-// character split across chunks survives. A line over MAX_LINE_BYTES yields one
-// 'oversized' event, then its remaining bytes are discarded up to the newline.
+/**
+ * Splits a byte stream into lines. Bytes are joined before decoding, so a
+ * character split across chunks survives. A line over MAX_LINE_BYTES yields one
+ * 'oversized' event, then its remaining bytes are discarded up to the newline.
+ */
 export async function* readLines(input: AsyncIterable<Buffer | string>): AsyncGenerator<LineEvent> {
   const pending: Buffer[] = [];
   let pendingBytes = 0;
@@ -61,6 +63,10 @@ export async function* readLines(input: AsyncIterable<Buffer | string>): AsyncGe
   if (!discarding && pendingBytes > 0) yield decodeLine(Buffer.concat(pending, pendingBytes));
 }
 
+/**
+ * Writes one JSON-RPC message to stdout as a single line, waiting for drain when the
+ * buffer is full. A message that cannot be serialized becomes an internal error response.
+ */
 export async function writeMessage(message: Message): Promise<void> {
   assert.equal(message.jsonrpc, '2.0', 'every message is JSON-RPC 2.0');
   let line: string;
@@ -73,7 +79,9 @@ export async function writeMessage(message: Message): Promise<void> {
   if (!process.stdout.write(`${line}\n`)) await once(process.stdout, 'drain');
 }
 
-// Serves requests from stdin until it ends, answering each through writeMessage.
+/**
+ * Serves requests from stdin until it ends, answering each through writeMessage.
+ */
 export async function runStdio(handle: LineHandler): Promise<void> {
   assert.equal(typeof handle, 'function', 'a line handler is required');
   process.stdout.on('error', (err: Error) => {

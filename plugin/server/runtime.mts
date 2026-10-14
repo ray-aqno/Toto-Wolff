@@ -70,6 +70,10 @@ export async function drainQuietly(vault: VaultService): Promise<void> {
   }
 }
 
+/**
+ * Builds the shared runtime from the parsed settings: the vault folder (required), a
+ * cached vault, DRS for the project folder and the subagent list.
+ */
 export function createRuntime(settings: ServerConfig): Runtime {
   const vaultPath = resolveVaultPath(settings);
   const vault = (): Promise<VaultService> => getCachedVault(vaultPath);

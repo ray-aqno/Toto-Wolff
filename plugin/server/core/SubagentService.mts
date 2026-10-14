@@ -21,11 +21,19 @@ function getFrontmatter(content: string): { frontmatter: string; systemPrompt: s
 export class SubagentService {
   constructor() {}
 
+  /**
+   * Lists the agents for `subagent_list`, looked up from the folder the server runs in.
+   * Scope 'user' finds nothing in 2.0; 'both' means the project's agents.
+   */
   list(scope: 'user' | 'project' | 'both' = 'both'): Promise<AgentConfig[]> {
     const agents = this.discoverAgents(process.cwd(), scope);
     return Promise.resolve(this.formatOutput(agents));
   }
 
+  /**
+   * Reads every `.md` agent file in `<cwd>/.pi/agents`, keyed by agent name, so a later
+   * file with the same name replaces an earlier one.
+   */
   discoverAgents(
     cwd: string,
     scope: 'user' | 'project' | 'both'
@@ -49,6 +57,11 @@ export class SubagentService {
     return agents;
   }
 
+  /**
+   * Parses one agent file's frontmatter and body into an AgentConfig, filling defaults
+   * for missing fields. Returns null for an unreadable file, missing frontmatter, or an
+   * empty name or prompt.
+   */
   parseAgentFile(filePath: string, source: 'user' | 'project'): AgentConfig | null {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
@@ -79,6 +92,9 @@ export class SubagentService {
     }
   }
 
+  /**
+   * Returns the agents as a plain list of fresh objects, in discovery order.
+   */
   formatOutput(agents: Map<string, AgentConfig>): AgentConfig[] {
     return Array.from(agents.values()).map((a) => ({
       name: a.name,

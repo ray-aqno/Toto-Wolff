@@ -18,8 +18,10 @@ const GIT_TIMEOUT_MS = 10_000;
  * (hooksPath points at the null device, which holds no hooks): a record the
  * tool writes needs none. Every commit is authored as toto-wolff, so a commit
  * never fails for want of a configured identity and shows the tool wrote it.
+ * Commits are never signed: toto-wolff@localhost has no signing key, so a
+ * vault that signs by default (commit.gpgsign) would fail every commit.
  */
-const VAULT_COMMIT_OPTIONS = ['-c', 'core.hooksPath=' + devNull, '-c', 'user.name=toto-wolff', '-c', 'user.email=toto-wolff@localhost'] as const;
+const VAULT_COMMIT_OPTIONS = ['-c', 'core.hooksPath=' + devNull, '-c', 'user.name=toto-wolff', '-c', 'user.email=toto-wolff@localhost', '-c', 'commit.gpgsign=false'] as const;
 const MAX_LIST_RESULTS = 1000;
 /** Deepest directory level the walks descend to (P10 Rule 2). */
 const MAX_WALK_DEPTH = 16;

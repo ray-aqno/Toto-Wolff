@@ -71,6 +71,18 @@ describe('FileStorage.commit() git options', () => {
     const { stdout } = await execFileAsync('git', ['log', '-1', '--format=%an <%ae>'], { cwd: tmpDir });
     expect(stdout.trim()).toBe('toto-wolff <toto-wolff@localhost>');
   });
+
+  it('does not sign the commit when the vault repository signs by default', async () => {
+    await execFileAsync('git', ['init'], { cwd: tmpDir });
+    // toto-wolff@localhost has no signing key, so a signed commit would fail.
+    await execFileAsync('git', ['config', 'commit.gpgsign', 'true'], { cwd: tmpDir });
+    const storage = new FileStorage({ id: 'file', name: 'file', options: { rootPath: tmpDir } });
+    await storage.initialize();
+
+    await storage.write('a.md', 'record');
+    const result = await storage.commit('vault:');
+    expect(result).toEqual({ committed: true });
+  });
 });
 
 describe('FileStorage.listDirAll() vs listDir() cap (regression)', () => {

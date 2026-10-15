@@ -1,19 +1,47 @@
 {
   "name": "toto-wolff",
-  "version": "2.0.0-spike.1",
-  "description": "Layout spike for toto-wolff 2.0: a dependency-free MCP server run directly by Node 24. Not for install.",
+  "description": "Persistent AI governance for Claude Code — council deliberation, P10 pre-execution planning, and a local vault that survives session resets.",
+  "version": "2.0.0",
   "author": {
     "name": "Rayyan Aquino"
   },
   "homepage": "https://github.com/ray-aqno/Toto-Wolff",
   "repository": "https://github.com/ray-aqno/Toto-Wolff",
   "license": "MIT",
-  "keywords": ["governance", "mcp"],
-  "skills": ["./skills/hello"],
+  "keywords": [
+    "governance",
+    "p10",
+    "council",
+    "vault",
+    "planning",
+    "mcp"
+  ],
+  "skills": [
+    "./skills/drs",
+    "./skills/karpathy",
+    "./skills/linear-sync",
+    "./skills/safety-car",
+    "./skills/p10",
+    "./skills/llm-council",
+    "./skills/the-cabinet",
+    "./skills/graph-run"
+  ],
   "mcpServers": {
     "toto-wolff": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.mts"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/server/index.mts",
+        "--vault",
+        "${user_config.vault_path}"
+      ]
+    }
+  },
+  "userConfig": {
+    "vault_path": {
+      "type": "directory",
+      "title": "Vault folder",
+      "description": "Absolute path of the folder toto-wolff keeps its records in.",
+      "required": true
     }
   }
 }

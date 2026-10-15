@@ -1,7 +1,7 @@
 ---
 name: linear-sync
 description: >
-  Sync an approved toto-wolff P10 plan into a Linear issue through an already-authenticated
+  Sync an approved toto-wolff P10 plan into a Linear issue through a connected
   Linear MCP connector. Use only when the user explicitly runs
   `/linear-sync <plan-path> --team <name> --project <name>`; never run it automatically or
   as a side effect of a /p10 approval.
@@ -9,7 +9,7 @@ description: >
 
 # linear-sync
 
-Syncs an approved toto-wolff P10 plan into a Linear issue, using an already-authenticated
+Syncs an approved toto-wolff P10 plan into a Linear issue, using a connected
 Linear MCP connector. No custom Linear client, no new package dependency — this skill only
 orchestrates existing MCP tool calls (`get_user`, `list_teams`, `list_projects`,
 `list_issue_statuses`, `save_issue`).
@@ -17,7 +17,7 @@ orchestrates existing MCP tool calls (`get_user`, `list_teams`, `list_projects`,
 **Trigger:** `/linear-sync <plan-path> --team <name> --project <name>`. Human-invoked only.
 Never runs automatically, never as a side effect of a `/p10` approval.
 
-**Assumption (explicit, not implicit):** this skill depends on an authenticated Linear MCP
+**Assumption (explicit, not implicit):** this skill depends on a connected Linear MCP
 connector being present in the invoking session. It does not manage, initiate, or guarantee
 that connection — it only verifies it at the start of each run (Step 0 below).
 
@@ -28,7 +28,7 @@ that connection — it only verifies it at the start of each run (Step 0 below).
 Attempt a lightweight Linear MCP call (`get_user` with `query: "me"`, or `list_teams`).
 
 - If it errors, is unavailable, or Linear MCP tools are not present in the current
-  session's tool list: refuse immediately. Tell the user to authorize the Linear
+  session's tool list: refuse immediately. Tell the user to connect the Linear
   connector via `claude mcp` or their connector settings, and stop.
 - No retry. No fallback path. Do not proceed to any step below until this check passes.
 

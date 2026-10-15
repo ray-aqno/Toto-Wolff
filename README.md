@@ -5,7 +5,7 @@
 
 Persistent AI governance for Claude Code. Every architectural decision is deliberated by a chain of AI models and written to a local file. Every code change is planned against a safety checklist before execution starts. Nothing disappears when the session closes.
 
-Claude Code sessions are stateless by default — decisions made in one session are gone in the next. toto-wolff fixes that: an MCP server that runs multi-model deliberation workflows, writes every ruling to plain Markdown files in a local vault, and lets future sessions pick up where the last one left off.
+Claude Code sessions are stateless by default: decisions made in one session are gone in the next. toto-wolff fixes that: a Claude Code plugin whose skills run the deliberation workflows through Claude, whose MCP server keeps every ruling as plain Markdown in a local vault and tracks task graphs step by step, so future sessions pick up where the last one left off.
 
 ---
 
@@ -18,11 +18,9 @@ claude plugin marketplace add ray-aqno/Toto-Wolff
 claude plugin install toto-wolff@toto-wolff
 ```
 
-Then give the MCP server a credential, in either of two ways: run `/plugin configure toto-wolff@toto-wolff` inside Claude Code (the key is masked and kept in Claude Code's secure credential store), or export `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN` plus `ANTHROPIC_BASE_URL`) in your shell before launching Claude Code. A value set through `/plugin configure` wins over the shell. See [Credentials](CLAUDE.md#credentials-required) for the `~/.claude.json` fallback.
+When you enable the plugin, Claude Code asks for its one setting, the **Vault folder**: the absolute path of the folder your records go in (for example `~/.toto/vault`, or an existing Obsidian vault). You can change it later in `/plugin` > Installed > toto-wolff > Configure. The plugin needs no API key and reads no environment variables: its MCP server makes no model calls, and the skills (`/llm-council`, `/p10`, `/the-cabinet`, `/safety-car`, `/karpathy`, `/graph-run`) run every workflow through Claude, on the account you're already logged into Claude Code with. It needs Node 24 or newer. See [`plugin/README.md`](plugin/README.md) for the full reference.
 
-The MCP server constructs its five model-backed services (and asserts on a missing credential) at process startup, before any tool is registered, so a missing credential takes down the whole server: every MCP tool it exposes, including non-model ones like `vault_write` and `drs_check`, not just the five that call a model. The `/council`, `/p10`, `/cabinet`, `/safety-car`, and `/karpathy` slash commands are unaffected either way: they run as Claude Code subagents, not through this MCP server, riding on whatever account you're already logged into Claude Code with, no separate credential and no separate cost. If you only plan to use the slash commands, skip this step; if you want any `toto-wolff` MCP tool at all, you need it.
-
-**Manual path (for contributing to this repo, or if your Claude Code host doesn't support plugin marketplaces yet):**
+**Manual path (for contributing to this repo, or if your Claude Code host doesn't support plugin marketplaces yet):** this builds the repository's own packages, the `toto` CLI and the original model-backed MCP server in `packages/mcp-server`, which differ from the plugin: their model-backed commands and tools need an Anthropic credential (see [Configuration](#configuration)).
 
 ```bash
 git clone https://github.com/ray-aqno/Toto-Wolff ~/toto-wolff
@@ -48,7 +46,7 @@ ls ~/.toto/vault/Council/Congressional-Records/
 
 That file is permanent. It survives the session, survives restarts, and is grep-able from the terminal. The governance loop is live.
 
-**Want to point the vault at an existing Obsidian vault?** Every ruling, plan, and release record is plain Markdown — it will appear in your graph and search automatically:
+**Want to point the vault at an existing Obsidian vault?** Every ruling, plan, and release record is plain Markdown, so it will appear in your graph and search automatically. With the plugin, set the Vault folder to it; with the manual path:
 
 ```bash
 TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
@@ -57,6 +55,15 @@ TOTO_VAULT_PATH="/path/to/your/obsidian/vault" ./setup
 **Already installed and want to update?** Run `toto upgrade` — it pulls the latest release, rebuilds all packages, and re-runs setup non-destructively. Vault, credentials, and config are untouched.
 
 **Upgrading to 1.5.0:** DRS Rule 2 (out-of-scope write) now fails closed. An empty `allowed_paths` used to mean "no restriction" and now means "nothing allowed", so an existing install relying on that must either list its allowed paths or set `permissive: true` in `.toto/config.yml`'s `drs:` block to keep the old behavior. Run `pnpm generate:drs-config` from the repository root after changing the config: DRS reads the generated `.toto/drs-config.json`, not the YAML directly, so an edit to `config.yml` alone leaves writes blocked. See the CHANGELOG for details.
+
+**Upgrading to 2.0.0:** the plugin is now a dependency-free MCP server and a state engine for task graphs; Claude runs every step, so the server makes no model calls. What changes for a 1.6 install:
+- **Where it installs from.** A marketplace install (`claude plugin marketplace add ray-aqno/Toto-Wolff`) keeps working and updates from `main`'s `plugin/` folder: run `claude plugin marketplace update toto-wolff`, then update or reinstall the plugin. The Claude plugin directory installs from branch `plugin`, which the publish workflow fills from each release tag.
+- **No credentials.** The API key, auth token and base URL settings are gone (no `userConfig`, no `ANTHROPIC_*` needed). You can remove them from your plugin settings.
+- **Five tools are gone:** `council_run`, `p10_plan`, `cabinet_run`, `safety_car_run` and `karpathy_check`. Their skills (`/llm-council`, `/p10`, `/the-cabinet`, `/safety-car`, `/karpathy`) still run those workflows, through Claude.
+- **Node 24** is required; on Node 22.18 to 23.x the server stops with one line, and older Node cannot load it.
+- **Set the Vault folder.** It is the plugin's only setting and is required. The plugin no longer reads `TOTO_VAULT_PATH`; set Vault folder to the folder you used before (1.x defaulted to `~/.toto/vault`).
+- **The six other tools** stay, with changes: there is no dashboard page or web server (`dashboard_status` returns the vault's record counts, recent items and blocked items; for a served dashboard use the repo's `packages/mcp-server` or `toto dashboard`), `vault_search` matches literal text and returns `{ results, truncated }`, and `vault_write` takes `{ path, content }`.
+- **New:** task graphs (`graph_*` tools), the built-in `idea-to-pr` graph, and the `graph-run` skill. See `plugin/README.md` and the CHANGELOG.
 
 **Upgrading to 1.6.0:** the MCP server now refuses an `ANTHROPIC_AUTH_TOKEN` that has no base URL from the same place (the shell, `/plugin configure`, or `~/.claude.json`), instead of sending that gateway token to Anthropic's public endpoint. If the server stops starting after the upgrade, set the matching `ANTHROPIC_BASE_URL` (or `anthropic_base_url` in the plugin settings) next to the token, or switch to an API key. Setting both a key and a token in the same place now also stops the server; keep only one. See the CHANGELOG for details.
 
@@ -92,9 +99,9 @@ Every council ruling and P10 plan is a signal: evidence that your team has alrea
 **Vault**
 A local directory of plain Markdown files with YAML frontmatter. No database, no running process required to read it. Every council ruling, P10 plan, Cabinet record, and signal lives here. The vault is the source of truth: grep-able, diffable, and editable in any text editor.
 
-The format is natively compatible with [Obsidian](https://obsidian.md). If you already use Obsidian, point `TOTO_VAULT_PATH` at your existing vault and every ruling, plan, and Cabinet record will appear in your graph, backlinks, and search automatically alongside your other notes. This is the recommended setup — the governance record becomes part of your second brain rather than an isolated directory.
+The format is natively compatible with [Obsidian](https://obsidian.md). If you already use Obsidian, set the plugin's Vault folder (or, for the repo's CLI and server, `TOTO_VAULT_PATH`) to your existing vault and every ruling, plan, and Cabinet record will appear in your graph, backlinks, and search automatically alongside your other notes. This is the recommended setup: the governance record becomes part of your second brain rather than an isolated directory.
 
-Default location when `TOTO_VAULT_PATH` is not set: `~/.toto/vault` (a standalone directory, no Obsidian required).
+The plugin has no default: Claude Code asks for the Vault folder when you enable it. The repo's CLI and server use `~/.toto/vault` when `TOTO_VAULT_PATH` is not set (a standalone directory, no Obsidian required).
 
 **Karpathy guidelines — execution contract**
 Four rules, derived from Andrej Karpathy's public writing on software craftsmanship, that govern how each P10 stage is implemented. P10 gates the structure; Karpathy governs the execution. The rules are: (1) think before coding — state assumptions, surface ambiguity, don't charge forward on a wrong interpretation; (2) simplicity first — minimum code that solves the stage, nothing speculative; (3) surgical changes — touch only what the stage authorizes, mention but don't fix things outside scope; (4) goal-driven execution — map each stage to verifiable success criteria and loop until met, not until it "looks right." Available as `/karpathy` in any Claude Code session.
@@ -106,7 +113,7 @@ Fires between P10 approval and execution. A single Sonnet agent with one job: fi
 A deterministic PreToolUse hook, not a slash command. Wired via `.claude/settings.json`, it evaluates every Write, Edit, NotebookEdit, and Bash call against 5 boundary rules before the call executes: (1) write target matches a frozen path in `.toto/freeze.json`; (2) write target is outside declared project scope; (3) write target filename matches an auth/permission surface pattern; (4) write target is in another tenant's namespace; (5) Bash command contains `rm -rf`, `DROP TABLE`, or `DELETE FROM` without a WHERE clause. No model reasoning — deterministic rule evaluation only. Override requires an explicit reason in `DRS_OVERRIDE_REASON`. Every block and every override is logged to the vault.
 
 **gstack**
-An optional Claude Code skill package built by Garry Tan that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it — the MCP server tools (`council_run`, `p10_plan`) cover the same ground programmatically. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically. gstack is a Claude Code skill, not a CLI binary — there's nothing to add to your shell `$PATH`. Run `./setup --print-gstack-install-prompt` for a ready-to-paste Claude Code prompt that installs or upgrades it.
+An optional Claude Code skill package built by Garry Tan that provides the `/council`, `/p10`, and `/cabinet` slash commands as interactive workflows. toto-wolff works without it: the plugin's own skills (`/llm-council`, `/p10`, `/the-cabinet`) cover the same ground. If you use gstack, the slash commands trigger the full multi-agent chains and write records to your vault automatically. gstack is a Claude Code skill, not a CLI binary, so there's nothing to add to your shell `$PATH`. Run `./setup --print-gstack-install-prompt` for a ready-to-paste Claude Code prompt that installs or upgrades it.
 
 ---
 
@@ -118,7 +125,11 @@ An optional Claude Code skill package built by Garry Tan that provides the `/cou
 - A **Cabinet record `.md`** in `~/.toto/vault/Cabinet/` after every release gate — three Opus seats (Garry Tan, Feynman, Karpathy), any veto blocks the ship
 - A **DRS event log** in `~/.toto/vault/DRS/` whenever the boundary hook fires — every block and every override is recorded with the rule, target, and reason
 - A **signal store** in `~/.toto/vault/Signals/` that feeds past rulings forward into future plans — `toto backfill` seeds it from existing ADRs and P10 plans
-- A **live dashboard** at `http://127.0.0.1:3099/dashboard` showing session counts, blocked plans, and vault records with SSE-backed live stats
+- **Task graphs**: the built-in `idea-to-pr` graph takes an idea through spec, council, RFC or ADR, P10 plan, Safety Car, a Karpathy build loop and the pull request, stopping at every human gate; `/graph-run` drives it and the run survives a closed session
+
+From the repository (manual path), not the plugin:
+
+- A **live dashboard** at `http://127.0.0.1:3099/dashboard` (the repo's `packages/mcp-server`) showing session counts, blocked plans, and vault records with SSE-backed live stats
 - A **`toto` CLI** with 12 commands for vault search, audit, doctor, interactive pit-wall chat via `toto radio`, and in-place upgrades via `toto upgrade`
 
 ---
@@ -127,12 +138,16 @@ An optional Claude Code skill package built by Garry Tan that provides the `/cou
 
 - macOS or Linux, bash ≥ 3.2, git
 - [Claude Code CLI](https://claude.ai/code) installed and authenticated (`claude --version` exits 0)
-- Node.js 24+ and pnpm 11.5.1+ (`node --version`, `pnpm --version`)
-- One of:
+- Node.js 24+ (`node --version`)
+
+The plugin needs nothing else: no API key, no build. The manual path also needs:
+
+- pnpm 11.5.1+ (`pnpm --version`)
+- For the repo server's model-backed tools and the `toto radio` / `toto synthesize` commands, one of:
   - `ANTHROPIC_API_KEY` — personal Anthropic API key
   - `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` — enterprise proxy (e.g. Manifest)
 
-> **API cost:** Each full `/council` session runs 6 Anthropic API calls (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling). Estimated $0.10–$0.30 per session at standard rates.
+> **API cost (repo server only):** each `council_run` call on the repo's `packages/mcp-server` makes 6 Anthropic API calls (2 Haiku scouts + 2 Sonnet analysts + 1 Sonnet brief + 1 Opus ruling), estimated $0.10–$0.30 at standard rates. The plugin's skills run on your Claude Code account instead.
 
 ---
 
@@ -153,6 +168,8 @@ An optional Claude Code skill package built by Garry Tan that provides the `/cou
 
 ## Commands
 
+The `toto` CLI comes with the manual path; the plugin does not install it.
+
 | Command | What it does | Example |
 |---------|-------------|---------|
 | `toto init` | Wire vault dirs and `~/.claude/CLAUDE.md` symlink | `toto init` |
@@ -172,7 +189,25 @@ An optional Claude Code skill package built by Garry Tan that provides the `/cou
 
 ## MCP tools
 
-Register the MCP server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Then these tools are available in every Claude Code session:
+### The plugin (2.0)
+
+The plugin registers its MCP server itself; Claude Code starts it with `node ${CLAUDE_PLUGIN_ROOT}/server/index.mts --vault <Vault folder>`. It has 14 tools and opens no ports:
+
+| Tool | What it does |
+|------|-------------|
+| `vault_write` | Write a record to the vault (`path`, `content`) |
+| `vault_search` | Literal-text search across vault records; returns `{ results, truncated }` |
+| `drs_check` | Check a tool call against the DRS boundary rules |
+| `subagent_list` | List the project's subagents (`.pi/agents`) |
+| `dashboard_status` | Vault record counts, recent items and blocked items, for Claude to summarise |
+| `score_confidence` | Deterministic HIGH/LOW confidence tier for plan provenance, not model reasoning |
+| `graph_list`, `graph_template`, `graph_start`, `graph_next`, `graph_report`, `graph_approve`, `graph_status`, `graph_resume` | Run a task graph one step at a time, with checkpointed state in `.toto/runs/` |
+
+Arguments, results and limits are in [`plugin/README.md`](plugin/README.md).
+
+### The repo's own server (`packages/mcp-server`)
+
+The manual path builds a separate server, with the original 11 tools, five of them model-backed. Register it in `~/.claude.json` under `mcpServers["toto-wolff"]`; its model-backed tools need an Anthropic credential (see [Configuration](#configuration)). Then these tools are available in every Claude Code session:
 
 | Tool | What it does |
 |------|-------------|
@@ -188,16 +223,16 @@ Register the MCP server in `~/.claude.json` under `mcpServers["toto-wolff"]`. Th
 | `dashboard_status` | Return vault stats (`councilCount`, `p10Count`, `blockedCount`) |
 | `score_confidence` | Deterministic HIGH/LOW confidence tier for plan provenance — not model reasoning |
 
-Start the server (the committed, self-contained bundle the plugin ships; `pnpm build` refreshes it):
+Start it after `pnpm build`:
 
 ```bash
-node plugin/server/index.mjs   # binds 127.0.0.1:3099
+pnpm -C packages/mcp-server start   # binds 127.0.0.1:3099
 ```
 
 Override the port:
 
 ```bash
-TOTO_MCP_PORT=4000 node plugin/server/index.mjs
+TOTO_MCP_PORT=4000 pnpm -C packages/mcp-server start
 ```
 
 The server exposes these read-only HTTP endpoints (loopback only — never accessible from outside your machine):
@@ -220,7 +255,9 @@ The server exposes these read-only HTTP endpoints (loopback only — never acces
 
 ## How it works
 
-Three packages in a pnpm workspace. `packages/core` owns shared types, error classes, and 8 distinct services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate), `CabinetService`, `SafetyCarService`, `KarpathyService`, `DRSService`, and `SubagentService`. A second `VaultService.ts` also exists under `packages/core/src/vault/`, exported as `VaultServiceV2`, an in-progress consolidation (not a 9th distinct service) from the `vault-read-api-design` stream: newer CLI commands (`toto report`, `toto synthesize`) use `VaultServiceV2`, while the original `VaultService` remains the primary implementation used by the governance services above. `packages/mcp-server` exposes 11 MCP tools and 5 HTTP endpoints on `127.0.0.1:3099`: loopback only, no LAN exposure, and renders the governance dashboard as server-rendered HTML (no React, no build step at runtime). `packages/cli` is the `toto` binary (12 commands including `toto upgrade` for in-place updates, and `toto dashboard --terminal` for the terminal blocked-items rollup).
+The plugin lives in `plugin/`: its manifest, copies of the skills, and `plugin/server/`, a dependency-free MCP server of readable `.mts` files that Node 24 runs directly, with no build. The server makes no model calls; it reads and writes the vault, checks DRS, and keeps task-graph state, and Claude runs each step. `.claude/skills/` is the source of truth for the skills, and `pnpm sync:plugin` copies them into `plugin/`.
+
+Alongside it, the repository holds its original three packages in a pnpm workspace, which the manual path builds. `packages/core` owns shared types, error classes, and 8 distinct services: `VaultService` (reads/writes flat Markdown + YAML frontmatter files, no database), `CouncilService` (Haiku scouts → Sonnet analysis → Opus ruling via `createAnthropicClient()`), `P10Service` (Skeptic scout + Minimalist scout → Sonnet draft → Opus arbiter with an 8-rule gate), `CabinetService`, `SafetyCarService`, `KarpathyService`, `DRSService`, and `SubagentService`. A second `VaultService.ts` also exists under `packages/core/src/vault/`, exported as `VaultServiceV2`, an in-progress consolidation (not a 9th distinct service) from the `vault-read-api-design` stream: newer CLI commands (`toto report`, `toto synthesize`) use `VaultServiceV2`, while the original `VaultService` remains the primary implementation used by the governance services above. `packages/mcp-server` exposes 11 MCP tools and 5 HTTP endpoints on `127.0.0.1:3099`: loopback only, no LAN exposure, and renders the governance dashboard as server-rendered HTML (no React, no build step at runtime). `packages/cli` is the `toto` binary (12 commands including `toto upgrade` for in-place updates, and `toto dashboard --terminal` for the terminal blocked-items rollup).
 
 The skill stack in `.claude/skills/` governs the full engineering workflow: `/council` for deliberation, `/p10` for pre-execution planning, `/safety-car` for adversarial stress testing of approved plans (CLEAR/DEPLOYED verdicts, single Sonnet agent), `/karpathy` for execution-time quality rules, and `/drs` as a deterministic PreToolUse hook that fires automatically on every Write/Edit/Bash call to enforce frozen paths, auth surfaces, and destructive shell pattern rules. `/cabinet` closes the loop at tagged releases.
 
@@ -229,6 +266,10 @@ The vault is the source of truth: a directory of `.md` files with YAML frontmatt
 ---
 
 ## Configuration
+
+**The plugin** has one setting, **Vault folder** (`vault_path`, required), asked when you enable it and changed in `/plugin` > Configure. It reads no environment variables; DRS reads the project's `.toto/drs-config.json`.
+
+**The repo's CLI and server** (manual path) read these environment variables:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|

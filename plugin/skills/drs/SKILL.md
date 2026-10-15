@@ -6,7 +6,7 @@ version: 1.0.0
 
 # DRS — Drag Reduction System
 
-**This is not a slash command.** DRS fires automatically on every tool call via a PreToolUse hook wired in `.claude/settings.json`. It does not require invocation.
+**This is not a slash command.** In the toto-wolff repository, DRS fires automatically on every tool call via a PreToolUse hook wired in `.claude/settings.json`. The plugin ships no hook: there, call the `drs_check` tool before a mutating action.
 
 **F1 rationale:** In Formula 1, DRS (Drag Reduction System) opens automatically when the delta threshold is met — the driver does not activate it manually, and it is not always open. It has a deterministic condition and a deterministic effect. Same mechanic here: DRS fires when a tool call crosses a defined boundary. No model reasoning. No judgment call. The rule runs; the rule decides.
 
@@ -28,8 +28,7 @@ DRS does NOT evaluate Read, Glob, Grep, or any read-only tool. Of the mutating t
 
 **Action:** HALT. The path is frozen. There is no `toto unfreeze` command. A frozen path changes only through an audited route, with authority:
 
-- **Council ruling, then the unfreeze cycle.** Get a `/council` ruling. Then, on the machine that holds the real `.toto/config.yml` (it is git-ignored, and the tracked `.toto/config.yml.example` has no `drs:` block, so generating from the example would write an empty freeze list), remove the path from `drs.freeze_paths`, run `pnpm generate:drs-config`, make the change, and restore the path and regenerate in the same commit so the tracked `.toto/freeze.json` ends unchanged (unless the ruling unfreezes the path for good). Cite the ruling in the commit or PR.
-- **Audited override.** Set `DRS_OVERRIDE_REASON` (see Override below). The write is allowed and an `OVERRIDDEN` record goes to the vault.
+- In the plugin, DRS runs through the drs_check tool; override with message_before: "override drs: <reason>". That override covers Rules 2 to 4 only, so in the plugin a frozen path changes only after a `/council` ruling. The repository's unfreeze cycle and bash-hook override are documented in `docs/drs-hook.md` in the toto-wolff repository.
 
 An Arbiter-approved P10 plan alone is enough only for the narrow removal-only class in council ruling `2026-09-20-types-ts-freeze-amendment`, and that delegation stays inert until a merge-base CI check for frozen paths exists.
 
@@ -91,11 +90,11 @@ Unless the command includes the literal string `--force-confirmed` anywhere in i
 
 ## Override
 
-There are two distinct override mechanisms, with different scopes. The TS/MCP override cannot bypass Rule 1 (frozen path) or Rule 5 (destructive pattern); the bash-hook override applies to any rule that hook evaluates, Rules 1 and 5 included. Rule 1's freeze list is a small, deliberately curated set that the TS/MCP override shouldn't defeat, and Rule 5 already has its own narrower `--force-confirmed` override on the command itself. The bash-hook override is the audited route to a frozen path (see Rule 1), because every honored use is recorded in the vault.
+The `drs_check` override cannot bypass Rule 1 (frozen path) or Rule 5 (destructive pattern). Rule 1's freeze list is a small, deliberately curated set that the override should not defeat, and Rule 5 already has its own narrower `--force-confirmed` override on the command itself.
 
 **TS/MCP path (`drs_check` tool):** pass `message_before: "override drs: <reason>"` as an argument to the `drs_check` tool call. This bypasses Rules 2/3/4 only (out-of-scope, auth-surface, cross-tenant). The reason is mandatory and is validated (non-empty after trimming, not a placeholder value) before being accepted. Every accepted override writes an audit record to the vault. The override does not suppress the vault write; it adds an `override: true` field and the reason text. If the record can't be written, the override is not honored.
 
-**Bash-hook path (`drs-check.sh`):** set `DRS_OVERRIDE_REASON=<reason>` in the environment. This hook has no message field, so the phrase-in-your-message trigger above only exists on the TS/MCP path, not here. The bash path's override applies to any rule it evaluates (it doesn't distinguish Rule 1/5 the way the TS path does), and is subject to the same non-empty/non-placeholder validation. If the audit record can't be written, the override is not honored and the rule blocks (exit 2).
+In the plugin, DRS runs through the drs_check tool; override with message_before: "override drs: <reason>". The repository's bash hook has its own override, documented in `docs/drs-hook.md` in the toto-wolff repository.
 
 Use overrides for genuine exceptions. Do not use them to unblock yourself from rules you disagree with — use `/council` for that.
 
@@ -133,29 +132,9 @@ All fields are optional. Missing fields disable the corresponding rule.
 
 ---
 
-## Hook wiring
+## Running DRS in the plugin
 
-DRS runs as a PreToolUse hook. Wire it in `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/skills/drs/bin/drs-check.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The hook script reads the tool call from stdin as JSON. Exit 0 = allow. Exit 2 = block.
+In the plugin, DRS runs through the drs_check tool; override with message_before: "override drs: <reason>".
 
 ---
 
@@ -164,7 +143,7 @@ The hook script reads the tool call from stdin as JSON. Exit 0 = allow. Exit 2 =
 Every DRS block (and every override) is written to:
 
 ```
-{VAULT_PATH}/DRS/YYYY-MM-DD-{slug}.md
+${user_config.vault_path}/DRS/YYYY-MM-DD-{slug}.md
 ```
 
 Frontmatter:
@@ -204,12 +183,6 @@ DRS fires on tool calls, not on intent. It does not reason about whether the eng
 
 ## Implementation
 
-The actual rule evaluation runs in `.claude/skills/drs/bin/drs-check.sh`. That script:
+In the plugin, DRS runs through the drs_check tool; override with message_before: "override drs: <reason>".
 
-- Reads the tool call from stdin as JSON
-- Extracts `tool_name` and `tool_input` fields
-- Evaluates the rules that apply to that tool (see What DRS does)
-- If any rule fires: writes a DRS vault record, prints the block reason to stderr, exits 2
-- If no rule fires: exits 0 (allow)
-
-Rules 1 and 5 are fully implementable in shell (file existence check + grep). Rules 2, 3, and 4 require the config files to be present — if the config is absent, those rules do not fire. This ensures DRS works on fresh installs without configuration.
+The repository's own bash hook and its implementation are documented in `docs/drs-hook.md` in the toto-wolff repository.

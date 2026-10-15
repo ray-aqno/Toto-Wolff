@@ -1,0 +1,138 @@
+name: Publish plugin
+
+# Copies a release tag's plugin/ folder onto branch `plugin` (the folder the
+# Claude plugin directory installs from) as one forward commit,
+# "release <tag>". Never forced: branch `plugin` only moves forward, and a
+# rollback is a dispatch with an older tag (a new forward commit).
+# The logic is scripts/publish-plugin.sh (tested in scripts/publish-plugin.test.ts);
+# RELEASE.md has the order: merge, tag, dry run, release, Validate.
+# One dispatch at a time: a newer queued run replaces an older queued one.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (vX.Y.Z, on main)"
+        required: true
+        type: string
+      dry_run:
+        description: "Do everything but the push (git push --dry-run), then show the commit"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-plugin
+  cancel-in-progress: false
+
+jobs:
+  # Read-only: installs dependencies and checks the release, with no write token.
+  gate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - name: Validate the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          tag="${INPUT_TAG:-$RELEASE_TAG}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::not a release tag (vX.Y.Z): $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the tag is a release of main
+        id: check
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$TAG is not on main"
+            exit 1
+          fi
+          if [ "v$(cat VERSION)" != "$TAG" ]; then
+            echo "::error::VERSION $(cat VERSION) does not match $TAG"
+            exit 1
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "$TAG is $(git rev-parse HEAD)"
+
+      - uses: pnpm/action-setup@0c17529a66aca453f9227af23103ed11469b1e47  # v4.0.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Check the plugin folder
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm check:plugin-sync
+
+  # Write access, but no dependency install: only git and the script run here.
+  publish:
+    needs: gate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          path: src
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version-file: src/.nvmrc
+
+      - name: Commit the release onto branch plugin
+        env:
+          TAG: ${{ needs.gate.outputs.tag }}
+          SHA: ${{ needs.gate.outputs.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          basic=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          echo "::add-mask::$basic"
+          # The token reaches git through its environment config, never argv.
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic"
+          url="https://github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$url" plugin > /dev/null; then
+            git clone --quiet --single-branch --branch plugin "$url" dest
+          else
+            git init --quiet -b plugin dest
+            git -C dest remote add origin "$url"
+          fi
+          echo "Publishing $TAG ($SHA)"
+          bash src/scripts/publish-plugin.sh "$TAG" src/plugin dest
+          git -C dest log -1 --stat --format='%h %s'
+          if [ "$DRY_RUN" = "true" ]; then
+            git -C dest push --dry-run origin HEAD:refs/heads/plugin
+            echo "Dry run: nothing was pushed."
+          else
+            git -C dest push origin HEAD:refs/heads/plugin
+          fi

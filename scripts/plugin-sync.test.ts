@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -10,11 +12,13 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
-  BUNDLE_BANNER,
+  ICON_REL,
   MAX_FILE_BYTES,
-  PACKAGES,
+  MAX_LINE_CHARS,
+  SKILL_EXCLUDES,
   assertNoSymlink,
   assertUnderRoot,
   checkPluginLayout,
@@ -23,25 +27,34 @@ import {
   listTree,
   readSkillList,
   removeTree,
+  checkLicenseAndIcon,
+  isCompletePng,
+  syncLicense,
   syncSkills,
 } from './plugin-sync-lib.js';
 
 const SKILLS = ['drs', 'p10'];
 let root: string;
 
-/** Builds a fixture repo: two source skills (drs has an executable script), a manifest and a bundle. */
+/**
+ * Builds a fixture repo: two source skills, a manifest and a server entry.
+ * drs has the repository-only bin/drs-check.sh (SKILL_EXCLUDES keeps it out
+ * of the plugin); p10 has an executable script that is copied.
+ */
 function makeFixture(): string {
   const dir = mkdtempSync(join(tmpdir(), 'plugin-sync-test-'));
   mkdirSync(join(dir, '.claude', 'skills', 'drs', 'bin'), { recursive: true });
   writeFileSync(join(dir, '.claude', 'skills', 'drs', 'SKILL.md'), '---\nname: drs\ndescription: d\n---\n');
   writeFileSync(join(dir, '.claude', 'skills', 'drs', 'bin', 'drs-check.sh'), '#!/bin/sh\nexit 0\n');
   chmodSync(join(dir, '.claude', 'skills', 'drs', 'bin', 'drs-check.sh'), 0o755);
-  mkdirSync(join(dir, '.claude', 'skills', 'p10'), { recursive: true });
+  mkdirSync(join(dir, '.claude', 'skills', 'p10', 'bin'), { recursive: true });
   writeFileSync(join(dir, '.claude', 'skills', 'p10', 'SKILL.md'), '---\nname: p10\ndescription: p\n---\n');
+  writeFileSync(join(dir, '.claude', 'skills', 'p10', 'bin', 'run.sh'), '#!/bin/sh\nexit 0\n');
+  chmodSync(join(dir, '.claude', 'skills', 'p10', 'bin', 'run.sh'), 0o755);
   mkdirSync(join(dir, 'plugin', '.claude-plugin'), { recursive: true });
   writeManifest(dir, SKILLS.map((s) => `./skills/${s}`));
   mkdirSync(join(dir, 'plugin', 'server'), { recursive: true });
-  writeFileSync(join(dir, 'plugin', 'server', 'index.mjs'), `${BUNDLE_BANNER} from "node:module";\nconsole.log(1);\n`);
+  writeFileSync(join(dir, 'plugin', 'server', 'index.mts'), "import process from 'node:process';\nvoid process;\n");
   return dir;
 }
 
@@ -62,26 +75,45 @@ afterEach(() => {
 });
 
 describe('a freshly synced plugin folder', () => {
-  it('passes every check and keeps the exec bit on drs-check.sh', () => {
+  it('passes every check and keeps the exec bit on a copied script', () => {
     expect(problems()).toEqual([]);
-    expect(statSync(join(root, 'plugin', 'skills', 'drs', 'bin', 'drs-check.sh')).mode & 0o111).not.toBe(0);
+    expect(statSync(join(root, 'plugin', 'skills', 'p10', 'bin', 'run.sh')).mode & 0o111).not.toBe(0);
+  });
+});
+
+describe('the repository-only drs hook script (SKILL_EXCLUDES)', () => {
+  it('is not copied into the plugin, and its absence is not drift', () => {
+    expect(SKILL_EXCLUDES['drs']).toEqual(['bin/']);
+    expect(existsSync(join(root, 'plugin', 'skills', 'drs', 'bin'))).toBe(false);
+    expect(existsSync(join(root, 'plugin', 'skills', 'drs', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(root, '.claude', 'skills', 'drs', 'bin', 'drs-check.sh'))).toBe(true);
+    expect(checkSkillCopies(root, SKILLS)).toEqual([]);
+  });
+
+  it('is removed from a plugin copy by the next sync, and reported as extra until then', () => {
+    mkdirSync(join(root, 'plugin', 'skills', 'drs', 'bin'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'skills', 'drs', 'bin', 'drs-check.sh'), '#!/bin/sh\nexit 0\n');
+    expect(checkSkillCopies(root, SKILLS)).toContain('skills/drs/bin/drs-check.sh: extra');
+    syncSkills(root, SKILLS);
+    expect(existsSync(join(root, 'plugin', 'skills', 'drs', 'bin'))).toBe(false);
+    expect(checkSkillCopies(root, SKILLS)).toEqual([]);
   });
 });
 
 describe('drift in a skill copy is caught', () => {
-  const copied = (): string => join(root, 'plugin', 'skills', 'drs', 'bin', 'drs-check.sh');
+  const copied = (): string => join(root, 'plugin', 'skills', 'p10', 'bin', 'run.sh');
 
   it('flipped byte', () => {
     writeFileSync(copied(), '#!/bin/sh\nexit 1\n');
-    expect(problems()).toContain('skills/drs/bin/drs-check.sh: bytes');
+    expect(problems()).toContain('skills/p10/bin/run.sh: bytes');
   });
   it('lost exec bit', () => {
     chmodSync(copied(), 0o644);
-    expect(problems()).toContain('skills/drs/bin/drs-check.sh: mode');
+    expect(problems()).toContain('skills/p10/bin/run.sh: mode');
   });
   it('deleted file', () => {
     unlinkSync(copied());
-    expect(problems()).toContain('skills/drs/bin/drs-check.sh: missing');
+    expect(problems()).toContain('skills/p10/bin/run.sh: missing');
   });
   it('extra file in a skill', () => {
     writeFileSync(join(root, 'plugin', 'skills', 'p10', 'stray.md'), 'x');
@@ -91,24 +123,45 @@ describe('drift in a skill copy is caught', () => {
 
 describe('the plugin folder layout is enforced', () => {
   it('extra top-level file', () => {
-    writeFileSync(join(root, 'plugin', 'README.md'), 'x');
-    expect(problems()).toContain('not allowed in the plugin folder: README.md');
+    writeFileSync(join(root, 'plugin', 'NOTES.md'), 'x');
+    expect(problems()).toContain('not allowed in the plugin folder: NOTES.md');
+  });
+  it('a README.md at the plugin root is allowed', () => {
+    writeFileSync(join(root, 'plugin', 'README.md'), '# plugin\n');
+    expect(problems()).toEqual([]);
+  });
+  it('a README.md anywhere else is not', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'README.md'), 'x');
+    expect(problems()).toContain('only readable .mts files may ship under server/: server/README.md');
   });
   it('symlink in the plugin folder', () => {
     symlinkSync(join(root, '.claude', 'skills', 'p10'), join(root, 'plugin', 'skills', 'linked'));
     expect(() => problems()).toThrow(/symlink/);
   });
-  it('file over the 1 MiB inspection limit', () => {
-    writeFileSync(join(root, 'plugin', 'server', 'index.mjs'), `${BUNDLE_BANNER}\n${'x'.repeat(MAX_FILE_BYTES)}`);
-    expect(problems().some((p) => p.startsWith(`over ${String(MAX_FILE_BYTES)} bytes`))).toBe(true);
+  it('file at the 256 KiB per-file limit', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'index.mts'), 'x'.repeat(MAX_FILE_BYTES));
+    expect(problems()).toContain(`not under ${String(MAX_FILE_BYTES)} bytes (the directory's per-file limit): server/index.mts`);
   });
-  it('missing bundle', () => {
-    unlinkSync(join(root, 'plugin', 'server', 'index.mjs'));
-    expect(problems()).toContain('missing bundle: server/index.mjs');
+  it('a file just under the limit passes', () => {
+    // In lines (999 characters plus a newline), so only the size is tested, not the minified guard.
+    const lines = `${'x'.repeat(999)}\n`.repeat(Math.floor((MAX_FILE_BYTES - 1) / 1000));
+    writeFileSync(join(root, 'plugin', 'server', 'index.mts'), lines + 'x'.repeat(MAX_FILE_BYTES - 1 - lines.length));
+    expect(statSync(join(root, 'plugin', 'server', 'index.mts')).size).toBe(MAX_FILE_BYTES - 1);
+    expect(problems()).toEqual([]);
   });
-  it('bundle bundled twice (two banners)', () => {
-    writeFileSync(join(root, 'plugin', 'server', 'index.mjs'), `${BUNDLE_BANNER};\n${BUNDLE_BANNER};\n`);
-    expect(problems().some((p) => p.includes('2 esbuild banners'))).toBe(true);
+  it('missing server entry', () => {
+    unlinkSync(join(root, 'plugin', 'server', 'index.mts'));
+    expect(problems()).toContain('missing server entry: server/index.mts');
+  });
+  it.each(['index.mjs', 'package.json', 'helper.ts', 'mcp/util.js'])('non-.mts file under server/: %s', (name) => {
+    mkdirSync(join(root, 'plugin', 'server', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'server', name), 'x');
+    expect(problems()).toContain(`only readable .mts files may ship under server/: server/${name}`);
+  });
+  it('nested .mts modules under server/ are allowed', () => {
+    mkdirSync(join(root, 'plugin', 'server', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'server', 'mcp', 'protocol.mts'), 'export {};\n');
+    expect(problems()).toEqual([]);
   });
 });
 
@@ -133,6 +186,7 @@ describe('sources and manifests are validated', () => {
   });
   it('an empty skill directory is refused', () => {
     rmSync(join(root, '.claude', 'skills', 'p10', 'SKILL.md'));
+    rmSync(join(root, '.claude', 'skills', 'p10', 'bin'), { recursive: true });
     expect(() => syncSkills(root, SKILLS)).toThrow(/no files/);
   });
 });
@@ -158,8 +212,87 @@ describe('path guards', () => {
   });
 });
 
-describe('PACKAGES', () => {
-  it('is core then mcp-server (core must build first)', () => {
-    expect(PACKAGES).toEqual(['core', 'mcp-server']);
+// A minimal complete PNG: signature, a 1x1 IHDR, IEND (CRCs are not checked).
+const PNG = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.from([0, 0, 0, 13]), Buffer.from('IHDR', 'latin1'), Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]), Buffer.alloc(4),
+  Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]),
+]);
+
+describe('spec criterion 2 and the shipped icon and LICENSE (#64)', () => {
+  it('allows a PNG icon and a LICENSE at their paths', () => {
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG);
+    writeFileSync(join(root, 'plugin', 'LICENSE'), 'MIT\n');
+    expect(problems()).toEqual([]);
+  });
+  it('refuses an icon that is not a PNG, or is executable', () => {
+    writeFileSync(join(root, 'plugin', ICON_REL), 'not a png');
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG.subarray(0, PNG.length - 12));
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG.subarray(0, 13));
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    // Full length, but the last chunk is not IEND (cut off and padded).
+    writeFileSync(join(root, 'plugin', ICON_REL), Buffer.concat([PNG.subarray(0, PNG.length - 12), Buffer.alloc(12)]));
+    expect(problems()).toContain(`not a complete PNG file: ${ICON_REL}`);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG);
+    chmodSync(join(root, 'plugin', ICON_REL), 0o755);
+    expect(problems()).toContain(`the icon must not be executable: ${ICON_REL}`);
+  });
+  it('exempts only the icon from the line scan (not any file starting with PNG bytes)', () => {
+    writeFileSync(join(root, 'plugin', 'server', 'x.mts'), Buffer.concat([PNG, Buffer.from('a'.repeat(MAX_LINE_CHARS + 1))]));
+    expect(problems().some((p) => p.includes('looks minified') && p.endsWith('x.mts'))).toBe(true);
+  });
+  it(`refuses a line longer than ${String(MAX_LINE_CHARS)} characters, accepts one at the limit`, () => {
+    writeFileSync(join(root, 'plugin', 'server', 'x.mts'), `${'a'.repeat(MAX_LINE_CHARS)}\n`);
+    expect(problems()).toEqual([]);
+    writeFileSync(join(root, 'plugin', 'server', 'x.mts'), `${'a'.repeat(MAX_LINE_CHARS + 1)}\n`);
+    expect(problems()).toContain(`a line of ${String(MAX_LINE_CHARS + 1)} characters looks minified (limit ${String(MAX_LINE_CHARS)}): server/x.mts`);
+  });
+  it.each([['package.json'], ['pnpm-lock.yaml'], ['yarn.lock'], ['package-lock.json'], ['bun.lockb']])('refuses %s anywhere, even inside a skill', (name) => {
+    writeFileSync(join(root, '.claude', 'skills', 'drs', name), '{}');
+    syncSkills(root, SKILLS);
+    expect(problems()).toContain(`no package manifest or lockfile may ship: skills/drs/${name}`);
+  });
+  it('refuses a .min. file, but lock.mts (a real server file) is fine (Arbiter condition 1)', () => {
+    writeFileSync(join(root, '.claude', 'skills', 'drs', 'app.min.js'), 'x');
+    syncSkills(root, SKILLS);
+    expect(problems()).toContain('no minified file may ship: skills/drs/app.min.js');
+    rmSync(join(root, '.claude', 'skills', 'drs', 'app.min.js'));
+    syncSkills(root, SKILLS);
+    writeFileSync(join(root, 'plugin', 'server', 'lock.mts'), 'export {};\n');
+    expect(problems()).toEqual([]);
+  });
+  it('syncs LICENSE from the root and flags a copy that differs', () => {
+    writeFileSync(join(root, 'LICENSE'), 'MIT License\n');
+    syncLicense(root);
+    writeFileSync(join(root, 'plugin', ICON_REL), PNG);
+    expect(checkLicenseAndIcon(root)).toEqual([]);
+    writeFileSync(join(root, 'plugin', 'LICENSE'), 'changed\n');
+    expect(checkLicenseAndIcon(root)).toEqual(['plugin/LICENSE must be a byte copy of the root LICENSE']);
+  });
+});
+
+describe('the icon (PR #72 review)', () => {
+  it('must exist: a deleted icon is a problem', () => {
+    writeFileSync(join(root, 'LICENSE'), 'MIT License\n');
+    syncLicense(root);
+    expect(checkLicenseAndIcon(root)).toEqual(['plugin/.claude-plugin/icon.png is missing']);
+  });
+  it('the real icon is a complete PNG', () => {
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    expect(isCompletePng(readFileSync(join(repo, 'plugin', ICON_REL)))).toBe(true);
+  });
+});
+
+describe('spec criterion 10: the marketplace on main installs a valid plugin (Arbiter condition 6)', () => {
+  it("resolves marketplace.json's source to a folder that passes the layout check", () => {
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    const market = JSON.parse(readFileSync(join(repo, '.claude-plugin', 'marketplace.json'), 'utf-8')) as { plugins: { name: string; source: string }[] };
+    const entry = market.plugins.find((p) => p.name === 'toto-wolff');
+    expect(entry?.source).toBe('./plugin');
+    const folder = join(repo, entry?.source ?? '');
+    const skills = readSkillList(join(folder, '.claude-plugin', 'plugin.json'));
+    expect(checkPluginLayout(folder, skills)).toEqual([]);
   });
 });

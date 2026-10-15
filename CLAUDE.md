@@ -292,13 +292,15 @@ claude plugin marketplace add <owner>/Toto-Wolff
 claude plugin install toto-wolff@toto-wolff
 ```
 
-The plugin ships from `plugin/` only (the marketplace source is `./plugin`): its manifest, copies of the listed skills from `.claude/skills/`, and `plugin/server/index.mjs`, a committed, minified esbuild bundle. It launches the server via `node ${CLAUDE_PLUGIN_ROOT}/server/index.mjs`: no `pnpm install`/build step required before first use. `.claude/skills/` stays the source of truth; `pnpm sync:plugin` regenerates `plugin/` and CI's `check:plugin-sync` fails if the committed copy is stale. See `RELEASE.md`.
+The plugin ships from `plugin/` only (the marketplace source is `./plugin`): its manifest, copies of the listed skills from `.claude/skills/`, and `plugin/server/`, readable `.mts` files that Node 24 runs directly (no bundle, no build step). It launches the server via `node ${CLAUDE_PLUGIN_ROOT}/server/index.mts --vault ${user_config.vault_path}`: the Vault folder setting is required, and the project is the folder Claude Code starts the server in. `.claude/skills/` stays the source of truth; `pnpm sync:plugin` regenerates `plugin/` and CI's `check:plugin-sync` fails if the committed copy is stale. See `RELEASE.md`.
 
-**Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]`. The committed bundle runs as-is; run `pnpm build` first only if you changed server or core source.
+**Fallback install path (manual wiring):** still supported for development on this repo directly, or for hosts that don't support plugin marketplaces yet. Register the server in `~/.claude.json` under `mcpServers["toto-wolff"]` and pass your vault folder with `--vault`: the server exits at startup without one. There is nothing to build.
 
-Start command (manual path): `node <repo>/plugin/server/index.mjs`
+Start command (manual path): `node <repo>/plugin/server/index.mts --vault <vault folder>`
 
 ## Credentials (required)
+
+This section covers the 1.x server in `packages/mcp-server`. The 2.0 plugin server makes no model calls and takes no credentials.
 
 The server calls the Anthropic API and exits if no credentials are present
 (`AssertionError: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN must be set and non-empty (checked plugin userConfig, shell environment and ~/.claude.json mcpServers.toto-wolff.env)`).
@@ -318,7 +320,7 @@ Manual wiring (fallback path), never committing a real token to this repo:
 "toto-wolff": {
   "type": "stdio",
   "command": "node",
-  "args": ["<repo>/plugin/server/index.mjs"],
+  "args": ["<repo>/packages/mcp-server/dist/index.js"],
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:2099",
     "ANTHROPIC_AUTH_TOKEN": "<your-manifest-token>"

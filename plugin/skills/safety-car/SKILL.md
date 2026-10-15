@@ -23,7 +23,7 @@ Safety car closes that gap. One adversarial Sonnet agent reads the approved plan
 Load the referenced P10 plan from the vault:
 
 ```
-{VAULT_PATH}/P10-Plans/[plan-filename].md
+${user_config.vault_path}/P10-Plans/[plan-filename].md
 ```
 
 If no specific plan is referenced, check for the most recent plan with `status: approved`. If no approved plan exists, halt and ask the engineer to run `/p10` first.
@@ -78,7 +78,7 @@ LOW and MEDIUM risks do not trigger DEPLOYED on their own. They are surfaced for
 Write the full report to:
 
 ```
-{VAULT_PATH}/Safety-Car/YYYY-MM-DD-[plan-slug].md
+${user_config.vault_path}/Safety-Car/YYYY-MM-DD-[plan-slug].md
 ```
 
 Frontmatter:
@@ -120,7 +120,7 @@ Risks:
 [If CLEAR]: Execution authorized. Proceed with karpathy.
 [If DEPLOYED]: Execution halted. Resolve the HIGH/CRITICAL risks above before proceeding.
 
-Record: {VAULT_PATH}/Safety-Car/YYYY-MM-DD-[slug].md
+Record: ${user_config.vault_path}/Safety-Car/YYYY-MM-DD-[slug].md
 ```
 
 ---
